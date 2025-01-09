@@ -179,6 +179,7 @@ impl<'info> CreateSwap<'info> {
             self.store_program.to_account_info(),
             CreateOrder {
                 owner: self.receiver.to_account_info(),
+                receiver: self.receiver.to_account_info(),
                 store: self.store.to_account_info(),
                 market: self.market.to_account_info(),
                 user: self.user.to_account_info(),
@@ -321,6 +322,7 @@ impl<'info> CancelSwap<'info> {
                 store: self.store.to_account_info(),
                 store_wallet: self.store_wallet.to_account_info(),
                 owner: self.receiver.to_account_info(),
+                receiver: self.receiver.to_account_info(),
                 rent_receiver: self.receiver.to_account_info(),
                 user: self.user.to_account_info(),
                 referrer_user: None,

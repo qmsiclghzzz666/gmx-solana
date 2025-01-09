@@ -12,7 +12,7 @@ use anchor_client::{
 
 use gmsol_model::{price::Prices, PnlFactorKind};
 use gmsol_store::states::{
-    deposit::find_first_deposit_owner_pda, market::status::MarketStatus, position::PositionKind,
+    deposit::find_first_deposit_receiver_pda, market::status::MarketStatus, position::PositionKind,
     user::ReferralCodeBytes, NonceBytes, PriceProviderKind,
 };
 use gmsol_timelock::states::utils::InstructionBuffer;
@@ -294,7 +294,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
 
     /// Find first deposit owner address.
     pub fn find_first_deposit_owner_address(&self) -> Pubkey {
-        find_first_deposit_owner_pda(self.store_program_id()).0
+        find_first_deposit_receiver_pda(self.store_program_id()).0
     }
 
     /// Find DPA for withdrawal account.

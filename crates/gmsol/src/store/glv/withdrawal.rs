@@ -46,6 +46,7 @@ pub struct CreateGlvWithdrawalBuilder<'a, C> {
     glv_token_source: Option<Pubkey>,
     hint: Option<CreateGlvWithdrawalHint>,
     should_unwrap_native_token: bool,
+    receiver: Pubkey,
 }
 
 /// Hint for [`CreateGlvWithdrawalBuilder`]
@@ -91,6 +92,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
             glv_token_source: None,
             hint: None,
             should_unwrap_native_token: true,
+            receiver: client.payer(),
         }
     }
 
@@ -141,6 +143,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
         self
     }
 
+    /// Set receiver.
+    /// Defaults to the payer.
+    pub fn receiver(&mut self, receiver: Pubkey) -> &mut Self {
+        self.receiver = receiver;
+        self
+    }
+
     fn market_address(&self) -> Pubkey {
         self.client
             .find_market_address(&self.store, &self.market_token)
@@ -165,6 +174,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
 
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let owner = self.client.payer();
+        let receiver = self.receiver;
         let glv_withdrawal = self
             .client
             .find_glv_withdrawal_address(&self.store, &owner, &nonce);
@@ -209,14 +219,14 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
         let mut prepare = self.client.prepare_associated_token_account(
             &final_long_token,
             &token_program_id,
-            None,
+            Some(&receiver),
         );
 
         // Prepare the ATA for receiving final short tokens.
         prepare = prepare.merge(self.client.prepare_associated_token_account(
             &final_short_token,
             &token_program_id,
-            None,
+            Some(&receiver),
         ));
 
         // Prepare the escrow account for GLV tokens.
@@ -251,6 +261,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
             .store_rpc()
             .accounts(accounts::CreateGlvWithdrawal {
                 owner,
+                receiver,
                 store: self.store,
                 market,
                 glv,
@@ -318,6 +329,7 @@ pub struct CloseGlvWithdrawalBuilder<'a, C> {
 pub struct CloseGlvWithdrawalHint {
     store: Pubkey,
     owner: Pubkey,
+    receiver: Pubkey,
     glv_token: Pubkey,
     market_token: Pubkey,
     final_long_token: Pubkey,
@@ -335,6 +347,7 @@ impl CloseGlvWithdrawalHint {
         Self {
             store: *glv_withdrawal.header().store(),
             owner: *glv_withdrawal.header().owner(),
+            receiver: *glv_withdrawal.header().receiver(),
             glv_token: glv_withdrawal.tokens().glv_token(),
             market_token: glv_withdrawal.tokens().market_token(),
             final_long_token: glv_withdrawal.tokens().final_long_token(),
@@ -407,13 +420,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvWithdrawalBuilder<'a, C
             &glv_token_program_id,
         );
         let final_long_token_ata = get_ata_or_owner_with_program_id(
-            &hint.owner,
+            &hint.receiver,
             &hint.final_long_token,
             hint.should_unwrap_native_token,
             &token_program_id,
         );
         let final_short_token_ata = get_ata_or_owner_with_program_id(
-            &hint.owner,
+            &hint.receiver,
             &hint.final_short_token,
             hint.should_unwrap_native_token,
             &token_program_id,
@@ -427,6 +440,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvWithdrawalBuilder<'a, C
                 store: hint.store,
                 store_wallet: self.client.find_store_wallet_address(&hint.store),
                 owner: hint.owner,
+                receiver: hint.receiver,
                 glv_withdrawal: self.glv_withdrawal,
                 market_token: hint.market_token,
                 final_long_token: hint.final_long_token,

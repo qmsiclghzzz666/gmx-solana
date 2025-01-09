@@ -140,12 +140,14 @@ async fn balanced_pool_withdrawal() -> eyre::Result<()> {
             .expect("must exist");
 
         // Withdraw.
+        let receiver = keeper.payer();
         let (rpc, withdrawal) = client
             .create_withdrawal(store, market_token, market_token_before_withdarwal)
+            .receiver(receiver)
             .build_with_address()
             .await?;
         let signature = rpc.send().await?;
-        tracing::info!(%withdrawal, %signature, "created a withdrawal");
+        tracing::info!(%withdrawal, %signature, %receiver, "created a withdrawal with receiver");
 
         let mut builder = keeper.execute_withdrawal(store, oracle, &withdrawal, false);
         deployment

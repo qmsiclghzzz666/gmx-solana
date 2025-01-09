@@ -35,6 +35,9 @@ pub struct CreateWithdrawal<'info> {
     /// The owner.
     #[account(mut)]
     pub owner: Signer<'info>,
+    /// The receiver of the output funds.
+    /// CHECK: only the address is used.
+    pub receiver: UncheckedAccount<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
     /// Market.
@@ -119,6 +122,7 @@ impl<'info> internal::Create<'info, Withdrawal> for CreateWithdrawal<'info> {
             .market(self.market.clone())
             .store(self.store.clone())
             .owner(&self.owner)
+            .receiver(&self.receiver)
             .nonce(nonce)
             .bump(bumps.withdrawal)
             .final_long_token(&self.final_long_token_escrow)
@@ -175,9 +179,13 @@ pub struct CloseWithdrawal<'info> {
     #[account(mut, seeds = [Store::WALLET_SEED, store.key().as_ref()], bump)]
     pub store_wallet: SystemAccount<'info>,
     /// The owner of the withdrawal.
-    /// CHECK: only use to validate and receive fund.
+    /// CHECK: only use to validate and receive input funds.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
+    /// The receiver of the withdrawal.
+    /// CHECK: only use to validate and receive output funds.
+    #[account(mut)]
+    pub receiver: UncheckedAccount<'info>,
     /// Market token.
     #[account(
         constraint = withdrawal.load()?.tokens.market_token() == market_token.key() @ CoreError::MarketTokenMintMismatched
@@ -193,6 +201,7 @@ pub struct CloseWithdrawal<'info> {
     #[account(
         mut,
         constraint = withdrawal.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
+        constraint = withdrawal.load()?.header.receiver == receiver.key() @ CoreError::ReceiverMismatched,
         // The rent receiver of a withdrawal must be the owner.
         constraint = withdrawal.load()?.header.rent_receiver() == owner.key @ CoreError::RentReceiverMismatched,
         constraint = withdrawal.load()?.header.store == store.key() @ CoreError::StoreMismatched,
@@ -222,25 +231,25 @@ pub struct CloseWithdrawal<'info> {
         associated_token::authority = withdrawal,
     )]
     pub final_short_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The ATA for market token of owner.
+    /// The ATA for market token of the owner.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
         constraint = is_associated_token_account(market_token_ata.key, owner.key, &market_token.key()) @ CoreError::NotAnATA,
     )]
     pub market_token_ata: UncheckedAccount<'info>,
-    /// The ATA for final long token of owner.
+    /// The ATA for final long token of the receiver.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account_or_owner(final_long_token_ata.key, owner.key, &final_long_token.key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(final_long_token_ata.key, receiver.key, &final_long_token.key()) @ CoreError::NotAnATA,
     )]
     pub final_long_token_ata: UncheckedAccount<'info>,
-    /// The ATA for final short token of owner.
+    /// The ATA for final short token of the receiver.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account_or_owner(final_short_token_ata.key, owner.key, &final_short_token.key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(final_short_token_ata.key, receiver.key, &final_short_token.key()) @ CoreError::NotAnATA,
     )]
     pub final_short_token_ata: UncheckedAccount<'info>,
     /// The system program.
@@ -296,7 +305,6 @@ impl<'info> internal::Close<'info, Withdrawal> for CloseWithdrawal<'info> {
             .token_program(self.token_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
             .payer(self.executor.to_account_info())
-            .owner(self.owner.to_account_info())
             .escrow_authority(self.withdrawal.to_account_info())
             .escrow_authority_seeds(&seeds)
             .init_if_needed(init_if_needed)
@@ -315,6 +323,7 @@ impl<'info> internal::Close<'info, Withdrawal> for CloseWithdrawal<'info> {
             .decimals(self.market_token.decimals)
             .ata(self.market_token_ata.to_account_info())
             .escrow(self.market_token_escrow.to_account_info())
+            .owner(self.owner.to_account_info())
             .build()
             .unchecked_execute()?
         {
@@ -328,6 +337,7 @@ impl<'info> internal::Close<'info, Withdrawal> for CloseWithdrawal<'info> {
             .decimals(self.final_long_token.decimals)
             .ata(self.final_long_token_ata.to_account_info())
             .escrow(self.final_long_token_escrow.to_account_info())
+            .owner(self.receiver.to_account_info())
             .build()
             .unchecked_execute()?
         {
@@ -342,6 +352,7 @@ impl<'info> internal::Close<'info, Withdrawal> for CloseWithdrawal<'info> {
                 .decimals(self.final_short_token.decimals)
                 .ata(self.final_short_token_ata.to_account_info())
                 .escrow(self.final_short_token_escrow.to_account_info())
+                .owner(self.receiver.to_account_info())
                 .build()
                 .unchecked_execute()?
             {

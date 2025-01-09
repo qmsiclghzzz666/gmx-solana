@@ -47,7 +47,7 @@ pub struct CreateGlvDepositBuilder<'a, C> {
     min_market_token_amount: u64,
     min_glv_token_amount: u64,
     max_execution_lamports: u64,
-    owner: Option<Pubkey>,
+    receiver: Option<Pubkey>,
     nonce: Option<NonceBytes>,
     market_token_source: Option<Pubkey>,
     initial_long_token_source: Option<Pubkey>,
@@ -96,7 +96,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
             min_market_token_amount: 0,
             min_glv_token_amount: 0,
             max_execution_lamports: GlvDeposit::MIN_EXECUTION_LAMPORTS,
-            owner: None,
+            receiver: None,
             nonce: None,
             market_token_source: None,
             initial_long_token_source: None,
@@ -168,10 +168,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         self
     }
 
-    /// Set Owner.
+    /// Set Receiver.
     /// Defaults to the payer.
-    pub fn owner(&mut self, owner: Option<Pubkey>) -> &mut Self {
-        self.owner = owner;
+    pub fn receiver(&mut self, receiver: Option<Pubkey>) -> &mut Self {
+        self.receiver = receiver;
         self
     }
 
@@ -204,8 +204,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         let hint = self.prepare_hint().await?;
 
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
-        let payer = self.client.payer();
-        let owner = self.owner.unwrap_or(payer);
+        let owner = self.client.payer();
+        let receiver = self.receiver.unwrap_or(owner);
         let glv_deposit = self
             .client
             .find_glv_deposit_address(&self.store, &owner, &nonce);
@@ -238,7 +238,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         let mut prepare = self.client.prepare_associated_token_account(
             &self.glv_token,
             &glv_token_program_id,
-            Some(&owner),
+            Some(&receiver),
         );
 
         // Prepare the escrow account for GLV tokens.
@@ -258,7 +258,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         if self.market_token_amount != 0 {
             market_token_source = Some(self.market_token_source.unwrap_or_else(|| {
                 get_associated_token_address_with_program_id(
-                    &payer,
+                    &owner,
                     &self.market_token,
                     &token_program_id,
                 )
@@ -269,7 +269,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
             let token = self.initial_long_token.unwrap_or(hint.long_token_mint);
             initial_long_token = Some(token);
             initial_long_token_source = Some(self.initial_long_token_source.unwrap_or_else(|| {
-                get_associated_token_address_with_program_id(&payer, &token, &token_program_id)
+                get_associated_token_address_with_program_id(&owner, &token, &token_program_id)
             }));
             initial_long_token_escrow = Some(get_associated_token_address_with_program_id(
                 &glv_deposit,
@@ -290,7 +290,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
             initial_short_token = Some(token);
             initial_short_token_source =
                 Some(self.initial_short_token_source.unwrap_or_else(|| {
-                    get_associated_token_address_with_program_id(&payer, &token, &token_program_id)
+                    get_associated_token_address_with_program_id(&owner, &token, &token_program_id)
                 }));
             initial_short_token_escrow = Some(get_associated_token_address_with_program_id(
                 &glv_deposit,
@@ -311,8 +311,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
             .store_rpc()
             .accounts(fix_optional_account_metas(
                 accounts::CreateGlvDeposit {
-                    payer,
                     owner,
+                    receiver,
                     store: self.store,
                     market,
                     glv,
@@ -387,6 +387,7 @@ pub struct CloseGlvDepositBuilder<'a, C> {
 pub struct CloseGlvDepositHint {
     store: Pubkey,
     owner: Pubkey,
+    receiver: Pubkey,
     glv_token: Pubkey,
     market_token: Pubkey,
     initial_long_token: Option<Pubkey>,
@@ -404,6 +405,7 @@ impl CloseGlvDepositHint {
         Self {
             store: *glv_deposit.header().store(),
             owner: *glv_deposit.header().owner(),
+            receiver: *glv_deposit.header().receiver(),
             glv_token: glv_deposit.tokens().glv_token(),
             market_token: glv_deposit.tokens().market_token(),
             initial_long_token: glv_deposit.tokens().initial_long_token.token(),
@@ -471,7 +473,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvDepositBuilder<'a, C> {
             &token_program_id,
         );
         let glv_token_ata = get_associated_token_address_with_program_id(
-            &hint.owner,
+            &hint.receiver,
             &hint.glv_token,
             &glv_token_program_id,
         );
@@ -501,6 +503,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvDepositBuilder<'a, C> {
                     store: hint.store,
                     store_wallet: self.client.find_store_wallet_address(&hint.store),
                     owner: hint.owner,
+                    receiver: hint.receiver,
                     market_token: hint.market_token,
                     initial_long_token: hint.initial_long_token,
                     initial_short_token: hint.initial_short_token,
@@ -552,6 +555,7 @@ pub struct ExecuteGlvDepositHint {
     store: Pubkey,
     token_map: Pubkey,
     owner: Pubkey,
+    receiver: Pubkey,
     glv_token: Pubkey,
     glv_market_tokens: BTreeSet<Pubkey>,
     market_token: Pubkey,
@@ -584,6 +588,7 @@ impl ExecuteGlvDepositHint {
             store: *glv_deposit.header().store(),
             token_map: *token_map_address,
             owner: *glv_deposit.header().owner(),
+            receiver: *glv_deposit.header().receiver(),
             glv_token: glv_deposit.tokens().glv_token(),
             glv_market_tokens,
             market_token: glv_deposit.tokens().market_token(),
@@ -808,6 +813,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                 .hint(CloseGlvDepositHint {
                     store: hint.store,
                     owner: hint.owner,
+                    receiver: hint.receiver,
                     glv_token: hint.glv_token,
                     market_token: hint.market_token,
                     initial_long_token: hint.initial_long_token,

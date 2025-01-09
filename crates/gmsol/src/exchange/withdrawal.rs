@@ -56,6 +56,7 @@ pub struct CreateWithdrawalBuilder<'a, C> {
     short_token_swap_path: Vec<Pubkey>,
     token_map: Option<Pubkey>,
     should_unwrap_native_token: bool,
+    receiver: Pubkey,
 }
 
 impl<'a, C, S> CreateWithdrawalBuilder<'a, C>
@@ -87,6 +88,7 @@ where
             short_token_swap_path: vec![],
             token_map: None,
             should_unwrap_native_token: true,
+            receiver: client.payer(),
         }
     }
 
@@ -157,6 +159,13 @@ where
         self
     }
 
+    /// Set receiver.
+    /// Defaults to the payer.
+    pub fn receiver(&mut self, receiver: Pubkey) -> &mut Self {
+        self.receiver = receiver;
+        self
+    }
+
     fn get_or_find_associated_market_token_account(&self) -> Pubkey {
         match self.market_token_account {
             Some(account) => account,
@@ -190,6 +199,7 @@ where
         let token_program_id = anchor_spl::token::ID;
 
         let owner = self.client.payer();
+        let receiver = self.receiver;
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let withdrawal = self
             .client
@@ -201,8 +211,8 @@ where
         let market_token_escrow = get_associated_token_address(&withdrawal, &self.market_token);
         let final_long_token_escrow = get_associated_token_address(&withdrawal, &long_token);
         let final_short_token_escrow = get_associated_token_address(&withdrawal, &short_token);
-        let final_long_token_ata = get_associated_token_address(&owner, &long_token);
-        let final_short_token_ata = get_associated_token_address(&owner, &short_token);
+        let final_long_token_ata = get_associated_token_address(&receiver, &long_token);
+        let final_short_token_ata = get_associated_token_address(&receiver, &short_token);
         let prepare_escrows = self
             .client
             .prepare_associated_token_account(&long_token, &token_program_id, Some(&withdrawal))
@@ -221,7 +231,7 @@ where
             .store_rpc()
             .accounts(accounts::PrepareAssociatedTokenAccount {
                 payer: owner,
-                owner,
+                owner: receiver,
                 mint: long_token,
                 account: final_long_token_ata,
                 system_program: system_program::ID,
@@ -234,7 +244,7 @@ where
             .store_rpc()
             .accounts(accounts::PrepareAssociatedTokenAccount {
                 payer: owner,
-                owner,
+                owner: receiver,
                 mint: short_token,
                 account: final_short_token_ata,
                 system_program: system_program::ID,
@@ -253,6 +263,7 @@ where
                 market,
                 withdrawal,
                 owner,
+                receiver,
                 market_token: self.market_token,
                 final_long_token: long_token,
                 final_short_token: short_token,
@@ -315,6 +326,7 @@ pub struct CloseWithdrawalBuilder<'a, C> {
 #[derive(Clone, Copy)]
 pub struct CloseWithdrawalHint {
     owner: Pubkey,
+    receiver: Pubkey,
     market_token: Pubkey,
     final_long_token: Pubkey,
     final_short_token: Pubkey,
@@ -329,6 +341,7 @@ impl<'a> From<&'a Withdrawal> for CloseWithdrawalHint {
         let tokens = withdrawal.tokens();
         Self {
             owner: *withdrawal.header().owner(),
+            receiver: *withdrawal.header().receiver(),
             market_token: tokens.market_token(),
             final_long_token: tokens.final_long_token(),
             final_short_token: tokens.final_short_token(),
@@ -387,12 +400,12 @@ where
         let hint = self.get_or_fetch_withdrawal_hint().await?;
         let market_token_ata = get_associated_token_address(&hint.owner, &hint.market_token);
         let final_long_token_ata = get_ata_or_owner(
-            &hint.owner,
+            &hint.receiver,
             &hint.final_long_token,
             hint.should_unwrap_native_token,
         );
         let final_short_token_ata = get_ata_or_owner(
-            &hint.owner,
+            &hint.receiver,
             &hint.final_short_token,
             hint.should_unwrap_native_token,
         );
@@ -409,6 +422,7 @@ where
                 event_authority: self.client.store_event_authority(),
                 executor: payer,
                 owner: hint.owner,
+                receiver: hint.receiver,
                 final_long_token: hint.final_long_token,
                 final_short_token: hint.final_short_token,
                 market_token_escrow: hint.market_token_account,
@@ -445,6 +459,7 @@ pub struct ExecuteWithdrawalBuilder<'a, C> {
 #[derive(Clone)]
 pub struct ExecuteWithdrawalHint {
     owner: Pubkey,
+    receiver: Pubkey,
     market_token: Pubkey,
     market_token_escrow: Pubkey,
     final_long_token_escrow: Pubkey,
@@ -464,6 +479,7 @@ impl ExecuteWithdrawalHint {
         let swap = withdrawal.swap();
         Ok(Self {
             owner: *withdrawal.header().owner(),
+            receiver: *withdrawal.header().receiver(),
             market_token: tokens.market_token(),
             market_token_escrow: tokens.market_token_account(),
             final_long_token_escrow: tokens.final_long_token_account(),
@@ -674,6 +690,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
                 .close_withdrawal(&self.store, &self.withdrawal)
                 .hint(CloseWithdrawalHint {
                     owner: hint.owner,
+                    receiver: hint.receiver,
                     market_token: hint.market_token,
                     final_long_token: hint.final_long_token,
                     final_short_token: hint.final_short_token,

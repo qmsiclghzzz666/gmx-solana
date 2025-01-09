@@ -19,8 +19,6 @@ use crate::{
     CoreError,
 };
 
-use self::internal::Authentication;
-
 /// The accounts definition for the [`create_deposit`](crate::gmsol_store::create_deposit)
 /// instruction.
 ///
@@ -33,12 +31,12 @@ use self::internal::Authentication;
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateDeposit<'info> {
-    /// The payer.
+    /// The owner of the deposit.
     #[account(mut)]
-    pub payer: Signer<'info>,
-    /// The owner.
+    pub owner: Signer<'info>,
+    /// The receiver of the output funds.
     /// CHECK: only the address is used.
-    pub owner: UncheckedAccount<'info>,
+    pub receiver: UncheckedAccount<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
     /// Market.
@@ -48,7 +46,7 @@ pub struct CreateDeposit<'info> {
     #[account(
         init,
         space = 8 + Deposit::INIT_SPACE,
-        payer = payer,
+        payer = owner,
         seeds = [Deposit::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
@@ -84,9 +82,9 @@ pub struct CreateDeposit<'info> {
     /// The ATA of the owner for receving market tokens.
     #[account(
         init_if_needed,
-        payer = payer,
+        payer = owner,
         associated_token::mint = market_token,
-        associated_token::authority = owner,
+        associated_token::authority = receiver,
     )]
     pub market_token_ata: Box<Account<'info, TokenAccount>>,
     /// The source initial long token account.
@@ -111,7 +109,7 @@ impl<'info> internal::Create<'info, Deposit> for CreateDeposit<'info> {
     }
 
     fn payer(&self) -> AccountInfo<'info> {
-        self.payer.to_account_info()
+        self.owner.to_account_info()
     }
 
     fn system_program(&self) -> AccountInfo<'info> {
@@ -119,15 +117,6 @@ impl<'info> internal::Create<'info, Deposit> for CreateDeposit<'info> {
     }
 
     fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
-        // Currently, only the market keeper is allowed to create deposits
-        // for the first deposit owner. In all other cases, the payer and
-        // the owner must still be the same, although this may not be
-        // strictly necessary.
-        if *self.owner.key == Deposit::first_deposit_owner() {
-            self.only_role(RoleKey::MARKET_KEEPER)?;
-        } else {
-            require_eq!(self.owner.key, self.payer.key)
-        }
         Ok(())
     }
 
@@ -144,6 +133,7 @@ impl<'info> internal::Create<'info, Deposit> for CreateDeposit<'info> {
             .market(self.market.clone())
             .store(self.store.clone())
             .owner(&self.owner)
+            .receiver(&self.receiver)
             .nonce(nonce)
             .bump(bumps.deposit)
             .initial_long_token(self.initial_long_token_escrow.as_deref())
@@ -180,7 +170,7 @@ impl<'info> CreateDeposit<'info> {
                         from: source.to_account_info(),
                         mint: mint.to_account_info(),
                         to: target.to_account_info(),
-                        authority: self.payer.to_account_info(),
+                        authority: self.owner.to_account_info(),
                     },
                 ),
                 amount,
@@ -206,7 +196,7 @@ impl<'info> CreateDeposit<'info> {
                         from: source.to_account_info(),
                         mint: mint.to_account_info(),
                         to: target.to_account_info(),
-                        authority: self.payer.to_account_info(),
+                        authority: self.owner.to_account_info(),
                     },
                 ),
                 amount,
@@ -227,16 +217,6 @@ impl<'info> CreateDeposit<'info> {
     }
 }
 
-impl<'info> Authentication<'info> for CreateDeposit<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.payer
-    }
-
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
-}
-
 /// The accounts definition for [`close_deposit`](crate::gmsol_store::close_deposit)
 /// instruction.
 #[event_cpi]
@@ -250,9 +230,13 @@ pub struct CloseDeposit<'info> {
     #[account(mut, seeds = [Store::WALLET_SEED, store.key().as_ref()], bump)]
     pub store_wallet: SystemAccount<'info>,
     /// The owner of the deposit.
-    /// CHECK: only use to validate and receive fund.
+    /// CHECK: only use to validate and receive the input funds.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
+    /// The receiver of the deposit.
+    /// CHECK: only use to validate and receive the output funds.
+    #[account(mut)]
+    pub receiver: UncheckedAccount<'info>,
     /// Market token.
     #[account(
         constraint = deposit.load()?.tokens.market_token.token().expect("must exist") == market_token.key() @ CoreError::MarketTokenMintMismatched
@@ -272,6 +256,7 @@ pub struct CloseDeposit<'info> {
     #[account(
         mut,
         constraint = deposit.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
+        constraint = deposit.load()?.header.receiver == receiver.key() @ CoreError::ReceiverMismatched,
         // The rent receiver of a deposit must be the owner.
         constraint = deposit.load()?.header.rent_receiver() == owner.key @ CoreError::RentReceiverMismatched,
         constraint = deposit.load()?.header.store == store.key() @ CoreError::StoreMismatched,
@@ -303,21 +288,21 @@ pub struct CloseDeposit<'info> {
         associated_token::authority = deposit,
     )]
     pub initial_short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
-    /// The ATA for market token of owner.
+    /// The ATA for market token of the receiver.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account(market_token_ata.key, owner.key, &market_token.key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account(market_token_ata.key, receiver.key, &market_token.key()) @ CoreError::NotAnATA,
     )]
     pub market_token_ata: UncheckedAccount<'info>,
-    /// The ATA for initial long token of owner.
+    /// The ATA for initial long token of the owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
         constraint = is_associated_token_account_or_owner(initial_long_token_ata.key, owner.key, &initial_long_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
     )]
     pub initial_long_token_ata: Option<UncheckedAccount<'info>>,
-    /// The ATA for initial short token of owner.
+    /// The ATA for initial short token of the owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
@@ -378,7 +363,6 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
             .token_program(self.token_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
             .payer(self.executor.to_account_info())
-            .owner(self.owner.to_account_info())
             .escrow_authority(self.deposit.to_account_info())
             .escrow_authority_seeds(&seeds)
             .init_if_needed(init_if_needed)
@@ -392,6 +376,7 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
             .decimals(self.market_token.decimals)
             .ata(self.market_token_ata.to_account_info())
             .escrow(self.market_token_escrow.to_account_info())
+            .owner(self.receiver.to_account_info())
             .build()
             .unchecked_execute()?
         {
@@ -425,6 +410,7 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
                 .decimals(mint.decimals)
                 .ata(ata.to_account_info())
                 .escrow(escrow.to_account_info())
+                .owner(self.owner.to_account_info())
                 .build()
                 .unchecked_execute()?
             {
@@ -446,6 +432,7 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
                 .decimals(mint.decimals)
                 .ata(ata.to_account_info())
                 .escrow(escrow.to_account_info())
+                .owner(self.owner.to_account_info())
                 .build()
                 .unchecked_execute()?
             {

@@ -15,7 +15,7 @@ async fn unwrap_native_token_with_swap_path() -> eyre::Result<()> {
     let short_token_amount = 2340 * 100_000_000;
     let market_token = deployment
         .prepare_market(
-            ["fBTC", "fBTC", "USDG"],
+            ["SOL", "fBTC", "USDG"],
             long_token_amount,
             short_token_amount,
             true,
@@ -64,14 +64,16 @@ async fn unwrap_native_token_with_swap_path() -> eyre::Result<()> {
         .await?;
 
     // Close position.
+    let receiver = keeper.payer();
     let (rpc, order) = client
         .market_decrease(store, market_token, false, collateral_amount, true, size)
         .final_output_token(&wsol.address)
         .swap_path(vec![*swap_market_token])
+        .receiver(receiver)
         .build_with_address()
         .await?;
     let signature = rpc.send().await?;
-    tracing::info!(%order, %signature, %size, "created an order to close position");
+    tracing::info!(%order, %signature, %size, %receiver, "created an order to close position");
 
     let mut builder = keeper.execute_order(store, oracle, &order, false)?;
     deployment

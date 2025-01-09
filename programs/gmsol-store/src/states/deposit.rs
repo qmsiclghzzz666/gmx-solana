@@ -29,8 +29,8 @@ pub struct Deposit {
 }
 
 /// PDA for first deposit owner.
-pub fn find_first_deposit_owner_pda(store_program_id: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[Deposit::FIRST_DEPOSIT_OWNER_SEED], store_program_id)
+pub fn find_first_deposit_receiver_pda(store_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[Deposit::FIRST_DEPOSIT_RECEIVER_SEED], store_program_id)
 }
 
 impl InitSpace for Deposit {
@@ -54,12 +54,12 @@ impl Closable for Deposit {
 }
 
 impl Deposit {
-    /// Fisrt Deposit Owner Seed.
-    pub const FIRST_DEPOSIT_OWNER_SEED: &'static [u8] = b"first_deposit_owner";
+    /// Fisrt Deposit Receiver Seed.
+    pub const FIRST_DEPOSIT_RECEIVER_SEED: &'static [u8] = b"first_deposit_receiver";
 
-    /// Get first deposit owner.
-    pub fn first_deposit_owner() -> Pubkey {
-        find_first_deposit_owner_pda(&crate::ID).0
+    /// Get first deposit receiver.
+    pub fn first_deposit_receiver() -> Pubkey {
+        find_first_deposit_receiver_pda(&crate::ID).0
     }
 
     /// Get tokens.
@@ -90,7 +90,7 @@ impl Deposit {
 
         if supply == 0 {
             Self::validate_first_deposit(
-                &self.header.owner,
+                &self.header.receiver,
                 self.params.min_market_token_amount,
                 market,
             )?;
@@ -100,7 +100,7 @@ impl Deposit {
     }
 
     pub(crate) fn validate_first_deposit(
-        owner: &Pubkey,
+        receiver: &Pubkey,
         min_amount: u64,
         market: &Market,
     ) -> Result<()> {
@@ -113,9 +113,9 @@ impl Deposit {
         }
 
         require_eq!(
-            *owner,
-            Self::first_deposit_owner(),
-            CoreError::InvalidOwnerForFirstDeposit
+            *receiver,
+            Self::first_deposit_receiver(),
+            CoreError::InvalidReceiverForFirstDeposit
         );
 
         require_gte!(

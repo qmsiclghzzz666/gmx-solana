@@ -178,6 +178,9 @@ pub struct CreateOrder<'info> {
     /// The owner of the order to be created.
     #[account(mut)]
     pub owner: Signer<'info>,
+    /// The receiver of the output funds.
+    /// CHECK: only the address is used.
+    pub receiver: UncheckedAccount<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
     /// Market.
@@ -320,6 +323,7 @@ impl<'info> internal::Create<'info, Order> for CreateOrder<'info> {
             .market(self.market.clone())
             .store(self.store.clone())
             .owner(self.owner.to_account_info())
+            .receiver(self.receiver.to_account_info())
             .nonce(nonce)
             .bump(bumps.order)
             .params(params)
@@ -466,11 +470,15 @@ pub struct CloseOrder<'info> {
     #[account(mut, seeds = [Store::WALLET_SEED, store.key().as_ref()], bump)]
     pub store_wallet: SystemAccount<'info>,
     /// The owner of the order.
-    /// CHECK: only used to validate and receive fund.
+    /// CHECK: only used to validate and receive input funds.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
+    /// The receiver of the order.
+    /// CHECK: only used to validate and receive output funds.
+    #[account(mut)]
+    pub receiver: UncheckedAccount<'info>,
     /// The rent receiver of the order.
-    /// CHECK: only used to validate and receive fund.
+    /// CHECK: only used to validate and receive rent.
     #[account(mut)]
     pub rent_receiver: UncheckedAccount<'info>,
     /// User Account.
@@ -499,6 +507,7 @@ pub struct CloseOrder<'info> {
         mut,
         constraint = order.load()?.header.store == store.key() @ CoreError::StoreMismatched,
         constraint = order.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
+        constraint = order.load()?.header.receiver == receiver.key() @ CoreError::ReceiverMismatched,
         constraint = order.load()?.header.rent_receiver() == rent_receiver.key @ CoreError::RentReceiverMismatched,
         constraint = order.load()?.tokens.initial_collateral.account() == initial_collateral_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
         constraint = order.load()?.tokens.final_output_token.account() == final_output_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
@@ -542,32 +551,32 @@ pub struct CloseOrder<'info> {
         associated_token::authority = order,
     )]
     pub short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
-    /// The ATA for initial collateral token of owner.
+    /// The ATA for initial collateral token of the owner.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
         constraint = is_associated_token_account_or_owner(initial_collateral_token_ata.key, owner.key, &initial_collateral_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
     )]
     pub initial_collateral_token_ata: Option<UncheckedAccount<'info>>,
-    /// The ATA for final output token of owner.
+    /// The ATA for final output token of the receiver.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account_or_owner(final_output_token_ata.key, owner.key, &final_output_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(final_output_token_ata.key, receiver.key, &final_output_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
     )]
     pub final_output_token_ata: Option<UncheckedAccount<'info>>,
-    /// The ATA for long token of owner.
+    /// The ATA for long token of the receiver.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account_or_owner(long_token_ata.key, owner.key, &long_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(long_token_ata.key, receiver.key, &long_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
     )]
     pub long_token_ata: Option<UncheckedAccount<'info>>,
-    /// The ATA for initial collateral token of owner.
+    /// The ATA for initial collateral token of the receiver.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account_or_owner(short_token_ata.key, owner.key, &short_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(short_token_ata.key, receiver.key, &short_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
     )]
     pub short_token_ata: Option<UncheckedAccount<'info>>,
     /// The system program.
@@ -655,19 +664,45 @@ impl<'info> CloseOrder<'info> {
             .token_program(self.token_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
             .payer(self.executor.to_account_info())
-            .owner(self.owner.to_account_info())
             .escrow_authority(self.order.to_account_info())
             .escrow_authority_seeds(&seeds)
             .rent_receiver(self.rent_receiver())
             .init_if_needed(init_if_needed)
             .should_unwrap_native(self.order.load()?.header().should_unwrap_native_token());
 
-        for (escrow, ata, token) in [
-            (
+        let state = self.order.load()?.header().action_state()?;
+
+        // If the order is not completed, transfer input funds to the owner before transferring output funds.
+        if !state.is_completed() {
+            let (escrow, ata, token) = (
                 self.initial_collateral_token_escrow.as_ref(),
                 self.initial_collateral_token_ata.as_ref(),
                 self.initial_collateral_token.as_ref(),
-            ),
+            );
+
+            if let Some(escrow) = escrow {
+                seen.insert(escrow.key());
+
+                let ata = ata.ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
+                let token = token.ok_or_else(|| error!(CoreError::TokenMintNotProvided))?;
+
+                if !builder
+                    .clone()
+                    .mint(token.to_account_info())
+                    .decimals(token.decimals)
+                    .ata(ata.to_account_info())
+                    .escrow(escrow.to_account_info())
+                    .owner(self.owner.to_account_info())
+                    .build()
+                    .unchecked_execute()?
+                {
+                    return Ok(false);
+                }
+            }
+        }
+
+        // Transfer output funds to the owner.
+        for (escrow, ata, token) in [
             (
                 self.final_output_token_escrow.as_ref(),
                 self.final_output_token_ata.as_ref(),
@@ -697,10 +732,40 @@ impl<'info> CloseOrder<'info> {
                     .decimals(token.decimals)
                     .ata(ata.to_account_info())
                     .escrow(escrow.to_account_info())
+                    .owner(self.receiver.to_account_info())
                     .build()
                     .unchecked_execute()?
                 {
                     return Ok(false);
+                }
+            }
+        }
+
+        // If the order is completed, transfer input funds to the owner after transferring output funds.
+        if state.is_completed() {
+            let (escrow, ata, token) = (
+                self.initial_collateral_token_escrow.as_ref(),
+                self.initial_collateral_token_ata.as_ref(),
+                self.initial_collateral_token.as_ref(),
+            );
+
+            if let Some(escrow) = escrow {
+                if !seen.contains(&escrow.key()) {
+                    let ata = ata.ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
+                    let token = token.ok_or_else(|| error!(CoreError::TokenMintNotProvided))?;
+
+                    if !builder
+                        .clone()
+                        .mint(token.to_account_info())
+                        .decimals(token.decimals)
+                        .ata(ata.to_account_info())
+                        .escrow(escrow.to_account_info())
+                        .owner(self.owner.to_account_info())
+                        .build()
+                        .unchecked_execute()?
+                    {
+                        return Ok(false);
+                    }
                 }
             }
         }

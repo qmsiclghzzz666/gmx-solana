@@ -118,7 +118,8 @@ impl<'info> internal::Create<'info, GlvShift> for CreateGlvShift<'info> {
     ) -> Result<()> {
         CreateShiftOperation::builder()
             .store(&self.store)
-            .owner(self.glv.to_account_info())
+            .owner(self.glv.as_ref())
+            .receiver(self.glv.as_ref())
             .shift(&self.glv_shift)
             .from_market(&self.from_market)
             .from_market_token_account(&self.from_market_token_vault)

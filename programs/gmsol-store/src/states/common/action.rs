@@ -65,6 +65,16 @@ impl ActionState {
     pub fn is_pending(&self) -> bool {
         matches!(self, Self::Pending)
     }
+
+    /// Check if the state is cancelled.
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self, Self::Cancelled)
+    }
+
+    /// Check if the state is completed.
+    pub fn is_completed(&self) -> bool {
+        matches!(self, Self::Completed)
+    }
 }
 
 /// Action Header.
@@ -79,6 +89,8 @@ pub struct ActionHeader {
     pub(crate) market: Pubkey,
     /// Owner.
     pub(crate) owner: Pubkey,
+    /// The output funds receiver.
+    pub(crate) receiver: Pubkey,
     /// Nonce bytes.
     pub(crate) nonce: [u8; 32],
     /// Max execution lamports.
@@ -144,6 +156,11 @@ impl ActionHeader {
         &self.owner
     }
 
+    /// Get the receiver.
+    pub fn receiver(&self) -> &Pubkey {
+        &self.receiver
+    }
+
     // Get the action id.
     pub fn id(&self) -> u64 {
         self.id
@@ -203,6 +220,7 @@ impl ActionHeader {
         store: Pubkey,
         market: Pubkey,
         owner: Pubkey,
+        receiver: Pubkey,
         nonce: [u8; 32],
         bump: u8,
         execution_lamports: u64,
@@ -213,6 +231,7 @@ impl ActionHeader {
         self.store = store;
         self.market = market;
         self.owner = owner;
+        self.receiver = receiver;
         self.nonce = nonce;
         self.max_execution_lamports = execution_lamports;
         self.updated_at = clock.unix_timestamp;

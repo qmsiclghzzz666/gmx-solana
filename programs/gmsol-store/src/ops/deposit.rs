@@ -45,6 +45,7 @@ pub(crate) struct CreateDepositOperation<'a, 'info> {
     market: AccountLoader<'info, Market>,
     store: AccountLoader<'info, Store>,
     owner: &'a AccountInfo<'info>,
+    receiver: &'a AccountInfo<'info>,
     nonce: &'a NonceBytes,
     bump: u8,
     #[builder(default)]
@@ -68,6 +69,7 @@ impl<'a, 'info> CreateDepositOperation<'a, 'info> {
             market,
             store,
             owner,
+            receiver,
             nonce,
             initial_long_token,
             initial_short_token,
@@ -85,6 +87,7 @@ impl<'a, 'info> CreateDepositOperation<'a, 'info> {
             store.key(),
             market.key(),
             owner.key(),
+            receiver.key(),
             *nonce,
             bump,
             params.execution_lamports,

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use gmsol::{
     constants::MARKET_USD_UNIT, exchange::ExchangeOps, store::market::MarketOps,
     types::MarketConfigKey,
@@ -34,134 +36,191 @@ async fn balanced_market_order() -> eyre::Result<()> {
 
     let long_collateral_amount = 100_000;
     let short_collateral_amount = 100 * 100_000_000;
+    let times = 8;
 
     deployment
-        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, long_collateral_amount * 4)
+        .mint_or_transfer_to_user(
+            "fBTC",
+            Deployment::DEFAULT_USER,
+            long_collateral_amount * times,
+        )
         .await?;
     deployment
         .mint_or_transfer_to_user(
             "USDG",
             Deployment::DEFAULT_USER,
-            short_collateral_amount * 4,
+            short_collateral_amount * times,
         )
         .await?;
 
     // Increase position.
     let size = 5_000 * 100_000_000_000_000_000_000;
 
-    for side in [true, false] {
-        for collateral_side in [true, false] {
-            let collateral_amount = if collateral_side {
-                long_collateral_amount
-            } else {
-                short_collateral_amount
-            };
-            let (rpc, order) = client
-                .market_increase(
-                    store,
-                    market_token,
-                    collateral_side,
-                    collateral_amount,
-                    side,
-                    size,
-                )
-                .build_with_address()
-                .await?;
-            let signature = rpc.send().await?;
-            tracing::info!(%order, %signature, %size, "created an increase position order");
+    for receiver in [keeper.payer(), client.payer()] {
+        for side in [true, false] {
+            for collateral_side in [true, false] {
+                let collateral_amount = if collateral_side {
+                    long_collateral_amount
+                } else {
+                    short_collateral_amount
+                };
+                // Increase position.
+                let (rpc, order) = client
+                    .market_increase(
+                        store,
+                        market_token,
+                        collateral_side,
+                        collateral_amount,
+                        side,
+                        size,
+                    )
+                    .build_with_address()
+                    .await?;
+                let signature = rpc.send().await?;
+                tracing::info!(%order, %signature, %size, %receiver, "created an increase position order");
 
-            let mut builder = keeper.execute_order(store, oracle, &order, false)?;
-            deployment
-                .execute_with_pyth(
-                    builder
-                        .add_alt(deployment.common_alt().clone())
-                        .add_alt(deployment.market_alt().clone()),
-                    None,
-                    true,
-                    true,
-                )
-                .await?;
+                // Cancel.
+                let signature = client.close_order(&order)?.build().await?.send().await?;
+                tracing::info!(%order, %signature, %size, %receiver, "increase position order cancelled");
 
-            // Increase position
-            let increment_size = size / 10;
-            let (rpc, order) = client
-                .market_increase(
-                    store,
-                    market_token,
-                    collateral_side,
-                    0,
-                    side,
-                    increment_size,
-                )
-                .build_with_address()
-                .await?;
-            let signature = rpc.send().await?;
-            tracing::info!(%order, %signature, %increment_size, "created an increase position order");
+                tokio::time::sleep(Duration::from_secs(2)).await;
 
-            let mut builder = keeper.execute_order(store, oracle, &order, false)?;
-            deployment
-                .execute_with_pyth(
-                    builder
-                        .add_alt(deployment.common_alt().clone())
-                        .add_alt(deployment.market_alt().clone()),
-                    None,
-                    true,
-                    true,
-                )
-                .await?;
+                // Increase position again.
+                let (rpc, order) = client
+                    .market_increase(
+                        store,
+                        market_token,
+                        collateral_side,
+                        collateral_amount,
+                        side,
+                        size,
+                    )
+                    .build_with_address()
+                    .await?;
+                let signature = rpc.send().await?;
+                tracing::info!(%order, %signature, %size, %receiver, "created an increase position order");
 
-            // Extract collateral.
-            let amount = collateral_amount / 2;
-            let (rpc, order) = client
-                .market_decrease(store, market_token, collateral_side, amount, side, 0)
-                .decrease_position_swap_type(Some(DecreasePositionSwapType::CollateralToPnlToken))
-                .min_output_amount(u128::MAX)
-                .build_with_address()
-                .await?;
-            let signature = rpc.send().await?;
-            tracing::info!(%order, %signature, %amount, "created a extract collateral order");
+                let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+                deployment
+                    .execute_with_pyth(
+                        builder
+                            .add_alt(deployment.common_alt().clone())
+                            .add_alt(deployment.market_alt().clone()),
+                        None,
+                        true,
+                        true,
+                    )
+                    .await?;
 
-            let mut builder = keeper.execute_order(store, oracle, &order, true)?;
-            deployment
-                .execute_with_pyth(
-                    builder
-                        .add_alt(deployment.common_alt().clone())
-                        .add_alt(deployment.market_alt().clone()),
-                    None,
-                    true,
-                    true,
-                )
-                .await?;
+                // Increase position again.
+                let increment_size = size / 10;
+                let (rpc, order) = client
+                    .market_increase(
+                        store,
+                        market_token,
+                        collateral_side,
+                        0,
+                        side,
+                        increment_size,
+                    )
+                    .receiver(receiver)
+                    .build_with_address()
+                    .await?;
+                let signature = rpc.send().await?;
+                tracing::info!(%order, %signature, %increment_size, %receiver, "created an increase position order");
 
-            // Decrease position.
-            let (rpc, order) = client
-                .market_decrease(
-                    store,
-                    market_token,
-                    collateral_side,
-                    0,
-                    side,
-                    size + increment_size,
-                )
-                .decrease_position_swap_type(Some(
-                    DecreasePositionSwapType::PnlTokenToCollateralToken,
-                ))
-                .build_with_address()
-                .await?;
-            let signature = rpc.send().await?;
-            tracing::info!(%order, %signature, %size, "created a decrease position order");
+                let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+                deployment
+                    .execute_with_pyth(
+                        builder
+                            .add_alt(deployment.common_alt().clone())
+                            .add_alt(deployment.market_alt().clone()),
+                        None,
+                        true,
+                        true,
+                    )
+                    .await?;
 
-            let mut builder = keeper.execute_order(store, oracle, &order, false)?;
-            deployment
-                .execute_with_pyth(
-                    builder
-                        .add_alt(deployment.common_alt().clone())
-                        .add_alt(deployment.market_alt().clone()),
-                    None,
-                    true,
-                    true,
-                )
-                .await?;
+                // Extract collateral.
+                let amount = collateral_amount / 2;
+                let (rpc, order) = client
+                    .market_decrease(store, market_token, collateral_side, amount, side, 0)
+                    .decrease_position_swap_type(Some(
+                        DecreasePositionSwapType::CollateralToPnlToken,
+                    ))
+                    .min_output_amount(u128::MAX)
+                    .receiver(receiver)
+                    .build_with_address()
+                    .await?;
+                let signature = rpc.send().await?;
+                tracing::info!(%order, %signature, %amount, %receiver, "created a extract collateral order");
+
+                let mut builder = keeper.execute_order(store, oracle, &order, true)?;
+                deployment
+                    .execute_with_pyth(
+                        builder
+                            .add_alt(deployment.common_alt().clone())
+                            .add_alt(deployment.market_alt().clone()),
+                        None,
+                        true,
+                        true,
+                    )
+                    .await?;
+
+                // Decrease position.
+                let (rpc, order) = client
+                    .market_decrease(
+                        store,
+                        market_token,
+                        collateral_side,
+                        0,
+                        side,
+                        size + increment_size,
+                    )
+                    .decrease_position_swap_type(Some(
+                        DecreasePositionSwapType::PnlTokenToCollateralToken,
+                    ))
+                    .receiver(receiver)
+                    .build_with_address()
+                    .await?;
+                let signature = rpc.send().await?;
+                tracing::info!(%order, %signature, %size, %receiver, "created a decrease position order");
+
+                // Cancel.
+                let signature = client.close_order(&order)?.build().await?.send().await?;
+                tracing::info!(%order, %signature, %size, %receiver, "decrease position order cancelled");
+
+                // Decrease position again.
+                let (rpc, order) = client
+                    .market_decrease(
+                        store,
+                        market_token,
+                        collateral_side,
+                        0,
+                        side,
+                        size + increment_size,
+                    )
+                    .decrease_position_swap_type(Some(
+                        DecreasePositionSwapType::PnlTokenToCollateralToken,
+                    ))
+                    .receiver(receiver)
+                    .build_with_address()
+                    .await?;
+                let signature = rpc.send().await?;
+                tracing::info!(%order, %signature, %size, %receiver, "created a decrease position order");
+
+                let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+                deployment
+                    .execute_with_pyth(
+                        builder
+                            .add_alt(deployment.common_alt().clone())
+                            .add_alt(deployment.market_alt().clone()),
+                        None,
+                        true,
+                        true,
+                    )
+                    .await?;
+            }
         }
     }
 
@@ -301,15 +360,16 @@ async fn single_token_market_order() -> eyre::Result<()> {
 
     let collateral_amount = 100_001;
     let initial_collateral_amount = 103 * 100_000_000;
+    let times = 4;
 
     deployment
-        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, collateral_amount * 4)
+        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, collateral_amount * times)
         .await?;
     deployment
         .mint_or_transfer_to_user(
             "USDG",
             Deployment::DEFAULT_USER,
-            initial_collateral_amount * 4,
+            initial_collateral_amount * times,
         )
         .await?;
 

@@ -260,7 +260,7 @@ async fn first_deposit() -> eyre::Result<()> {
         .expect_err("should throw an error on first deposit with unexpected owner");
     assert_eq!(
         err.anchor_error_code(),
-        Some(CoreError::InvalidOwnerForFirstDeposit.into())
+        Some(CoreError::InvalidReceiverForFirstDeposit.into())
     );
 
     // Only MARKET_KEEPER is allowed to create first deposit.

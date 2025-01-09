@@ -31,18 +31,16 @@ use crate::{
     CoreError,
 };
 
-use self::internal::Authentication;
-
 /// The accounts definition for [`create_glv_deposit`](crate::create_glv_deposit) instruction.
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateGlvDeposit<'info> {
-    /// Payer.
+    /// The owner of the deposit.
     #[account(mut)]
-    pub payer: Signer<'info>,
-    /// Owner.
+    pub owner: Signer<'info>,
+    /// The receiver of the output funds.
     /// CHECK: only the address is used.
-    pub owner: UncheckedAccount<'info>,
+    pub receiver: UncheckedAccount<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
     /// Market.
@@ -62,7 +60,7 @@ pub struct CreateGlvDeposit<'info> {
     /// GLV deposit.
     #[account(
         init,
-        payer = payer,
+        payer = owner,
         space = 8 + GlvDeposit::INIT_SPACE,
         seeds = [GlvDeposit::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
@@ -132,7 +130,7 @@ impl<'info> internal::Create<'info, GlvDeposit> for CreateGlvDeposit<'info> {
     }
 
     fn payer(&self) -> AccountInfo<'info> {
-        self.payer.to_account_info()
+        self.owner.to_account_info()
     }
 
     fn system_program(&self) -> AccountInfo<'info> {
@@ -140,15 +138,6 @@ impl<'info> internal::Create<'info, GlvDeposit> for CreateGlvDeposit<'info> {
     }
 
     fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
-        // Currently, only the market keeper is allowed to create deposits
-        // for the first deposit owner. In all other cases, the payer and
-        // the owner must still be the same, although this may not be
-        // strictly necessary.
-        if *self.owner.key == GlvDeposit::first_deposit_owner() {
-            self.only_role(RoleKey::MARKET_KEEPER)?;
-        } else {
-            require_eq!(self.owner.key, self.payer.key)
-        }
         Ok(())
     }
 
@@ -164,7 +153,8 @@ impl<'info> internal::Create<'info, GlvDeposit> for CreateGlvDeposit<'info> {
             .glv_deposit(self.glv_deposit.clone())
             .market(self.market.clone())
             .store(self.store.clone())
-            .owner(self.owner.to_account_info())
+            .owner(&self.owner)
+            .receiver(&self.receiver)
             .nonce(nonce)
             .bump(bumps.glv_deposit)
             .initial_long_token(self.initial_long_token_escrow.as_deref())
@@ -201,7 +191,7 @@ impl<'info> CreateGlvDeposit<'info> {
                         from: source.to_account_info(),
                         mint: mint.to_account_info(),
                         to: target.to_account_info(),
-                        authority: self.payer.to_account_info(),
+                        authority: self.owner.to_account_info(),
                     },
                 ),
                 amount,
@@ -227,7 +217,7 @@ impl<'info> CreateGlvDeposit<'info> {
                         from: source.to_account_info(),
                         mint: mint.to_account_info(),
                         to: target.to_account_info(),
-                        authority: self.payer.to_account_info(),
+                        authority: self.owner.to_account_info(),
                     },
                 ),
                 amount,
@@ -249,7 +239,7 @@ impl<'info> CreateGlvDeposit<'info> {
                         from: source.to_account_info(),
                         mint: mint.to_account_info(),
                         to: target.to_account_info(),
-                        authority: self.payer.to_account_info(),
+                        authority: self.owner.to_account_info(),
                     },
                 ),
                 amount,
@@ -272,16 +262,6 @@ impl<'info> CreateGlvDeposit<'info> {
     }
 }
 
-impl<'info> Authentication<'info> for CreateGlvDeposit<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.payer
-    }
-
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
-}
-
 /// The accounts definition for [`close_glv_deposit`](crate::gmsol_store::close_glv_deposit) instruction.
 #[event_cpi]
 #[derive(Accounts)]
@@ -297,11 +277,16 @@ pub struct CloseGlvDeposit<'info> {
     /// CHECK: only use to validate and receive fund.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
+    /// The recevier of the deposit.
+    /// CHECK: only use to validate and receive fund.
+    #[account(mut)]
+    pub receiver: UncheckedAccount<'info>,
     /// The GLV deposit to close.
     #[account(
         mut,
         constraint = glv_deposit.load()?.header.store == store.key() @ CoreError::StoreMismatched,
         constraint = glv_deposit.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
+        constraint = glv_deposit.load()?.header.receiver == receiver.key() @ CoreError::ReceiverMismatched,
         // The rent receiver of a GLV deposit must be the owner.
         constraint = glv_deposit.load()?.header.rent_receiver() == owner.key @ CoreError::RentReceiverMismatched,
         constraint = glv_deposit.load()?.tokens.market_token_account() == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
@@ -361,32 +346,32 @@ pub struct CloseGlvDeposit<'info> {
         associated_token::token_program = glv_token_program,
     )]
     pub glv_token_escrow: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
-    /// The ATA for market token of owner.
+    /// The ATA for market token of the owner.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
         constraint = is_associated_token_account(market_token_ata.key, owner.key, &market_token.key()) @ CoreError::NotAnATA,
     )]
     pub market_token_ata: UncheckedAccount<'info>,
-    /// The ATA for initial long token of owner.
+    /// The ATA for initial long token of the owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
         constraint = is_associated_token_account_or_owner(initial_long_token_ata.key, owner.key, &initial_long_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
     )]
     pub initial_long_token_ata: Option<UncheckedAccount<'info>>,
-    /// The ATA for initial short token of owner.
+    /// The ATA for initial short token of the owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
         constraint = is_associated_token_account_or_owner(initial_short_token_ata.key, owner.key, &initial_short_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
     )]
     pub initial_short_token_ata: Option<UncheckedAccount<'info>>,
-    /// The ATA for GLV token of owner.
+    /// The ATA for GLV token of the receiver.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account_with_program_id(glv_token_ata.key, owner.key, &glv_token.key(), &glv_token_program.key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_with_program_id(glv_token_ata.key, receiver.key, &glv_token.key(), &glv_token_program.key()) @ CoreError::NotAnATA,
     )]
     pub glv_token_ata: UncheckedAccount<'info>,
     /// The system program.
@@ -434,7 +419,6 @@ impl<'info> internal::Close<'info, GlvDeposit> for CloseGlvDeposit<'info> {
             .system_program(self.system_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
             .payer(self.executor.to_account_info())
-            .owner(self.owner.to_account_info())
             .escrow_authority(self.glv_deposit.to_account_info())
             .escrow_authority_seeds(&seeds)
             .init_if_needed(init_if_needed)
@@ -454,6 +438,7 @@ impl<'info> internal::Close<'info, GlvDeposit> for CloseGlvDeposit<'info> {
             .decimals(self.market_token.decimals)
             .ata(self.market_token_ata.to_account_info())
             .escrow(self.market_token_escrow.to_account_info())
+            .owner(self.owner.to_account_info())
             .build()
             .unchecked_execute()?
         {
@@ -468,6 +453,7 @@ impl<'info> internal::Close<'info, GlvDeposit> for CloseGlvDeposit<'info> {
             .decimals(self.glv_token.decimals)
             .ata(self.glv_token_ata.to_account_info())
             .escrow(self.glv_token_escrow.to_account_info())
+            .owner(self.receiver.to_account_info())
             .build()
             .unchecked_execute()?
         {
@@ -502,6 +488,7 @@ impl<'info> internal::Close<'info, GlvDeposit> for CloseGlvDeposit<'info> {
                 .decimals(mint.decimals)
                 .ata(ata.to_account_info())
                 .escrow(escrow.to_account_info())
+                .owner(self.owner.to_account_info())
                 .build()
                 .unchecked_execute()?
             {
@@ -524,6 +511,7 @@ impl<'info> internal::Close<'info, GlvDeposit> for CloseGlvDeposit<'info> {
                 .decimals(mint.decimals)
                 .ata(ata.to_account_info())
                 .escrow(escrow.to_account_info())
+                .owner(self.owner.to_account_info())
                 .build()
                 .unchecked_execute()?
             {

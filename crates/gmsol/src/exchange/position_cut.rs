@@ -402,6 +402,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
                 .close_order(&order)?
                 .hint(CloseOrderHint {
                     owner,
+                    receiver: owner,
                     store,
                     initial_collateral_token_and_account: None,
                     final_output_token_and_account: Some((

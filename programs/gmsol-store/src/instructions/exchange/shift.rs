@@ -23,6 +23,9 @@ pub struct CreateShift<'info> {
     /// The owner.
     #[account(mut)]
     pub owner: Signer<'info>,
+    /// The receiver of the output funds.
+    /// CHECK: only the address is used.
+    pub receiver: UncheckedAccount<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
     /// From market.
@@ -72,7 +75,7 @@ pub struct CreateShift<'info> {
     /// The ATA for receiving to market tokens.
     #[account(
         associated_token::mint = to_market_token,
-        associated_token::authority = owner,
+        associated_token::authority = receiver,
     )]
     pub to_market_token_ata: Box<Account<'info, TokenAccount>>,
     /// The system program.
@@ -108,7 +111,8 @@ impl<'info> internal::Create<'info, Shift> for CreateShift<'info> {
         self.transfer_tokens(params)?;
         CreateShiftOperation::builder()
             .store(&self.store)
-            .owner(self.owner.to_account_info())
+            .owner(&self.owner)
+            .receiver(&self.receiver)
             .shift(&self.shift)
             .from_market(&self.from_market)
             .from_market_token_account(&self.from_market_token_escrow)
@@ -161,14 +165,19 @@ pub struct CloseShift<'info> {
     #[account(mut, seeds = [Store::WALLET_SEED, store.key().as_ref()], bump)]
     pub store_wallet: SystemAccount<'info>,
     /// The owenr of the shift.
-    /// CHECK: only use to validate and receive fund.
+    /// CHECK: only use to validate and receive input funds.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
+    /// The receiver of the shift.
+    /// CHECK: only use to validate and receive output funds.
+    #[account(mut)]
+    pub receiver: UncheckedAccount<'info>,
     /// The shift to close.
     #[account(
         mut,
         constraint = shift.load()?.header.store == store.key() @ CoreError::StoreMismatched,
         constraint = shift.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
+        constraint = shift.load()?.header.receiver == receiver.key() @ CoreError::ReceiverMismatched,
         // The rent receiver of a shift must be the owner.
         constraint = shift.load()?.header.rent_receiver() == owner.key @ CoreError::RentReceiverMismatched,
         constraint = shift.load()?.tokens.from_market_token_account() == from_market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
@@ -195,18 +204,18 @@ pub struct CloseShift<'info> {
         associated_token::authority = shift,
     )]
     pub to_market_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The ATA for from market token of owner.
+    /// The ATA for from market token of the owner.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
         constraint = is_associated_token_account(from_market_token_ata.key, owner.key, &from_market_token.key()) @ CoreError::NotAnATA,
     )]
     pub from_market_token_ata: UncheckedAccount<'info>,
-    /// The ATA for to market token of owner.
+    /// The ATA for to market token of the receiver.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account(to_market_token_ata.key, owner.key, &to_market_token.key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account(to_market_token_ata.key, receiver.key, &to_market_token.key()) @ CoreError::NotAnATA,
     )]
     pub to_market_token_ata: UncheckedAccount<'info>,
     /// The system program.
@@ -262,33 +271,34 @@ impl<'info> internal::Close<'info, Shift> for CloseShift<'info> {
             .token_program(self.token_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
             .payer(self.executor.to_account_info())
-            .owner(self.owner.to_account_info())
             .escrow_authority(self.shift.to_account_info())
             .escrow_authority_seeds(&seeds)
             .init_if_needed(init_if_needed)
             .rent_receiver(self.rent_receiver())
             .should_unwrap_native(self.shift.load()?.header().should_unwrap_native_token());
 
-        // Transfer from market tokens.
+        // Transfer from_market tokens.
         if !builder
             .clone()
             .mint(self.from_market_token.to_account_info())
             .decimals(self.from_market_token.decimals)
             .ata(self.from_market_token_ata.to_account_info())
             .escrow(self.from_market_token_escrow.to_account_info())
+            .owner(self.owner.to_account_info())
             .build()
             .unchecked_execute()?
         {
             return Ok(false);
         }
 
-        // Transfer to market tokens.
+        // Transfer to_market tokens.
         if !builder
             .clone()
             .mint(self.to_market_token.to_account_info())
             .decimals(self.to_market_token.decimals)
             .ata(self.to_market_token_ata.to_account_info())
             .escrow(self.to_market_token_escrow.to_account_info())
+            .owner(self.receiver.to_account_info())
             .build()
             .unchecked_execute()?
         {

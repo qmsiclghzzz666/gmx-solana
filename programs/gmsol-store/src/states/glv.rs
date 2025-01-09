@@ -518,7 +518,7 @@ impl GlvDeposit {
 
         if supply == 0 {
             Self::validate_first_deposit(
-                &self.header.owner,
+                &self.header.receiver,
                 self.params.min_glv_token_amount,
                 glv,
             )?;
@@ -533,11 +533,11 @@ impl GlvDeposit {
     }
 
     #[inline]
-    pub(crate) fn first_deposit_owner() -> Pubkey {
-        Deposit::first_deposit_owner()
+    pub(crate) fn first_deposit_receiver() -> Pubkey {
+        Deposit::first_deposit_receiver()
     }
 
-    fn validate_first_deposit(owner: &Pubkey, min_amount: u64, glv: &Glv) -> Result<()> {
+    fn validate_first_deposit(receiver: &Pubkey, min_amount: u64, glv: &Glv) -> Result<()> {
         let min_tokens_for_first_deposit = glv.min_tokens_for_first_deposit;
 
         // Skip first deposit check if the amount is zero.
@@ -546,9 +546,9 @@ impl GlvDeposit {
         }
 
         require_eq!(
-            *owner,
-            Self::first_deposit_owner(),
-            CoreError::InvalidOwnerForFirstDeposit
+            *receiver,
+            Self::first_deposit_receiver(),
+            CoreError::InvalidReceiverForFirstDeposit
         );
 
         require_gte!(

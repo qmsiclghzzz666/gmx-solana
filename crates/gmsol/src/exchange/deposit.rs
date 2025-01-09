@@ -52,7 +52,7 @@ pub struct CreateDepositBuilder<'a, C> {
     initial_long_token_amount: u64,
     initial_short_token_amount: u64,
     min_market_token: u64,
-    owner: Option<Pubkey>,
+    receiver: Option<Pubkey>,
     nonce: Option<NonceBytes>,
     should_unwrap_native_token: bool,
 }
@@ -82,10 +82,10 @@ impl<'a, C> CreateDepositBuilder<'a, C> {
         self
     }
 
-    /// Set Owner.
+    /// Set recevier.
     /// Defaults to the payer.
-    pub fn owner(&mut self, owner: Option<Pubkey>) -> &mut Self {
-        self.owner = owner;
+    pub fn receiver(&mut self, receiver: Option<Pubkey>) -> &mut Self {
+        self.receiver = receiver;
         self
     }
 
@@ -117,14 +117,14 @@ where
             initial_long_token_amount: 0,
             initial_short_token_amount: 0,
             min_market_token: 0,
-            owner: None,
+            receiver: None,
             nonce: None,
             should_unwrap_native_token: true,
         }
     }
 
-    fn get_owner(&self) -> Pubkey {
-        self.owner.unwrap_or(self.client.payer())
+    fn get_receiver(&self) -> Pubkey {
+        self.receiver.unwrap_or(self.client.payer())
     }
 
     fn get_or_find_associated_initial_long_token_account(
@@ -227,8 +227,8 @@ where
             ..
         } = self;
         let nonce = nonce.unwrap_or_else(generate_nonce);
-        let payer = client.payer();
-        let owner = self.get_owner();
+        let owner = client.payer();
+        let receiver = self.get_receiver();
         let deposit = client.find_deposit_address(store, &owner, &nonce);
         let market = client.find_market_address(store, market_token);
 
@@ -238,7 +238,7 @@ where
             self.get_or_find_associated_initial_long_token_account(long_token.as_ref());
         let initial_short_token_account =
             self.get_or_find_associated_initial_short_token_account(short_token.as_ref());
-        let market_token_ata = get_associated_token_address(&owner, market_token);
+        let market_token_ata = get_associated_token_address(&receiver, market_token);
 
         let market_token_escrow = get_associated_token_address(&deposit, market_token);
         let initial_long_token_escrow = long_token
@@ -266,8 +266,8 @@ where
             .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CreateDeposit {
-                    payer,
                     owner,
+                    receiver,
                     store: *store,
                     market,
                     deposit,
@@ -341,6 +341,7 @@ pub struct CloseDepositBuilder<'a, C> {
 #[derive(Debug, Clone, Copy)]
 pub struct CloseDepositHint {
     owner: Pubkey,
+    receiver: Pubkey,
     market_token: Pubkey,
     market_token_account: Pubkey,
     initial_long_token: Option<Pubkey>,
@@ -355,6 +356,7 @@ impl<'a> CloseDepositHint {
     pub fn new(deposit: &'a Deposit) -> Self {
         Self {
             owner: *deposit.header().owner(),
+            receiver: *deposit.header().receiver(),
             market_token: deposit.tokens().market_token(),
             market_token_account: deposit.tokens().market_token_account(),
             initial_long_token: deposit.tokens().initial_long_token.token(),
@@ -419,7 +421,8 @@ where
             ..
         } = self;
         let owner = hint.owner;
-        let market_token_ata = get_associated_token_address(&owner, &hint.market_token);
+        let receiver = hint.receiver;
+        let market_token_ata = get_associated_token_address(&receiver, &hint.market_token);
         let should_unwrap_native_token = hint.should_unwrap_native_token;
         let initial_long_token_ata = hint
             .initial_long_token
@@ -437,6 +440,7 @@ where
                     store: *store,
                     store_wallet: client.find_store_wallet_address(store),
                     owner,
+                    receiver,
                     market_token: hint.market_token,
                     initial_long_token: hint.initial_long_token,
                     initial_short_token: hint.initial_short_token,
@@ -480,6 +484,7 @@ pub struct ExecuteDepositBuilder<'a, C> {
 #[derive(Clone, Debug)]
 pub struct ExecuteDepositHint {
     owner: Pubkey,
+    receiver: Pubkey,
     market_token_escrow: Pubkey,
     market_token_mint: Pubkey,
     /// Feeds.
@@ -497,6 +502,7 @@ impl ExecuteDepositHint {
     pub fn new(deposit: &Deposit, map: &impl TokenMapAccess) -> crate::Result<Self> {
         Ok(Self {
             owner: *deposit.header().owner(),
+            receiver: *deposit.header().receiver(),
             market_token_escrow: deposit.tokens().market_token_account(),
             market_token_mint: deposit.tokens().market_token(),
             feeds: deposit.swap().to_feeds(map)?,
@@ -700,6 +706,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
                 .close_deposit(store, deposit)
                 .hint(CloseDepositHint {
                     owner: hint.owner,
+                    receiver: hint.receiver,
                     market_token: hint.market_token_mint,
                     market_token_account: hint.market_token_escrow,
                     initial_long_token: hint.initial_long_token,

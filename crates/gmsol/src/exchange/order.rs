@@ -102,6 +102,7 @@ pub struct CreateOrderBuilder<'a, C> {
     long_token_account: Option<Pubkey>,
     short_token_account: Option<Pubkey>,
     should_unwrap_native_token: bool,
+    receiver: Pubkey,
 }
 
 /// Create Order Hint.
@@ -138,6 +139,7 @@ where
             long_token_account: None,
             short_token_account: None,
             should_unwrap_native_token: true,
+            receiver: client.payer(),
         }
     }
 
@@ -220,6 +222,13 @@ where
     /// Defaults to should unwrap.
     pub fn should_unwrap_native_token(&mut self, should_unwrap: bool) -> &mut Self {
         self.should_unwrap_native_token = should_unwrap;
+        self
+    }
+
+    /// Set receiver.
+    /// Defaults to the payer.
+    pub fn receiver(&mut self, receiver: Pubkey) -> &mut Self {
+        self.receiver = receiver;
         self
     }
 
@@ -340,8 +349,9 @@ where
         let token_program_id = anchor_spl::token::ID;
 
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
-        let payer = &self.client.payer();
-        let order = self.client.find_order_address(&self.store, payer, &nonce);
+        let owner = &self.client.payer();
+        let receiver = self.receiver;
+        let order = self.client.find_order_address(&self.store, owner, &nonce);
         let (initial_collateral_token, initial_collateral_token_account) =
             self.initial_collateral_accounts().await?.unzip();
         let final_output_token = self.get_final_output_token().await?;
@@ -357,24 +367,24 @@ where
             .map(|token| get_associated_token_address(&order, token));
         let long_token_accounts = long_token.as_ref().map(|token| {
             let escrow = get_associated_token_address(&order, token);
-            let ata = get_associated_token_address(payer, token);
+            let ata = get_associated_token_address(&receiver, token);
             (escrow, ata)
         });
         let short_token_accounts = short_token.as_ref().map(|token| {
             let escrow = get_associated_token_address(&order, token);
-            let ata = get_associated_token_address(payer, token);
+            let ata = get_associated_token_address(&receiver, token);
             (escrow, ata)
         });
         let final_output_token_accounts =
             if self.params.kind.is_swap() || self.params.kind.is_decrease_position() {
                 let escrow = get_associated_token_address(&order, &final_output_token);
-                let ata = get_associated_token_address(payer, &final_output_token);
+                let ata = get_associated_token_address(&receiver, &final_output_token);
                 Some((escrow, ata))
             } else {
                 None
             };
         let position = self.position().await?;
-        let user = self.client.find_user_address(&self.store, payer);
+        let user = self.client.find_user_address(&self.store, owner);
 
         let kind = self.params.kind;
         let params = CreateOrderParams {
@@ -416,7 +426,7 @@ where
                 let ata = self.client.prepare_associated_token_account(
                     &final_output_token,
                     &token_program_id,
-                    None,
+                    Some(&receiver),
                 );
                 escrow.merge(ata)
             }
@@ -450,19 +460,19 @@ where
                 let long_token_ata = self.client.prepare_associated_token_account(
                     &long_token,
                     &token_program_id,
-                    None,
+                    Some(&receiver),
                 );
                 let short_token_ata = self.client.prepare_associated_token_account(
                     &short_token,
                     &token_program_id,
-                    None,
+                    Some(&receiver),
                 );
 
                 let prepare_position = self
                     .client
                     .store_rpc()
                     .accounts(accounts::PreparePosition {
-                        owner: *payer,
+                        owner: *owner,
                         store: self.store,
                         market: self.market(),
                         position: position.expect("must provided"),
@@ -505,17 +515,17 @@ where
                 let long_token_ata = self.client.prepare_associated_token_account(
                     &long_token,
                     &token_program_id,
-                    None,
+                    Some(&receiver),
                 );
                 let short_token_ata = self.client.prepare_associated_token_account(
                     &short_token,
                     &token_program_id,
-                    None,
+                    Some(&receiver),
                 );
                 let final_output_token_ata = self.client.prepare_associated_token_account(
                     &final_output_token,
                     &token_program_id,
-                    None,
+                    Some(&receiver),
                 );
 
                 escrow
@@ -532,7 +542,7 @@ where
             .client
             .store_rpc()
             .accounts(accounts::PrepareUser {
-                owner: *payer,
+                owner: *owner,
                 store: self.store,
                 user,
                 system_program: system_program::ID,
@@ -548,7 +558,8 @@ where
                     order,
                     position,
                     market: self.market(),
-                    owner: *payer,
+                    owner: *owner,
+                    receiver,
                     user,
                     initial_collateral_token,
                     final_output_token,
@@ -610,6 +621,7 @@ pub struct ExecuteOrderHint {
     market_token: Pubkey,
     position: Option<Pubkey>,
     owner: Pubkey,
+    receiver: Pubkey,
     rent_receiver: Pubkey,
     user: Pubkey,
     referrer: Option<Pubkey>,
@@ -762,6 +774,7 @@ where
             market_token,
             position: params.position().copied(),
             owner,
+            receiver: *order.header().receiver(),
             rent_receiver,
             user: user_address,
             referrer,
@@ -1067,6 +1080,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
                 .reason("executed")
                 .hint(CloseOrderHint {
                     owner: hint.owner,
+                    receiver: hint.receiver,
                     store: self.store,
                     initial_collateral_token_and_account: hint.initial_collateral_token_and_account,
                     final_output_token_and_account: hint.final_output_token_and_account,
@@ -1154,6 +1168,7 @@ pub struct CloseOrderBuilder<'a, C> {
 #[derive(Clone, Copy)]
 pub struct CloseOrderHint {
     pub(super) owner: Pubkey,
+    pub(super) receiver: Pubkey,
     pub(super) store: Pubkey,
     pub(super) initial_collateral_token_and_account: Option<(Pubkey, Pubkey)>,
     pub(super) final_output_token_and_account: Option<(Pubkey, Pubkey)>,
@@ -1180,6 +1195,7 @@ impl CloseOrderHint {
         let rent_receiver = *order.header().rent_receiver();
         Ok(Self {
             owner: *owner,
+            receiver: *order.header().receiver(),
             store: *store,
             user: user_address,
             referrer,
@@ -1273,6 +1289,7 @@ where
                     order: self.order,
                     executor: payer,
                     owner,
+                    receiver: hint.receiver,
                     rent_receiver: hint.rent_receiver,
                     user: hint.user,
                     referrer_user,
@@ -1298,14 +1315,14 @@ where
                         }),
                     final_output_token_ata: hint.final_output_token_and_account.as_ref().map(
                         |(token, _)| {
-                            get_ata_or_owner(&owner, token, hint.should_unwrap_native_token)
+                            get_ata_or_owner(&hint.receiver, token, hint.should_unwrap_native_token)
                         },
                     ),
                     long_token_ata: hint.long_token_and_account.as_ref().map(|(token, _)| {
-                        get_ata_or_owner(&owner, token, hint.should_unwrap_native_token)
+                        get_ata_or_owner(&hint.receiver, token, hint.should_unwrap_native_token)
                     }),
                     short_token_ata: hint.short_token_and_account.as_ref().map(|(token, _)| {
-                        get_ata_or_owner(&owner, token, hint.should_unwrap_native_token)
+                        get_ata_or_owner(&hint.receiver, token, hint.should_unwrap_native_token)
                     }),
                     associated_token_program: anchor_spl::associated_token::ID,
                     token_program: anchor_spl::token::ID,

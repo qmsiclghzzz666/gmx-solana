@@ -40,6 +40,9 @@ pub struct CreateGlvWithdrawal<'info> {
     /// Owner.
     #[account(mut)]
     pub owner: Signer<'info>,
+    /// The receiver of the output funds.
+    /// CHECK: only the address is used.
+    pub receiver: UncheckedAccount<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
     /// Market.
@@ -143,6 +146,7 @@ impl<'info> internal::Create<'info, GlvWithdrawal> for CreateGlvWithdrawal<'info
             .market(self.market.clone())
             .store(self.store.clone())
             .owner(&self.owner)
+            .receiver(&self.receiver)
             .nonce(nonce)
             .bump(bumps.glv_withdrawal)
             .final_long_token(&self.final_long_token_escrow)
@@ -200,14 +204,19 @@ pub struct CloseGlvWithdrawal<'info> {
     #[account(mut, seeds = [Store::WALLET_SEED, store.key().as_ref()], bump)]
     pub store_wallet: SystemAccount<'info>,
     /// The owner of the deposit.
-    /// CHECK: only use to validate and receive fund.
+    /// CHECK: only use to validate and receive input funds.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
+    /// The receiver of the deposit.
+    /// CHECK: only use to validate and receive output funds.
+    #[account(mut)]
+    pub receiver: UncheckedAccount<'info>,
     /// The GLV withdrawal to close.
     #[account(
         mut,
         constraint = glv_withdrawal.load()?.header.store == store.key() @ CoreError::StoreMismatched,
         constraint = glv_withdrawal.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
+        constraint = glv_withdrawal.load()?.header.receiver == receiver.key() @ CoreError::ReceiverMismatched,
         // The rent receiver of a GLV withdrawal must be the owner.
         constraint = glv_withdrawal.load()?.header.rent_receiver() == owner.key @ CoreError::RentReceiverMismatched,
         constraint = glv_withdrawal.load()?.tokens.market_token_account() == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
@@ -259,25 +268,25 @@ pub struct CloseGlvWithdrawal<'info> {
         associated_token::authority = glv_withdrawal,
     )]
     pub final_short_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The ATA for market token of owner.
+    /// The ATA for market token of the owner.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
         constraint = is_associated_token_account(market_token_ata.key, owner.key, &market_token.key()) @ CoreError::NotAnATA,
     )]
     pub market_token_ata: UncheckedAccount<'info>,
-    /// The ATA for final long token of owner.
+    /// The ATA for final long token of the receiver.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account_or_owner(final_long_token_ata.key, owner.key, &final_long_token.as_ref().key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(final_long_token_ata.key, receiver.key, &final_long_token.as_ref().key()) @ CoreError::NotAnATA,
     )]
     pub final_long_token_ata: UncheckedAccount<'info>,
-    /// The ATA for final short token of owner.
+    /// The ATA for final short token of the receiver.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account_or_owner(final_short_token_ata.key, owner.key, &final_short_token.as_ref().key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(final_short_token_ata.key, receiver.key, &final_short_token.as_ref().key()) @ CoreError::NotAnATA,
     )]
     pub final_short_token_ata: UncheckedAccount<'info>,
     /// The escrow account for GLV tokens.
@@ -288,7 +297,7 @@ pub struct CloseGlvWithdrawal<'info> {
         associated_token::token_program = glv_token_program,
     )]
     pub glv_token_escrow: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
-    /// The ATA for GLV token of owner.
+    /// The ATA for GLV token of the owner.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
@@ -340,7 +349,6 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
             .system_program(self.system_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
             .payer(self.executor.to_account_info())
-            .owner(self.owner.to_account_info())
             .escrow_authority(self.glv_withdrawal.to_account_info())
             .escrow_authority_seeds(&seeds)
             .init_if_needed(init_if_needed)
@@ -360,6 +368,7 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
             .decimals(self.market_token.decimals)
             .ata(self.market_token_ata.to_account_info())
             .escrow(self.market_token_escrow.to_account_info())
+            .owner(self.owner.to_account_info())
             .build()
             .unchecked_execute()?
         {
@@ -374,6 +383,7 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
             .decimals(self.glv_token.decimals)
             .ata(self.glv_token_ata.to_account_info())
             .escrow(self.glv_token_escrow.to_account_info())
+            .owner(self.owner.to_account_info())
             .build()
             .unchecked_execute()?
         {
@@ -402,6 +412,7 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
                 .decimals(mint.decimals)
                 .ata(ata.to_account_info())
                 .escrow(escrow.to_account_info())
+                .owner(self.receiver.to_account_info())
                 .build()
                 .unchecked_execute()?
             {
@@ -420,6 +431,7 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
                 .decimals(mint.decimals)
                 .ata(ata.to_account_info())
                 .escrow(escrow.to_account_info())
+                .owner(self.receiver.to_account_info())
                 .build()
                 .unchecked_execute()?
             {

@@ -681,7 +681,7 @@ impl<C: Deref<Target = impl Signer> + Clone> crate::Client<C> {
         market_token: &Pubkey,
     ) -> CreateDepositBuilder<C> {
         let mut builder = self.create_deposit(store, market_token);
-        builder.owner(Some(self.find_first_deposit_owner_address()));
+        builder.receiver(Some(self.find_first_deposit_owner_address()));
         builder
     }
 }

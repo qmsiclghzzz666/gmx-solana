@@ -41,7 +41,8 @@ where
     T: anchor_lang::ZeroCopy + anchor_lang::Owner,
 {
     store: &'a AccountLoader<'info, Store>,
-    owner: AccountInfo<'info>,
+    owner: &'a AccountInfo<'info>,
+    receiver: &'a AccountInfo<'info>,
     shift: &'a AccountLoader<'info, T>,
     from_market: &'a AccountLoader<'info, Market>,
     from_market_token_account: &'a Account<'info, TokenAccount>,
@@ -71,6 +72,7 @@ where
             self.store.key(),
             self.from_market.key(),
             self.owner.key(),
+            self.receiver.key(),
             *self.nonce,
             self.bump,
             self.params.execution_lamports,

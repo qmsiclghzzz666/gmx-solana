@@ -37,6 +37,7 @@ pub struct CreateShiftBuilder<'a, C> {
     min_to_market_token_amount: u64,
     nonce: Option<NonceBytes>,
     hint: CreateShiftHint,
+    receiver: Pubkey,
 }
 
 /// Hint for creating shift.
@@ -63,6 +64,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
             min_to_market_token_amount: 0,
             nonce: None,
             hint: Default::default(),
+            receiver: client.payer(),
         }
     }
 
@@ -81,6 +83,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
     /// Set hint.
     pub fn hint(&mut self, hint: CreateShiftHint) -> &mut Self {
         self.hint = hint;
+        self
+    }
+
+    /// Set receiver.
+    /// Defaults to the payer.
+    pub fn receiver(&mut self, receiver: Pubkey) -> &mut Self {
+        self.receiver = receiver;
         self
     }
 
@@ -104,6 +113,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
         let token_program_id = anchor_spl::token::ID;
 
         let owner = self.client.payer();
+        let receiver = self.receiver;
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let shift = self.client.find_shift_address(&self.store, &owner, &nonce);
 
@@ -117,7 +127,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
         let from_market_token_escrow =
             get_associated_token_address(&shift, &self.from_market_token);
         let to_market_token_escrow = get_associated_token_address(&shift, &self.to_market_token);
-        let to_market_token_ata = get_associated_token_address(&owner, &self.to_market_token);
+        let to_market_token_ata = get_associated_token_address(&receiver, &self.to_market_token);
 
         let prepare_escrow = self
             .client
@@ -135,7 +145,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
         let prepare_ata = self.client.prepare_associated_token_account(
             &self.to_market_token,
             &token_program_id,
-            None,
+            Some(&receiver),
         );
 
         let rpc = self
@@ -143,6 +153,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
             .store_rpc()
             .accounts(accounts::CreateShift {
                 owner,
+                receiver,
                 store: self.store,
                 from_market,
                 to_market,
@@ -179,6 +190,7 @@ pub struct CloseShiftBuilder<'a, C> {
 pub struct CloseShiftHint {
     store: Pubkey,
     owner: Pubkey,
+    receiver: Pubkey,
     from_market_token: Pubkey,
     to_market_token: Pubkey,
     from_market_token_escrow: Pubkey,
@@ -192,6 +204,7 @@ impl CloseShiftHint {
         Ok(Self {
             store: *shift.header().store(),
             owner: *shift.header().owner(),
+            receiver: *shift.header().receiver(),
             from_market_token: tokens.from_market_token(),
             from_market_token_escrow: tokens.from_market_token_account(),
             to_market_token: tokens.to_market_token(),
@@ -205,7 +218,7 @@ impl CloseShiftHint {
     }
 
     fn to_market_token_ata(&self) -> Pubkey {
-        get_associated_token_address(&self.owner, &self.to_market_token)
+        get_associated_token_address(&self.receiver, &self.to_market_token)
     }
 }
 
@@ -262,6 +275,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseShiftBuilder<'a, C> {
                 store: hint.store,
                 store_wallet: self.client.find_store_wallet_address(&hint.store),
                 owner: hint.owner,
+                receiver: hint.receiver,
                 shift: self.shift,
                 from_market_token: hint.from_market_token,
                 to_market_token: hint.to_market_token,
@@ -301,6 +315,7 @@ pub struct ExecuteShiftHint {
     store: Pubkey,
     token_map: Pubkey,
     owner: Pubkey,
+    receiver: Pubkey,
     from_market_token: Pubkey,
     to_market_token: Pubkey,
     from_market_token_escrow: Pubkey,
@@ -329,6 +344,7 @@ impl ExecuteShiftHint {
         Ok(Self {
             store: *shift.header().store(),
             owner: *shift.header().owner(),
+            receiver: *shift.header().receiver(),
             from_market_token: token_infos.from_market_token(),
             from_market_token_escrow: token_infos.from_market_token_account(),
             to_market_token: token_infos.to_market_token(),
@@ -476,6 +492,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
                 .hint(CloseShiftHint {
                     store: hint.store,
                     owner: hint.owner,
+                    receiver: hint.receiver,
                     from_market_token: hint.from_market_token,
                     to_market_token: hint.to_market_token,
                     from_market_token_escrow: hint.from_market_token_escrow,

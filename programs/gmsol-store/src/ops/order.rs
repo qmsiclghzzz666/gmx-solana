@@ -99,6 +99,7 @@ pub(crate) struct CreateOrderOperation<'a, 'info> {
     market: AccountLoader<'info, Market>,
     store: AccountLoader<'info, Store>,
     owner: AccountInfo<'info>,
+    receiver: AccountInfo<'info>,
     #[builder(
         default,
         setter(
@@ -172,6 +173,7 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
                 self.store.key(),
                 self.market.key(),
                 self.owner.key(),
+                self.receiver.key(),
                 *self.nonce,
                 self.bump,
                 self.params.execution_lamports,
@@ -1723,6 +1725,7 @@ impl<'a, 'info> PositionCutOperation<'a, 'info> {
             .market(self.market.clone())
             .store(self.store.clone())
             .owner(self.owner.clone())
+            .receiver(self.owner.clone())
             .creator(self.executor.clone())
             .nonce(self.nonce)
             .bump(self.order_bump)

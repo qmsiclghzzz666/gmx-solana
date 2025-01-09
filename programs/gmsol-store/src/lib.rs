@@ -3322,6 +3322,9 @@ pub enum CoreError {
     /// Owner mismatched.
     #[msg("owner mismatched")]
     OwnerMismatched,
+    /// Receiver mismatched.
+    #[msg("receiver mismatched")]
+    ReceiverMismatched,
     /// Rent Receiver mismatched.
     #[msg("rent receiver mismatched")]
     RentReceiverMismatched,
@@ -3456,7 +3459,7 @@ pub enum CoreError {
     EmptyDeposit,
     /// Invalid owner for the first deposit.
     #[msg("invalid owner for the first deposit")]
-    InvalidOwnerForFirstDeposit,
+    InvalidReceiverForFirstDeposit,
     /// Not enough market token amount for the first deposit.
     #[msg("not enough market token amount for the first deposit")]
     NotEnoughMarketTokenAmountForFirstDeposit,

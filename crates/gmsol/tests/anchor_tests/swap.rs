@@ -30,50 +30,77 @@ async fn basic_swap() -> eyre::Result<()> {
 
     let long_collateral_amount = 100_000;
     let short_collateral_amount = 100 * 100_000_000;
+    let times = 8;
 
     deployment
-        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, long_token_amount * 4 + 17)
+        .mint_or_transfer_to_user(
+            "fBTC",
+            Deployment::DEFAULT_USER,
+            long_token_amount * times + 17,
+        )
         .await?;
     deployment
         .mint_or_transfer_to_user(
             "USDG",
             Deployment::DEFAULT_USER,
-            short_collateral_amount * 4 + 17,
+            short_collateral_amount * times + 17,
         )
         .await?;
 
-    for side in [true, false] {
-        let swap_in_amount = if side {
-            long_collateral_amount
-        } else {
-            short_collateral_amount
-        };
-        let swap_in_token = if side { &fbtc.address } else { &usdg.address };
-        let (rpc, order) = client
-            .market_swap(
-                store,
-                market_token,
-                !side,
-                swap_in_token,
-                swap_in_amount,
-                [market_token],
-            )
-            .build_with_address()
-            .await?;
-        let signature = rpc.send().await?;
-        tracing::info!(%order, %signature, %swap_in_amount, %side, "created a swap order");
+    for receiver in [keeper.payer(), client.payer()] {
+        for side in [true, false] {
+            let swap_in_amount = if side {
+                long_collateral_amount
+            } else {
+                short_collateral_amount
+            };
+            let swap_in_token = if side { &fbtc.address } else { &usdg.address };
+            let (rpc, order) = client
+                .market_swap(
+                    store,
+                    market_token,
+                    !side,
+                    swap_in_token,
+                    swap_in_amount,
+                    [market_token],
+                )
+                .receiver(receiver)
+                .build_with_address()
+                .await?;
+            let signature = rpc.send().await?;
+            tracing::info!(%order, %signature, %swap_in_amount, %side, %receiver, "created a swap order");
 
-        let mut builder = keeper.execute_order(store, oracle, &order, false)?;
-        deployment
-            .execute_with_pyth(
-                builder
-                    .add_alt(deployment.common_alt().clone())
-                    .add_alt(deployment.market_alt().clone()),
-                None,
-                true,
-                true,
-            )
-            .await?;
+            // Cancel swap.
+            let signature = client.close_order(&order)?.build().await?.send().await?;
+            tracing::info!(%order, %signature, %swap_in_amount, %side, %receiver, "cancelled the swap order");
+
+            let (rpc, order) = client
+                .market_swap(
+                    store,
+                    market_token,
+                    !side,
+                    swap_in_token,
+                    swap_in_amount,
+                    [market_token],
+                )
+                .receiver(receiver)
+                .build_with_address()
+                .await?;
+            let signature = rpc.send().await?;
+            tracing::info!(%order, %signature, %swap_in_amount, %side, %receiver, "created a swap order");
+
+            let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+            deployment
+                .execute_with_pyth(
+                    builder
+                        .add_alt(deployment.common_alt().clone())
+                        .add_alt(deployment.market_alt().clone()),
+                    None,
+                    true,
+                    true,
+                )
+                .await?;
+        }
     }
 
     Ok(())
