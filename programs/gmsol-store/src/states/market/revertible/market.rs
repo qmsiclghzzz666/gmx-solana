@@ -25,11 +25,25 @@ use crate::{
 
 use super::Revertible;
 
+/// Swap Pricing Kind.
+#[derive(Clone, Copy)]
+pub enum SwapPricingKind {
+    /// Swap.
+    Swap,
+    /// Deposit.
+    Deposit,
+    /// Withdrawal.
+    Withdrawal,
+    /// Shift.
+    Shift,
+}
+
 /// Revertible Market.
 pub struct RevertibleMarket<'a, 'info> {
     pub(super) market: RefMut<'a, Market>,
     order_fee_discount_factor: u128,
     event_emitter: EventEmitter<'a, 'info>,
+    swap_pricing: SwapPricingKind,
 }
 
 impl<'a, 'info> Key for RevertibleMarket<'a, 'info> {
@@ -55,12 +69,17 @@ impl<'a, 'info> RevertibleMarket<'a, 'info> {
             market,
             order_fee_discount_factor: 0,
             event_emitter,
+            swap_pricing: SwapPricingKind::Swap,
         })
     }
 
     pub(crate) fn with_order_fee_discount_factor(mut self, discount: u128) -> Self {
         self.order_fee_discount_factor = discount;
         self
+    }
+
+    pub(crate) fn set_swap_pricing_kind(&mut self, kind: SwapPricingKind) {
+        self.swap_pricing = kind;
     }
 
     pub(crate) fn event_emitter(&self) -> &EventEmitter<'a, 'info> {
@@ -353,7 +372,22 @@ impl<'a, 'info> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }>
     }
 
     fn swap_fee_params(&self) -> gmsol_model::Result<FeeParams<Factor>> {
-        self.market.swap_fee_params()
+        match self.swap_pricing {
+            SwapPricingKind::Shift => {
+                let params = self.market.swap_fee_params()?;
+                Ok(FeeParams::builder()
+                    .fee_receiver_factor(*params.receiver_factor())
+                    .positive_impact_fee_factor(0)
+                    .negative_impact_fee_factor(0)
+                    .build())
+            }
+            SwapPricingKind::Swap => self.market.swap_fee_params(),
+            SwapPricingKind::Deposit | SwapPricingKind::Withdrawal => {
+                // We currently do not have separate swap fees params specifically
+                // for deposits and withdrawals.
+                self.market.swap_fee_params()
+            }
+        }
     }
 }
 

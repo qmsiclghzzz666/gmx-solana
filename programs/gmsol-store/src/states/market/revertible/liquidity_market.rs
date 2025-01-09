@@ -8,7 +8,10 @@ use crate::{
     utils::internal::TransferUtils,
 };
 
-use super::{market::RevertibleMarket, Revertible};
+use super::{
+    market::{RevertibleMarket, SwapPricingKind},
+    Revertible,
+};
 
 /// Convert a [`RevertibleMarket`] to a [`LiquidityMarketMut`](gmsol_model::LiquidityMarketMut).
 pub struct RevertibleLiquidityMarket<'a, 'info> {
@@ -48,6 +51,11 @@ impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
 
     pub(crate) fn enable_burn(mut self, vault: &'a AccountInfo<'info>) -> Self {
         self.vault = Some(vault);
+        self
+    }
+
+    pub(crate) fn with_swap_pricing_kind(mut self, kind: SwapPricingKind) -> Self {
+        self.base.set_swap_pricing_kind(kind);
         self
     }
 

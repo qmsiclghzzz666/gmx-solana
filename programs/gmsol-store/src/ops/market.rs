@@ -14,6 +14,7 @@ use crate::{
         market::{
             revertible::{
                 liquidity_market::RevertibleLiquidityMarket,
+                market::SwapPricingKind,
                 swap_market::{SwapDirection, SwapMarkets},
                 Revertible, RevertibleMarket,
             },
@@ -283,8 +284,12 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         market_token_receiver: &'a AccountInfo<'info>,
         params: &DepositParams,
         initial_tokens: (Option<Pubkey>, Option<Pubkey>),
+        swap_pricing_kind: Option<SwapPricingKind>,
     ) -> Result<Execute<'a, 'info, u64>> {
-        self.market = self.market.enable_mint(market_token_receiver);
+        self.market = self
+            .market
+            .enable_mint(market_token_receiver)
+            .with_swap_pricing_kind(swap_pricing_kind.unwrap_or(SwapPricingKind::Deposit));
 
         let prices = self.oracle.market_prices(&self.market)?;
 
@@ -358,8 +363,12 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         market_token_vault: &'a AccountInfo<'info>,
         params: &WithdrawalParams,
         final_tokens: (Pubkey, Pubkey),
+        swap_pricing_kind: Option<SwapPricingKind>,
     ) -> Result<Execute<'a, 'info, (u64, u64)>> {
-        self.market = self.market.enable_burn(market_token_vault);
+        self.market = self
+            .market
+            .enable_burn(market_token_vault)
+            .with_swap_pricing_kind(swap_pricing_kind.unwrap_or(SwapPricingKind::Withdrawal));
 
         let prices = self.oracle.market_prices(&self.market)?;
 
@@ -465,6 +474,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
                 from_market_token_vault,
                 &withdrawal_params,
                 (long_token, short_token),
+                Some(SwapPricingKind::Shift),
             )?
             .take_output(output)
         };
@@ -498,8 +508,13 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             deposit_params.initial_long_token_amount = long_amount;
             deposit_params.initial_short_token_amount = short_amount;
             deposit_params.min_market_token_amount = params.min_to_market_token_amount;
-            op.unchecked_deposit(to_market_token_account, &deposit_params, (None, None))?
-                .take_output(output)
+            op.unchecked_deposit(
+                to_market_token_account,
+                &deposit_params,
+                (None, None),
+                Some(SwapPricingKind::Shift),
+            )?
+            .take_output(output)
         };
 
         Ok((from_market, to_market, received))

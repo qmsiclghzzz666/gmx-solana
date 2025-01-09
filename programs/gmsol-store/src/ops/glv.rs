@@ -346,6 +346,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
                         deposit.tokens.initial_long_token.token(),
                         deposit.tokens.initial_short_token.token(),
                     ),
+                    None,
                 )?;
 
                 market_token_amount = market_token_amount
@@ -791,6 +792,7 @@ impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
                         withdrawal.tokens.final_long_token(),
                         withdrawal.tokens.final_short_token(),
                     ),
+                    None,
                 )?
             };
 
@@ -1083,6 +1085,8 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
     }
 
     fn validate_before_execution(&self) -> Result<()> {
+        self.glv.load()?.validate_shift_interval()?;
+
         require!(
             self.from_market.key() != self.to_market.key(),
             CoreError::Internal
@@ -1173,6 +1177,31 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
             )?;
         }
 
+        // Validate price impact.
+        {
+            let mut prices = self.oracle.market_prices(from_market.market())?;
+
+            let (from_market_token_value, _, _) = get_glv_value_for_market(
+                self.oracle,
+                &mut prices,
+                from_market.market(),
+                shift.params.from_market_token_amount().into(),
+                true,
+            )?;
+
+            let (to_market_token_value, _, _) = get_glv_value_for_market(
+                self.oracle,
+                &mut prices,
+                to_market.market(),
+                received.into(),
+                false,
+            )?;
+
+            self.glv
+                .load()?
+                .validate_shift_price_impact(from_market_token_value, to_market_token_value)?;
+        }
+
         // Transfer market tokens from the GLV vault to the withdrawal vault before the commitment.
         {
             let glv = self.glv.load()?;
@@ -1194,6 +1223,8 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
             )
             .expect("failed to transfer from market tokens");
         }
+
+        self.glv.load_mut()?.update_shift_last_executed_ts()?;
 
         // Commit the changes.
         from_market.commit();

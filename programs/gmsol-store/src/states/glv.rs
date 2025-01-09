@@ -7,6 +7,7 @@ use anchor_lang::prelude::*;
 use gmsol_utils::InitSpace;
 
 use crate::{
+    constants,
     events::{GlvDepositRemoved, GlvWithdrawalRemoved, ShiftRemoved},
     states::{Deposit, Market},
     utils::token::validate_associated_token_account,
@@ -37,12 +38,16 @@ pub struct Glv {
     bump_bytes: [u8; 1],
     /// Index.
     pub(crate) index: u8,
-    padding: [u8; 4],
+    padding_0: [u8; 4],
     pub(crate) store: Pubkey,
     pub(crate) glv_token: Pubkey,
     pub(crate) long_token: Pubkey,
     pub(crate) short_token: Pubkey,
+    shift_last_executed_at: i64,
     pub(crate) min_tokens_for_first_deposit: u64,
+    shift_min_interval_secs: u32,
+    padding_1: [u8; 4],
+    shift_max_price_impact_factor: u128,
     reserve: [u8; 256],
     /// Market config map with market token addresses as keys.
     markets: GlvMarkets,
@@ -216,6 +221,9 @@ impl Glv {
         self.glv_token = *glv_token;
         self.long_token = *long_token;
         self.short_token = *short_token;
+
+        self.shift_min_interval_secs = constants::DEFAULT_GLV_MIN_SHIFT_INTERVAL_SECS;
+        self.shift_max_price_impact_factor = constants::DEFAULT_GLV_MAX_SHIFT_PRICE_IMPACT_FACTOR;
 
         require_gte!(
             Self::MAX_ALLOWED_NUMBER_OF_MARKETS,
@@ -456,6 +464,54 @@ impl Glv {
             .get(market_token)
             .ok_or_else(|| error!(CoreError::NotFound))?;
         config.validate_market_token_balance(new_balance, market_pool_value, market_token_supply)
+    }
+
+    pub(crate) fn validate_shift_interval(&self) -> Result<()> {
+        let interval = self.shift_min_interval_secs;
+        if interval == 0 {
+            Ok(())
+        } else {
+            let current = Clock::get()?.unix_timestamp;
+            let after = self
+                .shift_last_executed_at
+                .checked_add(interval as i64)
+                .ok_or_else(|| error!(CoreError::ValueOverflow))?;
+            require_gte!(current, after, CoreError::GlvShiftIntervalNotYetPassed);
+            Ok(())
+        }
+    }
+
+    pub(crate) fn validate_shift_price_impact(
+        &self,
+        from_market_token_value: u128,
+        to_market_token_value: u128,
+    ) -> Result<()> {
+        use gmsol_model::utils::div_to_factor;
+
+        if from_market_token_value < to_market_token_value {
+            Ok(())
+        } else {
+            let max_factor = self.shift_max_price_impact_factor;
+            let diff = from_market_token_value.abs_diff(to_market_token_value);
+            let effective_price_impact_factor = div_to_factor::<_, { constants::MARKET_DECIMALS }>(
+                &diff,
+                &from_market_token_value,
+                false,
+            )
+            .ok_or_else(|| error!(CoreError::Internal))?;
+            require_gte!(
+                max_factor,
+                effective_price_impact_factor,
+                CoreError::GlvShiftMaxPriceImpactExceeded
+            );
+            Ok(())
+        }
+    }
+
+    pub(crate) fn update_shift_last_executed_ts(&mut self) -> Result<()> {
+        let clock = Clock::get()?;
+        self.shift_last_executed_at = clock.unix_timestamp;
+        Ok(())
     }
 }
 

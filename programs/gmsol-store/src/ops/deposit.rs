@@ -265,6 +265,7 @@ impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
                     deposit.tokens.initial_long_token.token(),
                     deposit.tokens.initial_short_token.token(),
                 ),
+                None,
             )?
             .commit();
         }

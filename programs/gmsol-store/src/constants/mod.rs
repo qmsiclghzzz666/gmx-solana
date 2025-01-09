@@ -1,7 +1,10 @@
 /// Default market configs.
 pub mod market;
 
-pub use self::market::*;
+/// Default GLV configs.
+pub mod glv;
+
+pub use self::{glv::*, market::*};
 
 use gmsol_utils::price::Decimal;
 

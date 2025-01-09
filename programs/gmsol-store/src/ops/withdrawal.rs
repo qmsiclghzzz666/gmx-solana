@@ -219,6 +219,7 @@ impl<'a, 'info> ExecuteWithdrawalOperation<'a, 'info> {
                 withdrawal.tokens.final_long_token(),
                 withdrawal.tokens.final_short_token(),
             ),
+            None,
         )?;
 
         let final_output_amounts = executed.output;

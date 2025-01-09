@@ -35,7 +35,10 @@ use gmsol::{
         glv::GlvOps, gt::GtOps, market::MarketOps, oracle::OracleOps, roles::RolesOps,
         store_ops::StoreOps, token_config::TokenConfigOps,
     },
-    types::{FactorKey, MarketConfigKey, PriceProviderKind, RoleKey, TokenConfigBuilder},
+    types::{
+        glv::GlvMarketFlag, FactorKey, MarketConfigKey, PriceProviderKind, RoleKey,
+        TokenConfigBuilder,
+    },
     utils::{shared_signer, SendTransactionOptions, SignerRef, TransactionBuilder},
     Client, ClientOptions,
 };
@@ -811,14 +814,37 @@ impl Deployment {
                 } else {
                     None
                 }
-            });
+            })
+            .collect::<Vec<_>>();
 
-        let (rpc, glv_token) = keeper.initialize_glv(&self.store, 0, market_tokens)?;
+        let (rpc, glv_token) =
+            keeper.initialize_glv(&self.store, 0, market_tokens.iter().copied())?;
 
         let signature = rpc.send_without_preflight().await?;
         tracing::info!(%signature, %glv_token, "initialized a new GLV token");
 
         self.glv_token = glv_token;
+
+        let mut txn = keeper.transaction();
+
+        for market_token in market_tokens {
+            txn.push(keeper.toggle_glv_market_flag(
+                &self.store,
+                &glv_token,
+                &market_token,
+                GlvMarketFlag::IsDepositAllowed,
+                true,
+            ))?;
+        }
+
+        match txn.send_all(true).await {
+            Ok(signatures) => {
+                tracing::info!(%glv_token, "GLV deposit enabled, signatures: {signatures:#?}");
+            }
+            Err((signatures, err)) => {
+                tracing::error!(%err, %glv_token, "enabling GLV deposit failed, signatures: {signatures:#?}");
+            }
+        }
 
         Ok(())
     }

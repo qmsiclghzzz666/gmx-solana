@@ -109,6 +109,10 @@ impl<'info> internal::Create<'info, GlvShift> for CreateGlvShift<'info> {
         self.system_program.to_account_info()
     }
 
+    fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
+        self.glv.load()?.validate_shift_interval()
+    }
+
     fn create_impl(
         &mut self,
         params: &Self::CreateParams,
@@ -277,6 +281,7 @@ pub struct ExecuteGlvShift<'info> {
     pub oracle: AccountLoader<'info, Oracle>,
     /// GLV account.
     #[account(
+        mut,
         has_one = store,
         constraint = glv.load()?.contains(&from_market_token.key()) @ CoreError::InvalidArgument,
         constraint = glv.load()?.contains(&to_market_token.key()) @ CoreError::InvalidArgument,

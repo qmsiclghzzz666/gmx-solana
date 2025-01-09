@@ -347,5 +347,20 @@ async fn glv_shift() -> eyre::Result<()> {
         .instrument(tracing::info_span!("executing glv shift", glv_shift=%shift))
         .await?;
 
+    let (rpc, _shift) = keeper
+        .create_glv_shift(
+            store,
+            glv_token,
+            market_token,
+            to_market_token,
+            shift_amount,
+        )
+        .build_with_address()?;
+    let err = rpc.send().await.expect_err("should throw an error");
+    assert_eq!(
+        err.anchor_error_code(),
+        Some(CoreError::GlvShiftIntervalNotYetPassed.into())
+    );
+
     Ok(())
 }

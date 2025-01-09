@@ -22,6 +22,11 @@ impl<T> FeeParams<T> {
         }
     }
 
+    /// Get receiver factor.
+    pub fn receiver_factor(&self) -> &T {
+        &self.fee_receiver_factor
+    }
+
     #[inline]
     fn factor(&self, is_positive_impact: bool) -> &T {
         if is_positive_impact {

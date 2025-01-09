@@ -3668,6 +3668,12 @@ pub enum CoreError {
     /// Deposit is not allowed with the given market.
     #[msg("GLV: deposit is not allowed with the given market")]
     GlvDepositIsNotAllowed,
+    /// Shift interval not yet passed.
+    #[msg("GLV: shift interval not yet passed")]
+    GlvShiftIntervalNotYetPassed,
+    /// Shift max price impact exceeded.
+    #[msg("GLV: shift max price impact exceeded")]
+    GlvShiftMaxPriceImpactExceeded,
     // ===========================================
     //                Other Errors
     // ===========================================
