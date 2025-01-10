@@ -347,7 +347,7 @@ impl CloseGlvWithdrawalHint {
         Self {
             store: *glv_withdrawal.header().store(),
             owner: *glv_withdrawal.header().owner(),
-            receiver: *glv_withdrawal.header().receiver(),
+            receiver: glv_withdrawal.header().receiver(),
             glv_token: glv_withdrawal.tokens().glv_token(),
             market_token: glv_withdrawal.tokens().market_token(),
             final_long_token: glv_withdrawal.tokens().final_long_token(),

@@ -8,6 +8,7 @@ use gmsol_utils::InitSpace as _;
 
 use crate::{
     events::{EventEmitter, GtUpdated, OrderRemoved},
+    utils::pubkey::optional_address,
     CoreError,
 };
 
@@ -855,11 +856,7 @@ impl OrderParams {
 
     /// Get position address.
     pub fn position(&self) -> Option<&Pubkey> {
-        if self.position != Pubkey::default() {
-            Some(&self.position)
-        } else {
-            None
-        }
+        optional_address(&self.position)
     }
 
     /// Get initial collateral delta amount.

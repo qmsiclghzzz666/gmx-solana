@@ -6,7 +6,10 @@ use std::{
 use anchor_lang::prelude::*;
 
 use crate::{
-    utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
+    utils::{
+        fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
+        pubkey::DEFAULT_PUBKEY,
+    },
     CoreError,
 };
 
@@ -94,7 +97,7 @@ impl TokenConfig {
             .feeds
             .get(index)
             .ok_or_else(|| error!(CoreError::NotFound))?;
-        if config.feed == Pubkey::default() {
+        if config.feed == DEFAULT_PUBKEY {
             err!(CoreError::NotFound)
         } else {
             Ok(config)
@@ -326,7 +329,7 @@ impl Default for TokenConfigBuilder {
         Self {
             heartbeat_duration: DEFAULT_HEARTBEAT_DURATION,
             precision: DEFAULT_PRECISION,
-            feeds: vec![Pubkey::default(); MAX_FEEDS],
+            feeds: vec![DEFAULT_PUBKEY; MAX_FEEDS],
             timestamp_adjustments: vec![DEFAULT_TIMESTAMP_ADJUSTMENT; MAX_FEEDS],
             expected_provider: None,
         }

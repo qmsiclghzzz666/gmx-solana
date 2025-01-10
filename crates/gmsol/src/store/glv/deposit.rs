@@ -405,7 +405,7 @@ impl CloseGlvDepositHint {
         Self {
             store: *glv_deposit.header().store(),
             owner: *glv_deposit.header().owner(),
-            receiver: *glv_deposit.header().receiver(),
+            receiver: glv_deposit.header().receiver(),
             glv_token: glv_deposit.tokens().glv_token(),
             market_token: glv_deposit.tokens().market_token(),
             initial_long_token: glv_deposit.tokens().initial_long_token.token(),
@@ -588,7 +588,7 @@ impl ExecuteGlvDepositHint {
             store: *glv_deposit.header().store(),
             token_map: *token_map_address,
             owner: *glv_deposit.header().owner(),
-            receiver: *glv_deposit.header().receiver(),
+            receiver: glv_deposit.header().receiver(),
             glv_token: glv_deposit.tokens().glv_token(),
             glv_market_tokens,
             market_token: glv_deposit.tokens().market_token(),

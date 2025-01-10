@@ -14,6 +14,7 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     states::{order::TransferOut, position::PositionState, Position, Seed},
+    utils::pubkey::DEFAULT_PUBKEY,
     CoreError,
 };
 
@@ -130,6 +131,8 @@ impl TradeEvent {
 #[cfg(feature = "display")]
 impl std::fmt::Display for TradeEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::utils::pubkey::optional_address;
+
         f.debug_struct("TradeEvent")
             .field("trade_id", &self.trade_id)
             .field("store", &self.store.to_string())
@@ -139,7 +142,7 @@ impl std::fmt::Display for TradeEvent {
             .field("order", &self.order.to_string())
             .field(
                 "final_output_token",
-                &(self.final_output_token == Pubkey::default()).then_some(self.final_output_token),
+                &optional_address(&self.final_output_token),
             )
             .field("ts", &self.ts)
             .field("slot", &self.slot)
@@ -412,7 +415,7 @@ impl TradeData {
         self.user = position.owner;
         self.position = pubkey;
         self.order = order;
-        self.final_output_token = Pubkey::default();
+        self.final_output_token = DEFAULT_PUBKEY;
         self.ts = clock.unix_timestamp;
         self.slot = clock.slot;
         self.before = position.state;

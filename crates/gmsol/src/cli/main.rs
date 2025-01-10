@@ -9,7 +9,7 @@ use anchor_client::{
 };
 use clap::Parser;
 use eyre::eyre;
-use gmsol::{store::utils::read_store, utils::LocalSignerRef};
+use gmsol::utils::LocalSignerRef;
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
@@ -183,7 +183,7 @@ impl Cli {
 
     async fn store(&self, client: &GMSOLClient) -> eyre::Result<(Pubkey, String)> {
         if let Some(address) = self.store_address {
-            let store = read_store(&client.store_program().solana_rpc(), &address).await?;
+            let store = client.store(&address).await?;
             Ok((address, store.key()?.to_owned()))
         } else {
             let store = client.find_store_address(&self.store);
