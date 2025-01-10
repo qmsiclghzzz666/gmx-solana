@@ -102,25 +102,29 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
         self
     }
 
-    /// Set long swap path.
-    pub fn long_token_swap_path(
+    /// Final long token config.
+    pub fn final_long_token(
         &mut self,
-        final_long_token: &Pubkey,
-        market_tokens: Vec<Pubkey>,
+        token: Option<&Pubkey>,
+        min_amount: u64,
+        swap_path: Vec<Pubkey>,
     ) -> &mut Self {
-        self.final_long_token = Some(*final_long_token);
-        self.long_token_swap_path = market_tokens;
+        self.final_long_token = token.copied();
+        self.min_final_long_token_amount = min_amount;
+        self.long_token_swap_path = swap_path;
         self
     }
 
-    /// Set short swap path.
-    pub fn short_token_swap_path(
+    /// Final short token config.
+    pub fn final_short_token(
         &mut self,
-        final_short_token: &Pubkey,
-        market_tokens: Vec<Pubkey>,
+        token: Option<&Pubkey>,
+        min_amount: u64,
+        swap_path: Vec<Pubkey>,
     ) -> &mut Self {
-        self.final_short_token = Some(*final_short_token);
-        self.short_token_swap_path = market_tokens;
+        self.final_short_token = token.copied();
+        self.min_final_short_token_amount = min_amount;
+        self.short_token_swap_path = swap_path;
         self
     }
 
@@ -145,8 +149,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
 
     /// Set receiver.
     /// Defaults to the payer.
-    pub fn receiver(&mut self, receiver: Pubkey) -> &mut Self {
-        self.receiver = receiver;
+    pub fn receiver(&mut self, receiver: Option<Pubkey>) -> &mut Self {
+        self.receiver = receiver.unwrap_or(self.client.payer());
         self
     }
 

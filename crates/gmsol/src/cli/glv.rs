@@ -1,7 +1,7 @@
 use crate::{utils::ToggleValue, GMSOLClient, TimelockCtx};
 use gmsol::{
     store::glv::GlvOps,
-    types::{common::action::Action, glv::GlvMarketFlag, GlvDeposit},
+    types::{common::action::Action, glv::GlvMarketFlag, GlvDeposit, GlvWithdrawal},
 };
 use solana_sdk::pubkey::Pubkey;
 
@@ -37,7 +37,7 @@ enum Command {
     },
     /// Create GLV deposit.
     Deposit {
-        /// The address of the market token of the Market to deposit into.
+        /// The address of the market token of the GLV Market to deposit into.
         market_token: Pubkey,
         #[arg(long)]
         receiver: Option<Pubkey>,
@@ -70,6 +70,40 @@ enum Command {
         /// The initial short token amount.
         #[arg(long, default_value_t = 0)]
         short_token_amount: u64,
+        /// Swap paths for long token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        long_swap: Vec<Pubkey>,
+        /// Swap paths for short token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        short_swap: Vec<Pubkey>,
+    },
+    /// Create a GLV withdrawal.
+    Withdraw {
+        /// The address of the market token of the GLV Market to withdraw from.
+        market_token: Pubkey,
+        #[arg(long)]
+        receiver: Option<Pubkey>,
+        /// Extra execution fee allowed to use.
+        #[arg(long, short, default_value_t = 0)]
+        extra_execution_fee: u64,
+        /// The amount of GLV tokens to burn.
+        #[arg(long)]
+        amount: u64,
+        /// Final long token.
+        #[arg(long)]
+        final_long_token: Option<Pubkey>,
+        /// Final short token.
+        #[arg(long)]
+        final_short_token: Option<Pubkey>,
+        /// The GLV token account to use.
+        #[arg(long)]
+        glv_token_account: Option<Pubkey>,
+        /// Minimal amount of final long tokens to withdraw.
+        #[arg(long, default_value_t = 0)]
+        min_final_long_token_amount: u64,
+        /// Minimal amount of final short tokens to withdraw.
+        #[arg(long, default_value_t = 0)]
+        min_final_short_token_amount: u64,
         /// Swap paths for long token.
         #[arg(long, short, action = clap::ArgAction::Append)]
         long_swap: Vec<Pubkey>,
@@ -202,6 +236,47 @@ impl Args {
                     .build_with_address()
                     .await?;
                 println!("{deposit}");
+                rpc
+            }
+            Command::Withdraw {
+                market_token,
+                receiver,
+                extra_execution_fee,
+                amount,
+                final_long_token,
+                final_short_token,
+                glv_token_account,
+                min_final_long_token_amount,
+                min_final_short_token_amount,
+                long_swap,
+                short_swap,
+            } => {
+                let mut builder = client.create_glv_withdrawal(
+                    store,
+                    &selected.address(client, store),
+                    market_token,
+                    *amount,
+                );
+                if let Some(account) = glv_token_account {
+                    builder.glv_token_source(account);
+                }
+                builder
+                    .final_long_token(
+                        final_long_token.as_ref(),
+                        *min_final_long_token_amount,
+                        long_swap.clone(),
+                    )
+                    .final_short_token(
+                        final_short_token.as_ref(),
+                        *min_final_short_token_amount,
+                        short_swap.clone(),
+                    );
+                let (rpc, withdrawal) = builder
+                    .max_execution_fee(*extra_execution_fee + GlvWithdrawal::MIN_EXECUTION_LAMPORTS)
+                    .receiver(*receiver)
+                    .build_with_address()
+                    .await?;
+                println!("{withdrawal}");
                 rpc
             }
         };
