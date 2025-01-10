@@ -65,8 +65,6 @@ enum Command {
     ExecuteWithdrawal { withdrawal: Pubkey },
     /// Execute Order.
     ExecuteOrder { order: Pubkey },
-    /// Execute GLV Deposit.
-    ExecuteGlvDeposit { deposit: Pubkey },
     /// Liquidate a position.
     Liquidate { position: Pubkey },
     /// Auto-deleverage a position.
@@ -101,6 +99,10 @@ enum Command {
         #[arg(long)]
         keep: bool,
     },
+    /// Execute GLV Deposit.
+    ExecuteGlvDeposit { deposit: Pubkey },
+    /// Execute GLV Withdrawal.
+    ExecuteGlvWithdrawal { withdrawal: Pubkey },
 }
 
 #[derive(Debug, clap::ValueEnum, Clone, Copy)]
@@ -686,7 +688,49 @@ impl KeeperArgs {
                             ..Default::default()
                         })
                         .await?;
-                    tracing::info!(%deposit, "executed deposit at tx {signatures:#?}");
+                    tracing::info!(%deposit, "executed GLV deposit at tx {signatures:#?}");
+                    println!("{signatures:#?}");
+                }
+            }
+            Command::ExecuteGlvWithdrawal { withdrawal } => {
+                let mut builder = client.execute_glv_withdrawal(self.oracle()?, withdrawal, true);
+                for alt in &self.alts {
+                    let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
+                    builder.add_alt(alt);
+                }
+                let execution_fee = builder.build().await?.estimate_execution_fee(None).await?;
+                builder.set_execution_fee(execution_fee);
+                if self.use_pyth_pull_oracle() {
+                    let hint = builder.prepare_hint().await?;
+                    let feed_ids = extract_pyth_feed_ids(&hint.feeds)?;
+                    if feed_ids.is_empty() {
+                        tracing::error!(%withdrawal, "empty feed ids");
+                    }
+                    let oracle = PythPullOracle::try_new(client)?;
+                    let hermes = Hermes::default();
+                    let update = hermes
+                        .latest_price_updates(&feed_ids, Some(EncodingType::Base64))
+                        .await?;
+                    oracle
+                        .execute_with_pyth_price_updates(
+                            Some(update.binary()),
+                            &mut builder,
+                            Some(self.compute_unit_price),
+                            true,
+                            true,
+                        )
+                        .await?;
+                } else {
+                    let builder = builder.build().await?;
+                    let compute_unit_price_micro_lamports =
+                        self.get_compute_budget().map(|budget| budget.price());
+                    let signatures = builder
+                        .send_all_with_opts(SendTransactionOptions {
+                            compute_unit_price_micro_lamports,
+                            ..Default::default()
+                        })
+                        .await?;
+                    tracing::info!(%withdrawal, "executed GLV withdrawal at tx {signatures:#?}");
                     println!("{signatures:#?}");
                 }
             }
