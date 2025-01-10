@@ -315,6 +315,22 @@ impl SelectGtExchangeVault {
     }
 }
 
+#[derive(clap::Args)]
+#[group(required = true, multiple = false)]
+pub(crate) struct ToggleValue {
+    #[arg(long)]
+    enable: bool,
+    #[arg(long)]
+    disable: bool,
+}
+
+impl ToggleValue {
+    pub(crate) fn is_enable(&self) -> bool {
+        debug_assert!(self.enable != self.disable);
+        self.enable
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

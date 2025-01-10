@@ -19,6 +19,7 @@ mod alt;
 mod controller;
 mod exchange;
 mod feature_keeper;
+mod glv;
 mod gt;
 mod inspect;
 mod market_keeper;
@@ -100,6 +101,8 @@ enum Command {
     Order(order_keeper::KeeperArgs),
     /// Commands for MARKET_KEEPER.
     Market(market_keeper::Args),
+    /// Commands for GLV.
+    Glv(glv::Args),
     /// Commands for GT.
     Gt(gt::Args),
     /// Commands for CONTROLLER.
@@ -273,6 +276,16 @@ impl Cli {
             Command::Market(args) => {
                 args.run(&client, &store, timelock, self.serialize_only)
                     .await?
+            }
+            Command::Glv(args) => {
+                args.run(
+                    &client,
+                    &store,
+                    timelock,
+                    self.serialize_only,
+                    self.skip_preflight,
+                )
+                .await?
             }
             Command::Gt(args) => {
                 args.run(
