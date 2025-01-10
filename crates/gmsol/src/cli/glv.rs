@@ -1,7 +1,7 @@
 use crate::{utils::ToggleValue, GMSOLClient, TimelockCtx};
 use gmsol::{
     store::glv::GlvOps,
-    types::{common::action::Action, glv::GlvMarketFlag, GlvDeposit, GlvWithdrawal},
+    types::{common::action::Action, glv::GlvMarketFlag, GlvDeposit, GlvShift, GlvWithdrawal},
 };
 use solana_sdk::pubkey::Pubkey;
 
@@ -110,6 +110,24 @@ enum Command {
         /// Swap paths for short token.
         #[arg(long, short, action = clap::ArgAction::Append)]
         short_swap: Vec<Pubkey>,
+    },
+    /// Create a GLV shift.
+    Shift {
+        /// From market token.
+        #[arg(long, value_name = "FROM_MARKET_TOKEN")]
+        from: Pubkey,
+        /// To market token.
+        #[arg(long, value_name = "TO_MARKET_TOKEN")]
+        to: Pubkey,
+        /// Amount.
+        #[arg(long)]
+        amount: u64,
+        /// Min output amount.
+        #[arg(long, default_value_t = 0)]
+        min_output_amount: u64,
+        /// Extra execution fee allowed to use.
+        #[arg(long, short, default_value_t = 0)]
+        extra_execution_fee: u64,
     },
 }
 
@@ -277,6 +295,31 @@ impl Args {
                     .build_with_address()
                     .await?;
                 println!("{withdrawal}");
+                rpc
+            }
+            Command::Shift {
+                from,
+                to,
+                amount,
+                min_output_amount,
+                extra_execution_fee,
+            } => {
+                let mut builder = client.create_glv_shift(
+                    store,
+                    &selected.address(client, store),
+                    from,
+                    to,
+                    *amount,
+                );
+
+                builder
+                    .execution_fee(extra_execution_fee + GlvShift::MIN_EXECUTION_LAMPORTS)
+                    .min_to_market_token_amount(*min_output_amount);
+
+                let (rpc, shift) = builder.build_with_address()?;
+
+                println!("{shift}");
+
                 rpc
             }
         };
