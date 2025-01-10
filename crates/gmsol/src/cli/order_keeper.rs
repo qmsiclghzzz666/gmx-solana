@@ -103,6 +103,8 @@ enum Command {
     ExecuteGlvDeposit { deposit: Pubkey },
     /// Execute GLV Withdrawal.
     ExecuteGlvWithdrawal { withdrawal: Pubkey },
+    /// Execute GLV Shift.
+    ExecuteGlvShift { shift: Pubkey },
 }
 
 #[derive(Debug, clap::ValueEnum, Clone, Copy)]
@@ -731,6 +733,48 @@ impl KeeperArgs {
                         })
                         .await?;
                     tracing::info!(%withdrawal, "executed GLV withdrawal at tx {signatures:#?}");
+                    println!("{signatures:#?}");
+                }
+            }
+            Command::ExecuteGlvShift { shift } => {
+                let mut builder = client.execute_glv_shift(self.oracle()?, shift, true);
+                for alt in &self.alts {
+                    let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
+                    builder.add_alt(alt);
+                }
+                let execution_fee = builder.build().await?.estimate_execution_fee(None).await?;
+                builder.set_execution_fee(execution_fee);
+                if self.use_pyth_pull_oracle() {
+                    let hint = builder.prepare_hint().await?;
+                    let feed_ids = extract_pyth_feed_ids(&hint.feeds)?;
+                    if feed_ids.is_empty() {
+                        tracing::error!(%shift, "empty feed ids");
+                    }
+                    let oracle = PythPullOracle::try_new(client)?;
+                    let hermes = Hermes::default();
+                    let update = hermes
+                        .latest_price_updates(&feed_ids, Some(EncodingType::Base64))
+                        .await?;
+                    oracle
+                        .execute_with_pyth_price_updates(
+                            Some(update.binary()),
+                            &mut builder,
+                            Some(self.compute_unit_price),
+                            true,
+                            true,
+                        )
+                        .await?;
+                } else {
+                    let builder = builder.build().await?;
+                    let compute_unit_price_micro_lamports =
+                        self.get_compute_budget().map(|budget| budget.price());
+                    let signatures = builder
+                        .send_all_with_opts(SendTransactionOptions {
+                            compute_unit_price_micro_lamports,
+                            ..Default::default()
+                        })
+                        .await?;
+                    tracing::info!(%shift, "executed GLV shift at tx {signatures:#?}");
                     println!("{signatures:#?}");
                 }
             }
