@@ -802,7 +802,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer
 {
     async fn feed_ids(&mut self) -> crate::Result<FeedIds> {
         let hint = self.prepare_hint().await?;
-        Ok(hint.feeds)
+        Ok(FeedIds::new(hint.store, hint.feeds))
     }
 
     fn process_feeds(

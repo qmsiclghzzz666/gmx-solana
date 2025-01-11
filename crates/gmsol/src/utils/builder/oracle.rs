@@ -89,7 +89,34 @@ impl<O: PullOracle, T: SetExecutionFee> SetExecutionFee for WithPullOracle<O, T>
 }
 
 /// Feed IDs.
-pub type FeedIds = TokensWithFeed;
+#[derive(Debug, Clone)]
+pub struct FeedIds {
+    store: Pubkey,
+    tokens_with_feed: TokensWithFeed,
+}
+
+impl FeedIds {
+    /// Get the store address.
+    pub fn store(&self) -> &Pubkey {
+        &self.store
+    }
+
+    /// Create from `store` and `tokens_with_feed`.
+    pub fn new(store: Pubkey, tokens_with_feed: TokensWithFeed) -> Self {
+        Self {
+            store,
+            tokens_with_feed,
+        }
+    }
+}
+
+impl Deref for FeedIds {
+    type Target = TokensWithFeed;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tokens_with_feed
+    }
+}
 
 /// Pull Oracle.
 pub trait PullOracle {
