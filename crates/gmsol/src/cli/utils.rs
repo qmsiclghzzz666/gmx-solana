@@ -246,7 +246,9 @@ pub fn signer_from_source(
         }
         "usb" => {
             let manufacturer = url.host_str().ok_or_eyre("missing manufacturer")?;
-            let pubkey = (!url.path().is_empty()).then(|| url.path());
+            let path = url.path();
+            let path = path.strip_prefix('/').unwrap_or(path);
+            let pubkey = (!path.is_empty()).then_some(path);
             let locator = Locator::new_from_parts(manufacturer, pubkey)?;
             let query = url.query_pairs().collect::<HashMap<_, _>>();
             if query.len() > 1 {
