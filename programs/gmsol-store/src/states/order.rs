@@ -120,12 +120,13 @@ impl OrderKind {
 
 /// Transfer Out.
 #[zero_copy]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(BorshSerialize, BorshDeserialize, Default, InitSpace)]
 pub struct TransferOut {
     /// Executed.
     executed: u8,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 7],
     /// Final output token.
     pub final_output_token: u64,

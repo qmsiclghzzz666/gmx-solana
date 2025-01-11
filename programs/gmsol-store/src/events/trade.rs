@@ -204,13 +204,14 @@ gmsol_utils::flags!(TradeFlag, 8, u8);
 /// Trade event data.
 #[account(zero_copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[derive(BorshSerialize, BorshDeserialize, InitSpace)]
 pub struct TradeData {
     /// Trade flag.
     // FIXME: Use the type alias `TradeFlag` instead of the concrete type.
     // However, this causes the IDL build to fail in `anchor v0.30.1`.
     flags: u8,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 7],
     /// Trade id.
     pub trade_id: u64,
@@ -266,6 +267,7 @@ pub struct TradeData {
     pub after: PositionState,
     /// Transfer out.
     pub transfer_out: TransferOut,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 8],
     /// Prices.
     pub prices: TradePrices,
