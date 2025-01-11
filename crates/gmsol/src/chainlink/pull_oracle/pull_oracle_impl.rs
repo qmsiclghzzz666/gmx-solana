@@ -1,4 +1,8 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{
+    collections::HashMap,
+    ops::Deref,
+    sync::{Arc, RwLock},
+};
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
 use gmsol_store::states::PriceProviderKind;
@@ -19,7 +23,7 @@ pub struct ChainlinkPullOracleFactory {
     access_controller: Pubkey,
     store: Pubkey,
     feed_index: u8,
-    feeds: FeedAddressMap,
+    feeds: RwLock<FeedAddressMap>,
 }
 
 impl ChainlinkPullOracleFactory {
@@ -53,7 +57,7 @@ impl ChainlinkPullOracleFactory {
 
     /// Prepare feed accounts for the given tokens and feed_ids.
     pub async fn prepare_feeds<C: Deref<Target = impl Signer> + Clone>(
-        &mut self,
+        &self,
         gmsol: &crate::Client<C>,
         feed_ids: HashMap<Pubkey, FeedId>,
     ) -> crate::Result<()> {
@@ -89,7 +93,7 @@ impl ChainlinkPullOracleFactory {
                     )?;
                 }
             }
-            self.feeds.insert(feed_id, address);
+            self.feeds.write().unwrap().insert(feed_id, address);
         }
 
         if !txs.is_emtpy() {
@@ -108,7 +112,7 @@ impl ChainlinkPullOracleFactory {
 
     /// Create [`ChainlinkPullOracle`].
     pub fn make_oracle<'a, C>(
-        &'a self,
+        self: Arc<Self>,
         chainlink: &'a Client,
         gmsol: &'a crate::Client<C>,
     ) -> ChainlinkPullOracle<'a, C> {
@@ -120,7 +124,16 @@ impl ChainlinkPullOracleFactory {
 pub struct ChainlinkPullOracle<'a, C> {
     chainlink: &'a Client,
     gmsol: &'a crate::Client<C>,
-    ctx: &'a ChainlinkPullOracleFactory,
+    ctx: Arc<ChainlinkPullOracleFactory>,
+}
+
+impl<'a, C> Clone for ChainlinkPullOracle<'a, C> {
+    fn clone(&self) -> Self {
+        Self {
+            ctx: self.ctx.clone(),
+            ..*self
+        }
+    }
 }
 
 impl<'a, C> ChainlinkPullOracle<'a, C> {
@@ -128,7 +141,7 @@ impl<'a, C> ChainlinkPullOracle<'a, C> {
     pub fn new(
         chainlink: &'a Client,
         gmsol: &'a crate::Client<C>,
-        ctx: &'a ChainlinkPullOracleFactory,
+        ctx: Arc<ChainlinkPullOracleFactory>,
     ) -> Self {
         Self {
             chainlink,
@@ -138,7 +151,7 @@ impl<'a, C> ChainlinkPullOracle<'a, C> {
     }
 }
 
-impl<'r, 'a, C> PullOracle for &'r ChainlinkPullOracle<'a, C> {
+impl<'a, C> PullOracle for ChainlinkPullOracle<'a, C> {
     type PriceUpdates = HashMap<FeedId, ApiReportData>;
 
     async fn fetch_price_updates(
@@ -185,8 +198,8 @@ impl<'r, 'a, C> PullOracle for &'r ChainlinkPullOracle<'a, C> {
     }
 }
 
-impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
-    for &'r ChainlinkPullOracle<'a, C>
+impl<'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
+    for ChainlinkPullOracle<'a, C>
 {
     async fn fetch_price_update_instructions(
         &self,
@@ -198,10 +211,11 @@ impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
         let mut txs = PriceUpdateInstructions::new(self.gmsol);
         let mut map = HashMap::with_capacity(price_updates.len());
 
+        let feeds = self.ctx.feeds.read().unwrap();
         for (feed_id, update) in price_updates {
             let feed_id = Pubkey::new_from_array(*feed_id);
             tracing::info!("adding ix to post price update for {feed_id}");
-            let feed = self.ctx.feeds.get(&feed_id).ok_or_else(|| {
+            let feed = feeds.get(&feed_id).ok_or_else(|| {
                 crate::Error::invalid_argument(format!(
                     "feed account for the given `feed_id` is not provided, feed_id = {feed_id}"
                 ))

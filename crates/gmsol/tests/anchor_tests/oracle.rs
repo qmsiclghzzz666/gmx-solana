@@ -102,7 +102,7 @@ async fn use_chainlink_data_streams() -> eyre::Result<()> {
 
     let execute = keeper.execute_deposit(store, oracle, &deposit, false);
     tokio::time::sleep(Duration::from_secs(2)).await;
-    let execute = WithPullOracle::new(&chainlink, execute, None).await?;
+    let execute = WithPullOracle::new(chainlink, execute, None).await?;
     let mut execute = EstimateFee::new(execute, None);
 
     let txs = execute.build().await?;

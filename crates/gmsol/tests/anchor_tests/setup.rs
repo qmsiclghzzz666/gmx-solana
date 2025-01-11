@@ -1277,8 +1277,8 @@ impl Deployment {
     pub(crate) async fn chainlink_pull_oracle<'a>(
         &self,
         gmsol: &'a gmsol::Client<SignerRef>,
-    ) -> eyre::Result<ChainlinkPullOracleFactory> {
-        let mut oracle = ChainlinkPullOracleFactory::with_program_id_and_access_controller(
+    ) -> eyre::Result<Arc<ChainlinkPullOracleFactory>> {
+        let oracle = ChainlinkPullOracleFactory::with_program_id_and_access_controller(
             &self.store,
             self.chainlink_feed_index,
             &self.chainlink_verifier_program,
@@ -1300,7 +1300,7 @@ impl Deployment {
 
         oracle.prepare_feeds(gmsol, feed_ids).await?;
 
-        Ok(oracle)
+        Ok(Arc::new(oracle))
     }
 }
 
