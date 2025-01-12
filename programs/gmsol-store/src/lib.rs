@@ -167,6 +167,8 @@
 //! - [`update_glv_market_config`]: Update GLV market config.
 //! - [`toggle_glv_market_flag`]: Toggle flags of GLV market.
 //! - [`update_glv_config`]: Update GLV global config.
+//! - [`insert_glv_market`]: Insert a new market to the GLV.
+//! - [`remove_glv_market`]: Remove a market from the GLV.
 //!
 //! #### Instructions for [`GlvDeposit`](states::GlvDeposit)
 //! - [`create_glv_deposit`]: Create a GLV deposit by the owner.
@@ -2843,13 +2845,69 @@ pub mod gmsol_store {
     ///   - A signer
     ///   - Have MARKET_KEEPER role in the `store`
     /// - The [`store`](UpdateGlvConfig::store) must be properly initialized.
-    /// - The [`glv`](UpdateGlvMarketConfig::glv) must be:
+    /// - The [`glv`](UpdateGlvConfig::glv) must be:
     ///   - Properly initialized
     ///   - Owned by the `store`
     /// - The `params` must not non-empty.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn update_glv_config(ctx: Context<UpdateGlvConfig>, params: UpdateGlvParams) -> Result<()> {
         instructions::unchecked_update_glv(ctx, &params)
+    }
+
+    /// Insert a new market to the GLV.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](InsertGlvMarket)*
+    ///
+    /// # Errors
+    /// - The [`authority`](InsertGlvMarket::authority) must be:
+    ///   - A signer
+    ///   - Have MARKET_KEEPER role in the `store`
+    /// - The [`store`](InsertGlvMarket::store) must be properly initialized.
+    /// - The [`glv`](InsertGlvMarket::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
+    /// - The [`market_token`](InsertGlvMarket::market_token) must be:
+    ///   - A initialized SPL Token / Token-2022 mint
+    ///   - Have `store` as its mint authority
+    ///   - Not already contains in the given GLV
+    /// - The [`market`](InsertGlvMarket::market) must be:
+    ///   - A initialized market account owned by the `store`
+    ///   - Must have `market_token` as its market token
+    ///   - Must have the same long token and short token as the GLV
+    ///   - Must be enabled
+    /// - The [`vault`](InsertGlvMarket::vault) must be either:
+    ///   - The ATA of `market_token` owned by `glv`, or
+    ///   - Unintialized ATA account of `market_token` owned by `glv`
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn insert_glv_market(ctx: Context<InsertGlvMarket>) -> Result<()> {
+        instructions::unchecked_insert_glv_market(ctx)
+    }
+
+    /// Remove a market from the GLV.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](RemoveGlvMarket)*
+    ///
+    /// # Errors
+    /// - The [`authority`](RemoveGlvMarket::authority) must:
+    ///   - Be a signer
+    ///   - Have MARKET_KEEPER role in the `store`
+    /// - The [`store`](RemoveGlvMarket::store) must be properly initialized.
+    /// - The [`glv`](RemoveGlvMarket::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
+    /// - The [`market_token`](RemoveGlvMarket::market_token) must be:
+    ///   - A initialized SPL Token mint
+    ///   - Having `store` as its mint authority
+    ///   - Contained in the given GLV
+    ///   - Having deposit disabled in the GLV
+    /// - The [`vault`](RemoveGlvMarket::vault) must be:
+    ///   - The ATA of `market_token` owned by `glv`
+    ///   - Having no remaining balance
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn remove_glv_market(ctx: Context<RemoveGlvMarket>) -> Result<()> {
+        instructions::unchecked_remove_glv_market(ctx)
     }
 
     /// Create GLV deposit.

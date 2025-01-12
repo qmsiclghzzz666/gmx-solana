@@ -12,7 +12,7 @@ use crate::{
     constants,
     states::{
         glv::{Glv, UpdateGlvParams},
-        Seed, Store,
+        Market, Seed, Store,
     },
     utils::{internal, token::is_associated_token_account_with_program_id},
     CoreError,
@@ -189,7 +189,6 @@ impl<'info> InitializeGlv<'info> {
 #[derive(Accounts)]
 pub struct UpdateGlvMarketConfig<'info> {
     /// Authority.
-    #[account(mut)]
     pub authority: Signer<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
@@ -260,10 +259,10 @@ pub(crate) fn unchecked_toggle_glv_market_flag(
 #[derive(Accounts)]
 pub struct UpdateGlvConfig<'info> {
     /// Authority.
-    #[account(mut)]
     pub authority: Signer<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
+    /// GLV to update.
     #[account(mut, has_one = store)]
     pub glv: AccountLoader<'info, Glv>,
 }
@@ -282,6 +281,150 @@ pub(crate) fn unchecked_update_glv(
 }
 
 impl<'info> internal::Authentication<'info> for UpdateGlvConfig<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// The accounts definition for [`insert_glv_market`](crate::gmsol_store::insert_glv_market) instruction.
+#[derive(Accounts)]
+pub struct InsertGlvMarket<'info> {
+    /// Authority.
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// GLV to modify.
+    #[account(
+        mut,
+        has_one = store,
+    )]
+    pub glv: AccountLoader<'info, Glv>,
+    /// Market token.
+    #[account(
+        mint::authority = store,
+        mint::token_program = token_program,
+        constraint = !glv.load()?.contains(&market_token.key()) @ CoreError::PreconditionsAreNotMet,
+    )]
+    pub market_token: InterfaceAccount<'info, token_interface::Mint>,
+    /// Market.
+    #[account(
+        has_one = store,
+        constraint = market.load()?.meta().market_token_mint == market_token.key() @ CoreError::MarketTokenMintMismatched,
+    )]
+    pub market: AccountLoader<'info, Market>,
+    /// Vault.
+    #[account(
+        init_if_needed,
+        payer = authority,
+        associated_token::mint = market_token,
+        associated_token::authority = glv,
+        associated_token::token_program = token_program,
+    )]
+    pub vault: InterfaceAccount<'info, token_interface::TokenAccount>,
+    /// System program.
+    pub system_program: Program<'info, System>,
+    /// Token program for market token.
+    pub token_program: Interface<'info, token_interface::TokenInterface>,
+    /// Associated token program.
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+/// Insert a new market to the GLV.
+///
+/// # CHECK
+/// - Only MARKET_KEEPER can use.
+pub(crate) fn unchecked_insert_glv_market(ctx: Context<InsertGlvMarket>) -> Result<()> {
+    let mut glv = ctx.accounts.glv.load_mut()?;
+    let market = ctx.accounts.market.load()?;
+
+    glv.insert_market(&ctx.accounts.store.key(), &market)?;
+
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for InsertGlvMarket<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// The accounts definition for [`remove_glv_market`](crate::gmsol_store::remove_glv_market) instruction.
+#[derive(Accounts)]
+pub struct RemoveGlvMarket<'info> {
+    /// Authority.
+    pub authority: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// GLV to modify.
+    #[account(
+        mut,
+        has_one = store,
+    )]
+    pub glv: AccountLoader<'info, Glv>,
+    /// Market token.
+    #[account(
+        mint::authority = store,
+        constraint = glv.load()?.contains(&market_token.key()) @ CoreError::PreconditionsAreNotMet,
+    )]
+    pub market_token: InterfaceAccount<'info, token_interface::Mint>,
+    /// Vault.
+    #[account(
+        mut,
+        associated_token::mint = market_token,
+        associated_token::authority = glv,
+    )]
+    pub vault: InterfaceAccount<'info, token_interface::TokenAccount>,
+    /// Token program.
+    pub token_program: Interface<'info, token_interface::TokenInterface>,
+}
+
+/// Remove a new market from the GLV.
+///
+/// # CHECK
+/// - Only MARKET_KEEPER can use.
+pub(crate) fn unchecked_remove_glv_market(ctx: Context<RemoveGlvMarket>) -> Result<()> {
+    use anchor_spl::token_interface::{close_account, CloseAccount};
+
+    let market_token = ctx.accounts.market_token.key();
+    require_eq!(
+        ctx.accounts.vault.amount,
+        0,
+        CoreError::PreconditionsAreNotMet
+    );
+    ctx.accounts
+        .glv
+        .load_mut()?
+        .unchecked_remove_market(&market_token)?;
+
+    {
+        let glv = ctx.accounts.glv.load()?;
+        let signer = glv.signer_seeds();
+        close_account(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                CloseAccount {
+                    account: ctx.accounts.vault.to_account_info(),
+                    destination: ctx.accounts.authority.to_account_info(),
+                    authority: ctx.accounts.glv.to_account_info(),
+                },
+            )
+            .with_signer(&[&signer]),
+        )?;
+    }
+
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for RemoveGlvMarket<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }

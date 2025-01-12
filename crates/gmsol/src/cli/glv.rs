@@ -41,6 +41,10 @@ enum Command {
         #[command(flatten)]
         config: Config,
     },
+    /// Insert Market.
+    InsertMarket { market_token: Pubkey },
+    /// Remove Market.
+    RemoveMarket { market_token: Pubkey },
     /// Create GLV deposit.
     Deposit {
         /// The address of the market token of the GLV Market to deposit into.
@@ -242,6 +246,18 @@ impl Args {
                 market_token,
                 config.max_amount,
                 config.max_value,
+            ),
+            Command::InsertMarket { market_token } => client.insert_glv_market(
+                store,
+                &selected.address(client, store),
+                market_token,
+                None,
+            ),
+            Command::RemoveMarket { market_token } => client.remove_glv_market(
+                store,
+                &selected.address(client, store),
+                market_token,
+                None,
             ),
             Command::Deposit {
                 market_token,

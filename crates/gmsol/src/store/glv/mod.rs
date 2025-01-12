@@ -72,6 +72,24 @@ pub trait GlvOps<C> {
         params: UpdateGlvParams,
     ) -> RpcBuilder<C>;
 
+    /// Insert GLV market.
+    fn insert_glv_market(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        market_token: &Pubkey,
+        token_program_id: Option<&Pubkey>,
+    ) -> RpcBuilder<C>;
+
+    /// Remove GLV market.
+    fn remove_glv_market(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        market_token: &Pubkey,
+        token_program_id: Option<&Pubkey>,
+    ) -> RpcBuilder<C>;
+
     /// Create a GLV deposit.
     fn create_glv_deposit(
         &self,
@@ -229,6 +247,56 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
                 glv,
             })
             .args(instruction::UpdateGlvConfig { params })
+    }
+
+    fn insert_glv_market(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        market_token: &Pubkey,
+        token_program_id: Option<&Pubkey>,
+    ) -> RpcBuilder<C> {
+        let token_program_id = token_program_id.unwrap_or(&anchor_spl::token::ID);
+        let glv = self.find_glv_address(glv_token);
+        let market = self.find_market_address(store, market_token);
+        let vault =
+            get_associated_token_address_with_program_id(&glv, market_token, token_program_id);
+        self.store_rpc()
+            .accounts(accounts::InsertGlvMarket {
+                authority: self.payer(),
+                store: *store,
+                glv,
+                market_token: *market_token,
+                market,
+                vault,
+                system_program: system_program::ID,
+                token_program: *token_program_id,
+                associated_token_program: anchor_spl::associated_token::ID,
+            })
+            .args(instruction::InsertGlvMarket {})
+    }
+
+    fn remove_glv_market(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        market_token: &Pubkey,
+        token_program_id: Option<&Pubkey>,
+    ) -> RpcBuilder<C> {
+        let token_program_id = token_program_id.unwrap_or(&anchor_spl::token::ID);
+        let glv = self.find_glv_address(glv_token);
+        let vault =
+            get_associated_token_address_with_program_id(&glv, market_token, token_program_id);
+        self.store_rpc()
+            .accounts(accounts::RemoveGlvMarket {
+                authority: self.payer(),
+                store: *store,
+                glv,
+                market_token: *market_token,
+                vault,
+                token_program: *token_program_id,
+            })
+            .args(instruction::RemoveGlvMarket {})
     }
 
     fn create_glv_deposit(

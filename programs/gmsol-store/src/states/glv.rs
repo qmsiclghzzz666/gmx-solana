@@ -256,6 +256,50 @@ impl Glv {
         Ok(())
     }
 
+    pub(crate) fn insert_market(&mut self, store: &Pubkey, market: &Market) -> Result<()> {
+        let meta = market.validated_meta(store)?;
+
+        require_eq!(
+            meta.long_token_mint,
+            self.long_token,
+            CoreError::InvalidArgument
+        );
+
+        require_eq!(
+            meta.short_token_mint,
+            self.short_token,
+            CoreError::InvalidArgument
+        );
+
+        let market_token = meta.market_token_mint;
+        self.markets
+            .insert_with_options(&market_token, GlvMarketConfig::default(), true)?;
+
+        Ok(())
+    }
+
+    /// Remove market from the GLV.
+    ///
+    /// # CHECK
+    /// - The balance of the vault must be zero.
+    pub(crate) fn unchecked_remove_market(&mut self, market_token: &Pubkey) -> Result<()> {
+        let config = self
+            .market_config(market_token)
+            .ok_or_else(|| error!(CoreError::NotFound))?;
+
+        require!(
+            !config.get_flag(GlvMarketFlag::IsDepositAllowed),
+            CoreError::PreconditionsAreNotMet
+        );
+
+        require!(
+            self.markets.remove(market_token).is_some(),
+            CoreError::Internal
+        );
+
+        Ok(())
+    }
+
     /// Get all market tokens.
     pub fn market_tokens(&self) -> impl Iterator<Item = Pubkey> + '_ {
         self.markets
