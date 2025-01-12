@@ -296,6 +296,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
         let market = self.market.load()?;
         market.validate(&self.store.key())?;
 
+        let glv_address = self.glv.key();
         let glv = self.glv.load()?;
         let glv_deposit = self.glv_deposit.load()?;
 
@@ -304,6 +305,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
             &market,
             &self.glv_token_mint.to_account_info(),
             &glv,
+            &glv_address,
         )?;
 
         require_gte!(

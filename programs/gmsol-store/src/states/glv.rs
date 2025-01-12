@@ -720,6 +720,7 @@ impl GlvDeposit {
         market: &Market,
         glv_token: &AccountInfo,
         glv: &Glv,
+        glv_address: &Pubkey,
     ) -> Result<()> {
         use anchor_spl::token::accessor::amount;
 
@@ -732,8 +733,9 @@ impl GlvDeposit {
         let supply = amount(market_token)?;
 
         if supply == 0 && self.is_market_deposit_required() {
+            // The receiver of the market tokens is GLV.
             Deposit::validate_first_deposit(
-                &self.header.owner,
+                glv_address,
                 self.params.deposit.min_market_token_amount,
                 market,
             )?;
