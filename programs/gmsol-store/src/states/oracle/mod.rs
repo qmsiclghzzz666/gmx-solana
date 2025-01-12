@@ -356,8 +356,13 @@ impl OraclePrice {
         let feed_id = token_config.get_feed(&provider)?;
 
         let (oracle_slot, oracle_ts, price) = match provider {
-            PriceProviderKind::Switchboard => {
-                Switchboard::check_and_get_price(clock, token_config, account)?
+            PriceProviderKind::ChainlinkDataStreams => {
+                parsed.ok_or_else(|| error!(CoreError::Internal))?
+            }
+            PriceProviderKind::Pyth => {
+                let (oracle_slot, oracle_ts, price) =
+                    Pyth::check_and_get_price(clock, token_config, account, &feed_id)?;
+                (oracle_slot, oracle_ts, price)
             }
             PriceProviderKind::Chainlink => {
                 require_eq!(feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
@@ -371,13 +376,8 @@ impl OraclePrice {
                 )?;
                 (oracle_slot, oracle_ts, price)
             }
-            PriceProviderKind::Pyth => {
-                let (oracle_slot, oracle_ts, price) =
-                    Pyth::check_and_get_price(clock, token_config, account, &feed_id)?;
-                (oracle_slot, oracle_ts, price)
-            }
-            PriceProviderKind::ChainlinkDataStreams => {
-                parsed.ok_or_else(|| error!(CoreError::Internal))?
+            PriceProviderKind::Switchboard => {
+                Switchboard::check_and_get_price(clock, token_config, account)?
             }
         };
 

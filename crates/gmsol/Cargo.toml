@@ -28,6 +28,7 @@ required-features = ["chainlink-pull-oracle", "cli"]
 cli = [
     "chainlink-pull-oracle",
     "pyth-pull-oracle",
+    "switchboard-pull-oracle",
     "tokio/full",
     "clap",
     "tracing-subscriber",
@@ -60,6 +61,7 @@ pyth-pull-oracle = [
     "pyth-solana-receiver-sdk",
     "byteorder",
 ]
+switchboard-pull-oracle = ["switchboard-on-demand-client"]
 rust-embed = ["dep:rust-embed"]
 poem = ["dep:poem"]
 doc = ["gmsol-store/doc", "cli"]
@@ -75,7 +77,12 @@ anchor-test = [
 
 mock = ["mock-chainlink-verifier"]
 
-devnet = []
+devnet = [
+    "gmsol-store/devnet",
+    "gmsol-timelock/devnet",
+    "gmsol-treasury/devnet",
+    "switchboard-on-demand-client?/devnet",
+]
 
 [dependencies]
 gmsol-utils = { workspace = true }
@@ -140,6 +147,7 @@ bs58 = { workspace = true }
 async-stream = { workspace = true }
 either = { workspace = true }
 url = { workspace = true }
+spl-token = { workspace = true }
 
 # Dependencies for cli
 clap = { workspace = true, optional = true, features = ["derive", "env"] }
@@ -181,13 +189,11 @@ tower = { workspace = true, optional = true }
 pin-project-lite = { workspace = true, optional = true }
 
 # Dependencies for switchboard support
-switchboard-on-demand-client = { workspace = true }
-spl-token = { workspace = true }
+switchboard-on-demand-client = { workspace = true, optional = true }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 event-listener = { workspace = true }
-spl-token = { workspace = true }
 spl-associated-token-account = { workspace = true }
 shellexpand = { workspace = true }
 mock-chainlink-verifier = { workspace = true }

@@ -2,14 +2,22 @@ use crate::{states::TokenConfig, CoreError};
 use anchor_lang::prelude::*;
 use gmsol_utils::price::Decimal;
 use gmsol_utils::price::Price;
-use switchboard_on_demand::{SbFeed, ON_DEMAND_MAINNET_PID};
+use switchboard_on_demand::SbFeed;
 
 /// The Switchboard receiver program.
 pub struct Switchboard;
 
+#[cfg(feature = "devnet")]
 impl Id for Switchboard {
     fn id() -> Pubkey {
-        ON_DEMAND_MAINNET_PID
+        switchboard_on_demand::ON_DEMAND_DEVNET_PID
+    }
+}
+
+#[cfg(not(feature = "devnet"))]
+impl Id for Switchboard {
+    fn id() -> Pubkey {
+        switchboard_on_demand::ON_DEMAND_MAINNET_PID
     }
 }
 
@@ -22,11 +30,12 @@ impl Switchboard {
     ) -> Result<(u64, i64, Price)> {
         let feed = AccountLoader::<SbFeed>::try_from(feed)?;
         let feed = feed.load()?;
-        let max_age = clock.unix_timestamp - token_config.heartbeat_duration() as i64;
         let (min_result_ts, _) = feed.current_result_ts_range();
-        if min_result_ts < max_age {
-            return Err(error!(CoreError::PriceIsStale));
-        }
+        require_gte!(
+            min_result_ts.saturating_add(token_config.heartbeat_duration().into()),
+            clock.unix_timestamp,
+            CoreError::PriceFeedNotUpdated
+        );
         Ok((
             feed.result.slot,
             feed.result_ts(),
@@ -38,26 +47,33 @@ impl Switchboard {
         let min_price = feed
             .min_value()
             .ok_or_else(|| error!(CoreError::PriceIsStale))?;
-        let min_price = Decimal::try_from_price(
-            min_price.mantissa() as u128,
-            min_price.scale() as u8,
-            token_config.token_decimals(),
-            token_config.precision(),
-        )
-        .map_err(|_| error!(CoreError::PriceIsStale))?;
+        let min_price = from_rust_decimal_price(&min_price, token_config)?;
         let max_price = feed
             .max_value()
             .ok_or_else(|| error!(CoreError::PriceIsStale))?;
-        let max_price = Decimal::try_from_price(
-            max_price.mantissa() as u128,
-            max_price.scale() as u8,
-            token_config.token_decimals(),
-            token_config.precision(),
-        )
-        .map_err(|_| error!(CoreError::PriceIsStale))?;
+        let max_price = from_rust_decimal_price(&max_price, token_config)?;
         Ok(Price {
             min: min_price,
             max: max_price,
         })
     }
+}
+
+fn from_rust_decimal_price(
+    price: &rust_decimal::Decimal,
+    token_config: &TokenConfig,
+) -> Result<Decimal> {
+    Decimal::try_from_price(
+        price
+            .mantissa()
+            .try_into()
+            .map_err(|_| error!(CoreError::InvalidPriceFeedPrice))?,
+        price
+            .scale()
+            .try_into()
+            .map_err(|_| error!(CoreError::InvalidPriceFeedPrice))?,
+        token_config.token_decimals(),
+        token_config.precision(),
+    )
+    .map_err(|_| error!(CoreError::InvalidPriceFeedPrice))
 }

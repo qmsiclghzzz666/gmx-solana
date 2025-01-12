@@ -17,6 +17,7 @@ debug-msg = []
 idl-build = ["anchor-lang/idl-build"]
 no-mock = []
 multi-store = []
+devnet = []
 
 [dependencies]
 anchor-lang = { workspace = true }

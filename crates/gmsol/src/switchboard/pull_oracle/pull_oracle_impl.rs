@@ -1,6 +1,11 @@
-use crate::utils::{
-    builder::{FeedAddressMap, FeedIds, PostPullOraclePrices, PriceUpdateInstructions, PullOracle},
-    transaction_builder::rpc_builder::Program,
+use crate::{
+    store::utils::Feeds,
+    utils::{
+        builder::{
+            FeedAddressMap, FeedIds, PostPullOraclePrices, PriceUpdateInstructions, PullOracle,
+        },
+        transaction_builder::rpc_builder::Program,
+    },
 };
 use anchor_client::solana_client::nonblocking::rpc_client::RpcClient;
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
@@ -18,8 +23,7 @@ use std::{
     sync::Arc,
 };
 use switchboard_on_demand_client::{
-    prost::Message,
-    fetch_and_cache_luts, oracle_job::OracleJob, BatchFeedRequest, CrossbarClient,
+    fetch_and_cache_luts, oracle_job::OracleJob, prost::Message, BatchFeedRequest, CrossbarClient,
     FetchSignaturesBatchParams, Gateway, OracleAccountData, PullFeed, PullFeedAccountData,
     PullFeedSubmitResponse, PullFeedSubmitResponseParams, QueueAccountData, SbContext,
     SlotHashSysvar, State, Submission, SWITCHBOARD_ON_DEMAND_PROGRAM_ID,
@@ -55,6 +59,7 @@ impl<'a, C> SwitchboardPullOracle<'a, C> {
     }
 }
 
+/// Swtichboard Price Updates type.
 pub struct SbPriceUpdates {
     /// The list of feed pubkeys for which prices were fetched.
     pub feeds: Vec<Pubkey>,
@@ -77,9 +82,14 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PullOracle for SwitchboardPullO
     async fn fetch_price_updates(
         &self,
         feed_ids: &FeedIds,
-        _after: Option<OffsetDateTime>, // Sb always calculates price on the fly.
+        after: Option<OffsetDateTime>,
     ) -> crate::Result<Self::PriceUpdates> {
-        let feeds = filter_feed_ids(feed_ids, PriceProviderKind::Switchboard)?;
+        let feeds = filter_switchboard_feed_ids(feed_ids)?;
+
+        if feeds.is_empty() {
+            return Err(crate::Error::switchboard_error("no switchboard feed found"));
+        }
+
         let mut num_signatures = 3;
         let mut feed_configs = Vec::new();
         let mut queue = Pubkey::default();
@@ -137,6 +147,21 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PullOracle for SwitchboardPullO
                 oracle_keys.insert(oracle_key);
             }
             for (idx, x) in resp.feed_responses.iter().enumerate() {
+                if let Some(after) = after {
+                    let Some(ts) = x.timestamp else {
+                        return Err(crate::Error::switchboard_error(
+                            "missing timestamp of the feed result",
+                        ))?;
+                    };
+                    let ts = OffsetDateTime::from_unix_timestamp(ts)
+                        .map_err(crate::Error::switchboard_error)?;
+                    if ts < after {
+                        return Err(crate::Error::switchboard_error(
+                            "feed result is too old, ts={ts}, required={after}",
+                        ));
+                    }
+                }
+
                 let mut value_i128 = i128::MAX;
                 if let Ok(val) = x.success_value.parse::<i128>() {
                     value_i128 = val;
@@ -254,11 +279,13 @@ fn encode_jobs(job_array: &[OracleJob]) -> Vec<String> {
         .collect()
 }
 
-fn filter_feed_ids(feed_ids: &FeedIds, provider: PriceProviderKind) -> crate::Result<Vec<Pubkey>> {
-    let Some(sb_idx) = feed_ids.providers.iter().position(|x| *x == provider as u8) else {
-        return Err(crate::Error::switchboard_error("no switchboard feed found"));
-    };
-    let offset = feed_ids.nums[..sb_idx].iter().sum::<u16>() as usize;
-    let feeds = feed_ids.feeds[offset..offset + feed_ids.nums[sb_idx] as usize].to_vec();
-    Ok(feeds)
+fn filter_switchboard_feed_ids(feed_ids: &FeedIds) -> crate::Result<Vec<Pubkey>> {
+    Feeds::new(feed_ids)
+        .filter_map(|res| {
+            res.map(|(provider, feed)| {
+                matches!(provider, PriceProviderKind::Switchboard).then_some(feed)
+            })
+            .transpose()
+        })
+        .collect()
 }

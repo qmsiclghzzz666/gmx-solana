@@ -1,5 +1,6 @@
 IDL_OUT_DIR := "idl-out"
 FEATURES := "cli,u128"
+DEVNET_FEATURES := "devnet"
 SCRIPTS := "./scripts"
 TARGET := "./target"
 
@@ -34,10 +35,10 @@ test-crates:
   cargo test --features {{FEATURES}}
 
 test-programs *ARGS:
-  anchor test {{ARGS}}
+  anchor test {{ARGS}} -- --features {{DEVNET_FEATURES}}
 
 test-programs-debug *ARGS:
-  anchor test {{ARGS}} -- --features debug-msg
+  anchor test {{ARGS}} -- --features debug-msg --features {{DEVNET_FEATURES}}
 
 build-docs *ARGS:
   cargo doc --features doc {{ARGS}}
@@ -56,10 +57,13 @@ check-verifiable:
   fi
 
 build-verifiable:
+  anchor build -v -- --features no-mock --features {{DEVNET_FEATURES}}
+
+build-verifiable-mainnet:
   anchor build -v -- --features no-mock
 
 build-verifiable-with-mock:
-  anchor build -v
+  anchor build -v -- --features {{DEVNET_FEATURES}}
 
 check-geyser:
   @if [ -f "{{GEYSER_PLUGIN_PATH}}" ]; then \

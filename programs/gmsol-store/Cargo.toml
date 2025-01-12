@@ -28,6 +28,7 @@ enum-iter = []
 no-bug-fix = []
 no-mock = ["chainlink-datastreams/no-mock"]
 multi-store = []
+devnet = []
 
 [dependencies]
 bytemuck = { workspace = true }
