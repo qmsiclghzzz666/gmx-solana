@@ -49,8 +49,10 @@ enum Command {
     Deposit {
         /// The address of the market token of the GLV Market to deposit into.
         market_token: Pubkey,
-        #[arg(long)]
+        #[arg(long, group = "deposit-receiver")]
         receiver: Option<Pubkey>,
+        #[arg(long, group = "deposit-receiver", requires = "min_amount")]
+        first_deposit: bool,
         /// Extra execution fee allowed to use.
         #[arg(long, short, default_value_t = 0)]
         extra_execution_fee: u64,
@@ -262,6 +264,7 @@ impl Args {
             Command::Deposit {
                 market_token,
                 receiver,
+                first_deposit,
                 extra_execution_fee,
                 min_amount,
                 long_token,
@@ -300,7 +303,11 @@ impl Args {
                     .min_glv_token_amount(*min_amount)
                     .long_token_swap_path(long_swap.clone())
                     .short_token_swap_path(short_swap.clone())
-                    .receiver(*receiver)
+                    .receiver(if *first_deposit {
+                        Some(GlvDeposit::first_deposit_receiver())
+                    } else {
+                        *receiver
+                    })
                     .build_with_address()
                     .await?;
                 println!("{deposit}");

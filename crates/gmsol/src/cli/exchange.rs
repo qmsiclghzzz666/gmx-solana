@@ -58,7 +58,7 @@ enum Command {
         /// Reciever.
         #[arg(long, group = "deposit_receiver")]
         receiver: Option<Pubkey>,
-        #[arg(long, group = "deposit_receiver")]
+        #[arg(long, group = "deposit_receiver", requires = "min_amount")]
         first_deposit: bool,
     },
     /// Cancel a deposit.

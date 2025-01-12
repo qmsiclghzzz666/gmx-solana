@@ -765,8 +765,9 @@ impl GlvDeposit {
             || self.params.deposit.initial_short_token_amount != 0
     }
 
+    /// Get first deposit receiver.
     #[inline]
-    pub(crate) fn first_deposit_receiver() -> Pubkey {
+    pub fn first_deposit_receiver() -> Pubkey {
         Deposit::first_deposit_receiver()
     }
 
