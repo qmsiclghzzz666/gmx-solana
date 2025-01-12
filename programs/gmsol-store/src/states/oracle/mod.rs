@@ -4,6 +4,9 @@ pub mod price_map;
 /// Custom Price Feed.
 mod feed;
 
+/// Switchboard.
+pub mod switchboard;
+
 /// Chainlink.
 pub mod chainlink;
 
@@ -32,6 +35,7 @@ pub use self::{
     chainlink::Chainlink,
     feed::{PriceFeed, PriceFeedPrice},
     pyth::Pyth,
+    switchboard::Switchboard,
     time::{ValidateOracleTime, ValidateOracleTimeExt},
     validator::PriceValidator,
 };
@@ -303,6 +307,8 @@ pub enum PriceProviderKind {
     Pyth = 1,
     /// Chainlink Data Feed.
     Chainlink = 2,
+    /// Switchboard On-Demand (V3) Data Feed.
+    Switchboard = 3,
 }
 
 impl PriceProviderKind {
@@ -312,6 +318,8 @@ impl PriceProviderKind {
             Some(Self::Chainlink)
         } else if *program_id == Pyth::id() {
             Some(Self::Pyth)
+        } else if *program_id == Switchboard::id() {
+            Some(Self::Switchboard)
         } else {
             None
         }
@@ -348,6 +356,9 @@ impl OraclePrice {
         let feed_id = token_config.get_feed(&provider)?;
 
         let (oracle_slot, oracle_ts, price) = match provider {
+            PriceProviderKind::Switchboard => {
+                Switchboard::check_and_get_price(clock, token_config, account)?
+            }
             PriceProviderKind::Chainlink => {
                 require_eq!(feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
                 let program =
