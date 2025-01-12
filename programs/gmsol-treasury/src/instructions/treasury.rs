@@ -766,7 +766,7 @@ impl<'info> ConfirmGtBuyback<'info> {
         )
     }
 
-    fn get_max_buyback_value(&self, vaults: &[AccountInfo<'info>]) -> Result<u128> {
+    fn get_max_buyback_value(&self, vaults: &[AccountInfo<'info>]) -> Result<BuybackValue> {
         use anchor_spl::token::accessor;
         use gmsol_model::utils::apply_factor;
 
@@ -798,7 +798,7 @@ impl<'info> ConfirmGtBuyback<'info> {
         )
         .ok_or_else(|| error!(CoreError::ValueOverflow))?;
 
-        Ok(gt_bank_value.min(max_buyback_value))
+        Ok(BuybackValue::new(gt_bank_value, max_buyback_value))
     }
 
     /// Reserve the final GT bank balances eligible for buyback.
@@ -814,7 +814,10 @@ impl<'info> ConfirmGtBuyback<'info> {
             return Ok(());
         }
 
-        let max_buyback_value = self.get_max_buyback_value(vaults)?;
+        let BuybackValue {
+            max_buyback_value,
+            gt_bank_value,
+        } = self.get_max_buyback_value(vaults)?;
 
         let buyback_amount = u128::from(self.gt_exchange_vault.load()?.amount());
 
@@ -843,8 +846,22 @@ impl<'info> ConfirmGtBuyback<'info> {
         // Reserve balances for buyback.
         self.gt_bank
             .load_mut()?
-            .reserve_balances(&buyback_value, &max_buyback_value)?;
+            .reserve_balances(&buyback_value, &gt_bank_value)?;
 
         Ok(())
+    }
+}
+
+struct BuybackValue {
+    gt_bank_value: u128,
+    max_buyback_value: u128,
+}
+
+impl BuybackValue {
+    fn new(gt_bank_value: u128, max_buyback_value: u128) -> Self {
+        Self {
+            gt_bank_value,
+            max_buyback_value: gt_bank_value.min(max_buyback_value),
+        }
     }
 }
