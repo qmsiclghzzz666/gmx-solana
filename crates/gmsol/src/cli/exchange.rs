@@ -55,6 +55,11 @@ enum Command {
         /// Swap paths for short token.
         #[arg(long, short, action = clap::ArgAction::Append)]
         short_swap: Vec<Pubkey>,
+        /// Reciever.
+        #[arg(long, group = "deposit_receiver")]
+        receiver: Option<Pubkey>,
+        #[arg(long, group = "deposit_receiver")]
+        first_deposit: bool,
     },
     /// Cancel a deposit.
     CancelDeposit {
@@ -347,6 +352,8 @@ impl ExchangeArgs {
                 short_token_amount,
                 long_swap,
                 short_swap,
+                receiver,
+                first_deposit,
             } => {
                 let mut builder = client.create_deposit(store, market_token);
                 if *long_token_amount != 0 {
@@ -363,11 +370,17 @@ impl ExchangeArgs {
                         short_token_account.as_ref(),
                     );
                 }
+                let receiver = if *first_deposit {
+                    Some(Deposit::first_deposit_receiver())
+                } else {
+                    *receiver
+                };
                 let (builder, deposit) = builder
                     .execution_fee(*extra_execution_fee + Deposit::MIN_EXECUTION_LAMPORTS)
                     .min_market_token(*min_amount)
                     .long_token_swap_path(long_swap.clone())
                     .short_token_swap_path(short_swap.clone())
+                    .receiver(receiver)
                     .build_with_address()
                     .await?;
                 let signature = builder.into_anchor_request().send().await?;
