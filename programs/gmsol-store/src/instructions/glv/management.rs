@@ -10,12 +10,15 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
-    states::{glv::Glv, Seed, Store},
+    states::{
+        glv::{Glv, UpdateGlvParams},
+        Seed, Store,
+    },
     utils::{internal, token::is_associated_token_account_with_program_id},
     CoreError,
 };
 
-/// The accounts definitions for [`initialize_glv`](crate::gmsol_store::initialize_glv) instruction.
+/// The accounts definition for [`initialize_glv`](crate::gmsol_store::initialize_glv) instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///
@@ -251,4 +254,39 @@ pub(crate) fn unchecked_toggle_glv_market_flag(
         enable
     );
     Ok(())
+}
+
+/// The accounts definition for [`update_glv_config`](crate::gmsol_store::update_glv_config) instruction.
+#[derive(Accounts)]
+pub struct UpdateGlvConfig<'info> {
+    /// Authority.
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    #[account(mut, has_one = store)]
+    pub glv: AccountLoader<'info, Glv>,
+}
+
+/// Update thte config of GLV.
+///
+/// # CHECK
+/// - Only MARKET_KEEPER can use.
+pub(crate) fn unchecked_update_glv(
+    ctx: Context<UpdateGlvConfig>,
+    params: &UpdateGlvParams,
+) -> Result<()> {
+    params.validate()?;
+    ctx.accounts.glv.load_mut()?.update_config(params)?;
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for UpdateGlvConfig<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
 }

@@ -1,7 +1,11 @@
 use crate::{utils::ToggleValue, GMSOLClient, TimelockCtx};
 use gmsol::{
     store::glv::GlvOps,
-    types::{common::action::Action, glv::GlvMarketFlag, GlvDeposit, GlvShift, GlvWithdrawal},
+    types::{
+        common::action::Action,
+        glv::{GlvMarketFlag, UpdateGlvParams},
+        GlvDeposit, GlvShift, GlvWithdrawal,
+    },
 };
 use solana_sdk::pubkey::Pubkey;
 
@@ -21,16 +25,18 @@ enum Command {
         #[clap(required = true)]
         market_tokens: Vec<Pubkey>,
     },
+    /// Update Config.
+    Update(UpdateGlvArgs),
     /// Toggle GLV market flag.
-    Toggle {
+    ToggleMarketFlag {
         market_token: Pubkey,
         #[arg(long)]
         flag: GlvMarketFlag,
         #[command(flatten)]
         toggle: ToggleValue,
     },
-    /// Update.
-    Update {
+    /// Update Market Config.
+    UpdateMarket {
         market_token: Pubkey,
         #[command(flatten)]
         config: Config,
@@ -144,6 +150,30 @@ struct GlvToken {
 
 #[derive(clap::Args)]
 #[group(required = true, multiple = true)]
+struct UpdateGlvArgs {
+    /// Minimum amount for the first GLV deposit.
+    #[arg(long)]
+    min_tokens_for_first_deposit: Option<u64>,
+    /// Minimum shift interval seconds.
+    #[arg(long)]
+    shift_min_interval_secs: Option<u32>,
+    /// Maximum price impact factor after shift.
+    #[arg(long)]
+    shift_max_price_impact_factor: Option<u128>,
+}
+
+impl<'a> From<&'a UpdateGlvArgs> for UpdateGlvParams {
+    fn from(args: &'a UpdateGlvArgs) -> Self {
+        Self {
+            min_tokens_for_first_deposit: args.min_tokens_for_first_deposit,
+            shift_min_interval_secs: args.shift_min_interval_secs,
+            shift_max_price_impact_factor: args.shift_max_price_impact_factor,
+        }
+    }
+}
+
+#[derive(clap::Args)]
+#[group(required = true, multiple = true)]
 struct Config {
     #[arg(long)]
     max_amount: Option<u64>,
@@ -188,7 +218,11 @@ impl Args {
                 println!("{glv_token}");
                 rpc
             }
-            Command::Toggle {
+            Command::Update(args) => {
+                let glv_token = selected.address(client, store);
+                client.update_glv_config(store, &glv_token, args.into())
+            }
+            Command::ToggleMarketFlag {
                 market_token,
                 flag,
                 toggle,
@@ -199,7 +233,7 @@ impl Args {
                 *flag,
                 toggle.is_enable(),
             ),
-            Command::Update {
+            Command::UpdateMarket {
                 market_token,
                 config,
             } => client.update_glv_market_config(

@@ -7,7 +7,10 @@ use anchor_client::{
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use gmsol_store::{
     accounts, instruction,
-    states::{glv::GlvMarketFlag, Market},
+    states::{
+        glv::{GlvMarketFlag, UpdateGlvParams},
+        Market,
+    },
 };
 
 use crate::utils::RpcBuilder;
@@ -59,6 +62,14 @@ pub trait GlvOps<C> {
         market_token: &Pubkey,
         flag: GlvMarketFlag,
         enable: bool,
+    ) -> RpcBuilder<C>;
+
+    /// Update GLV config.
+    fn update_glv_config(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        params: UpdateGlvParams,
     ) -> RpcBuilder<C>;
 
     /// Create a GLV deposit.
@@ -202,6 +213,22 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
                 flag: flag.to_string(),
                 enable,
             })
+    }
+
+    fn update_glv_config(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        params: UpdateGlvParams,
+    ) -> RpcBuilder<C> {
+        let glv = self.find_glv_address(glv_token);
+        self.store_rpc()
+            .accounts(accounts::UpdateGlvConfig {
+                authority: self.payer(),
+                store: *store,
+                glv,
+            })
+            .args(instruction::UpdateGlvConfig { params })
     }
 
     fn create_glv_deposit(

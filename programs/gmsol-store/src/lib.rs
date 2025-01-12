@@ -165,6 +165,8 @@
 //! #### Instructions for [`Glv`](states::Glv).
 //! - [`initialize_glv`]: Initialize a GLV.
 //! - [`update_glv_market_config`]: Update GLV market config.
+//! - [`toggle_glv_market_flag`]: Toggle flags of GLV market.
+//! - [`update_glv_config`]: Update GLV global config.
 //!
 //! #### Instructions for [`GlvDeposit`](states::GlvDeposit)
 //! - [`create_glv_deposit`]: Create a GLV deposit by the owner.
@@ -230,6 +232,7 @@ use self::{
         withdrawal::CreateWithdrawalParams,
     },
     states::{
+        glv::UpdateGlvParams,
         market::{config::EntryArgs, status::MarketStatus},
         order::UpdateOrderParams,
         token_config::TokenConfigBuilder,
@@ -2825,6 +2828,28 @@ pub mod gmsol_store {
         enable: bool,
     ) -> Result<()> {
         instructions::unchecked_toggle_glv_market_flag(ctx, &flag, enable)
+    }
+
+    /// Update GLV config.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](UpdateGlvConfig)*
+    ///
+    /// # Arguments
+    /// - `params`: The update of the config.
+    ///
+    /// # Errors
+    /// - The [`authority`](UpdateGlvConfig::authority) must be:
+    ///   - A signer
+    ///   - Have MARKET_KEEPER role in the `store`
+    /// - The [`store`](UpdateGlvConfig::store) must be properly initialized.
+    /// - The [`glv`](UpdateGlvMarketConfig::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
+    /// - The `params` must not non-empty.
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn update_glv_config(ctx: Context<UpdateGlvConfig>, params: UpdateGlvParams) -> Result<()> {
+        instructions::unchecked_update_glv(ctx, &params)
     }
 
     /// Create GLV deposit.

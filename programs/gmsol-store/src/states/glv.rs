@@ -225,6 +225,37 @@ impl Glv {
         &self.short_token
     }
 
+    pub(crate) fn update_config(&mut self, params: &UpdateGlvParams) -> Result<()> {
+        if let Some(amount) = params.min_tokens_for_first_deposit {
+            require_neq!(
+                self.min_tokens_for_first_deposit,
+                amount,
+                CoreError::PreconditionsAreNotMet
+            );
+            self.min_tokens_for_first_deposit = amount;
+        }
+
+        if let Some(secs) = params.shift_min_interval_secs {
+            require_neq!(
+                self.shift_min_interval_secs,
+                secs,
+                CoreError::PreconditionsAreNotMet
+            );
+            self.shift_min_interval_secs = secs;
+        }
+
+        if let Some(factor) = params.shift_max_price_impact_factor {
+            require_neq!(
+                self.shift_max_price_impact_factor,
+                factor,
+                CoreError::PreconditionsAreNotMet
+            );
+            self.shift_max_price_impact_factor = factor;
+        }
+
+        Ok(())
+    }
+
     /// Get all market tokens.
     pub fn market_tokens(&self) -> impl Iterator<Item = Pubkey> + '_ {
         self.markets
@@ -445,6 +476,29 @@ impl Glv {
     /// Get max shift price impact factor.
     pub fn shift_max_price_impact_factor(&self) -> u128 {
         self.shift_max_price_impact_factor
+    }
+}
+
+/// GLV Update Params.
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct UpdateGlvParams {
+    /// Minimum amount for the first GLV deposit.
+    pub min_tokens_for_first_deposit: Option<u64>,
+    /// Minimum shift interval seconds.
+    pub shift_min_interval_secs: Option<u32>,
+    /// Maximum price impact factor after shift.
+    pub shift_max_price_impact_factor: Option<u128>,
+}
+
+impl UpdateGlvParams {
+    pub(crate) fn validate(&self) -> Result<()> {
+        require!(
+            self.min_tokens_for_first_deposit.is_some()
+                || self.shift_min_interval_secs.is_some()
+                || self.shift_max_price_impact_factor.is_some(),
+            CoreError::InvalidArgument
+        );
+        Ok(())
     }
 }
 
