@@ -4,6 +4,7 @@ use std::{
 };
 
 use anchor_lang::prelude::*;
+use anchor_spl::{token::Mint, token_interface};
 use gmsol_utils::InitSpace;
 
 use crate::{
@@ -716,21 +717,19 @@ impl GlvDeposit {
     /// - The address of `glv_token` must match the glv token address of this deposit.
     pub(crate) fn unchecked_validate_for_execution(
         &self,
-        market_token: &AccountInfo,
+        market_token: &Account<Mint>,
         market: &Market,
-        glv_token: &AccountInfo,
+        glv_token: &InterfaceAccount<token_interface::Mint>,
         glv: &Glv,
         glv_address: &Pubkey,
     ) -> Result<()> {
-        use anchor_spl::token::accessor::amount;
-
         require_eq!(
-            *market_token.key,
+            market_token.key(),
             self.tokens.market_token(),
             CoreError::MarketTokenMintMismatched
         );
 
-        let supply = amount(market_token)?;
+        let supply = market_token.supply;
 
         if supply == 0 && self.is_market_deposit_required() {
             // The receiver of the market tokens is GLV.
@@ -742,12 +741,12 @@ impl GlvDeposit {
         }
 
         require_eq!(
-            *glv_token.key,
+            glv_token.key(),
             self.tokens.glv_token(),
             CoreError::TokenMintMismatched,
         );
 
-        let supply = amount(glv_token)?;
+        let supply = glv_token.supply;
 
         if supply == 0 {
             Self::validate_first_deposit(

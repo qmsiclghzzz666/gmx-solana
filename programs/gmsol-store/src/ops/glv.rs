@@ -301,9 +301,9 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
         let glv_deposit = self.glv_deposit.load()?;
 
         glv_deposit.unchecked_validate_for_execution(
-            &self.market_token_mint.to_account_info(),
+            self.market_token_mint,
             &market,
-            &self.glv_token_mint.to_account_info(),
+            self.glv_token_mint,
             &glv,
             &glv_address,
         )?;

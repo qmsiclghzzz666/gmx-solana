@@ -237,7 +237,7 @@ impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
 
         self.deposit
             .load()?
-            .validate_for_execution(&self.market_token_mint.to_account_info(), &market)?;
+            .validate_for_execution(self.market_token_mint, &market)?;
 
         Ok(())
     }

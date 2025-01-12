@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::Mint;
 use gmsol_utils::InitSpace;
 
 use crate::{events::DepositRemoved, states::MarketConfigKey, CoreError};
@@ -75,20 +76,16 @@ impl Deposit {
     /// Validate the deposit params for execution.
     pub(crate) fn validate_for_execution(
         &self,
-        market_token: &AccountInfo,
+        market_token: &Account<Mint>,
         market: &Market,
     ) -> Result<()> {
-        use anchor_spl::token::accessor::amount;
-
         require_eq!(
-            *market_token.key,
+            market_token.key(),
             self.tokens().market_token(),
             CoreError::MarketTokenMintMismatched
         );
 
-        let supply = amount(market_token)?;
-
-        if supply == 0 {
+        if market_token.supply == 0 {
             Self::validate_first_deposit(
                 &self.header.receiver(),
                 self.params.min_market_token_amount,
