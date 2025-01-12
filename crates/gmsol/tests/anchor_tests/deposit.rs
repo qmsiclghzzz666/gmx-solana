@@ -227,10 +227,7 @@ async fn first_deposit() -> eyre::Result<()> {
     let min_amount = 1u64;
 
     deployment
-        .mint_or_transfer_to_user(long_token, Deployment::DEFAULT_USER, amount)
-        .await?;
-    deployment
-        .mint_or_transfer_to_user(long_token, Deployment::DEFAULT_KEEPER, amount)
+        .mint_or_transfer_to_user(long_token, Deployment::DEFAULT_USER, amount * 2)
         .await?;
 
     let signature = keeper
@@ -257,25 +254,38 @@ async fn first_deposit() -> eyre::Result<()> {
     let err = deployment
         .execute_with_pyth(&mut builder, None, false, false)
         .await
-        .expect_err("should throw an error on first deposit with unexpected owner");
+        .expect_err("should throw an error on first deposit with unexpected receiver");
     assert_eq!(
         err.anchor_error_code(),
         Some(CoreError::InvalidReceiverForFirstDeposit.into())
     );
 
-    // Only MARKET_KEEPER is allowed to create first deposit.
-    let (rpc, deposit) = keeper
+    let (rpc, deposit) = client
         .create_first_deposit(store, market_token)
         .long_token(amount, None, None)
         .min_market_token(min_amount)
         .build_with_address()
         .await?;
     let signature = rpc.send_without_preflight().await?;
-    tracing::info!(%signature, %deposit, "created first deposit by market keeper");
+    tracing::info!(%signature, %deposit, "created first deposit");
     let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
     deployment
         .execute_with_pyth(&mut builder, None, false, false)
-        .instrument(tracing::info_span!("execut first deposit", first_deposit=%deposit))
+        .instrument(tracing::info_span!("execute first deposit", first_deposit=%deposit))
+        .await?;
+
+    // Should be able to deposit normally.
+    let (rpc, deposit) = client
+        .create_deposit(store, market_token)
+        .long_token(amount, None, None)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send_without_preflight().await?;
+    tracing::info!(%signature, %deposit, "created deposit");
+    let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
+    deployment
+        .execute_with_pyth(&mut builder, None, false, false)
+        .instrument(tracing::info_span!("execute deposit", first_deposit=%deposit))
         .await?;
 
     Ok(())
