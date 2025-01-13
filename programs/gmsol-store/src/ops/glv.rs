@@ -296,17 +296,10 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
         let market = self.market.load()?;
         market.validate(&self.store.key())?;
 
-        let glv_address = self.glv.key();
         let glv = self.glv.load()?;
         let glv_deposit = self.glv_deposit.load()?;
 
-        glv_deposit.unchecked_validate_for_execution(
-            self.market_token_mint,
-            &market,
-            self.glv_token_mint,
-            &glv,
-            &glv_address,
-        )?;
+        glv_deposit.unchecked_validate_for_execution(self.glv_token_mint, &glv)?;
 
         require_gte!(
             self.market_token_source.amount,
@@ -342,6 +335,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
 
             if deposit.is_market_deposit_required() {
                 let executed = op.unchecked_deposit(
+                    &deposit.header().receiver(),
                     &self.market_token_vault,
                     &deposit.params.deposit,
                     (
@@ -1103,8 +1097,6 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
         from_market.validate_shiftable(&to_market)?;
 
         let shift = self.glv_shift.load()?;
-        Borrow::<Shift>::borrow(&*shift)
-            .validate_for_execution(&self.to_market_token_mint.to_account_info(), &to_market)?;
 
         // Validate the vault has enough from market tokens.
         let amount = Borrow::<Shift>::borrow(&*shift)
@@ -1155,6 +1147,7 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
 
         let (from_market, to_market, received) = from_market.unchecked_shift(
             to_market,
+            &shift.header().receiver(),
             &shift.params,
             &self.from_market_token_withdrawal_vault,
             &self.to_market_token_glv_vault,

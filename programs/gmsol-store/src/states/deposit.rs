@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
 use gmsol_utils::InitSpace;
 
 use crate::{events::DepositRemoved, states::MarketConfigKey, CoreError};
@@ -71,29 +70,6 @@ impl Deposit {
     /// Get swap params.
     pub fn swap(&self) -> &SwapParams {
         &self.swap
-    }
-
-    /// Validate the deposit params for execution.
-    pub(crate) fn validate_for_execution(
-        &self,
-        market_token: &Account<Mint>,
-        market: &Market,
-    ) -> Result<()> {
-        require_eq!(
-            market_token.key(),
-            self.tokens().market_token(),
-            CoreError::MarketTokenMintMismatched
-        );
-
-        if market_token.supply == 0 {
-            Self::validate_first_deposit(
-                &self.header.receiver(),
-                self.params.min_market_token_amount,
-                market,
-            )?;
-        }
-
-        Ok(())
     }
 
     pub(crate) fn validate_first_deposit(

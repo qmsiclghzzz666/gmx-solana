@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 
-use crate::{events::ShiftRemoved, states::Deposit, CoreError};
+use crate::events::ShiftRemoved;
 
 use super::{
     common::{
         action::{Action, ActionHeader, Closable},
         token::TokenAndAccount,
     },
-    Market, Seed,
+    Seed,
 };
 
 /// Shift.
@@ -58,33 +58,6 @@ impl Shift {
     /// Get token infos.
     pub fn tokens(&self) -> &TokenAccounts {
         &self.tokens
-    }
-
-    /// Validate the shift params for execution.
-    pub(crate) fn validate_for_execution(
-        &self,
-        to_market_token: &AccountInfo,
-        to_market: &Market,
-    ) -> Result<()> {
-        use anchor_spl::token::accessor::amount;
-
-        require_eq!(
-            *to_market_token.key,
-            self.tokens().to_market_token(),
-            CoreError::MarketTokenMintMismatched
-        );
-
-        let supply = amount(to_market_token)?;
-
-        if supply == 0 {
-            Deposit::validate_first_deposit(
-                &self.header.owner,
-                self.params.min_to_market_token_amount,
-                to_market,
-            )?;
-        }
-
-        Ok(())
     }
 }
 

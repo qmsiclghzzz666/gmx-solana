@@ -22,7 +22,7 @@ use crate::{
             HasMarketMeta,
         },
         withdrawal::WithdrawalParams,
-        Market, Oracle, ShiftParams, Store,
+        Deposit, Market, Oracle, ShiftParams, Store,
     },
     CoreError, ModelError,
 };
@@ -273,19 +273,37 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         Ok(())
     }
 
+    fn validate_first_deposit(&self, receiver: &Pubkey, params: &DepositParams) -> Result<()> {
+        if self.market().market_token().supply == 0 {
+            Deposit::validate_first_deposit(
+                receiver,
+                params.min_market_token_amount,
+                self.market().base().as_ref(),
+            )?;
+        }
+
+        Ok(())
+    }
+
     /// Swap and deposit into the current market.
     ///
     /// # CHECK
+    /// - `market_token_receiver` must be the correct escrow
+    ///   account for market token.
     ///
     /// # Errors
+    /// - Error if first deposit validation failed.
     #[inline(never)]
     pub(crate) fn unchecked_deposit(
         mut self,
+        receiver: &Pubkey,
         market_token_receiver: &'a AccountInfo<'info>,
         params: &DepositParams,
         initial_tokens: (Option<Pubkey>, Option<Pubkey>),
         swap_pricing_kind: Option<SwapPricingKind>,
     ) -> Result<Execute<'a, 'info, u64>> {
+        self.validate_first_deposit(receiver, params)?;
+
         self.market = self
             .market
             .enable_mint(market_token_receiver)
@@ -458,6 +476,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
     pub(crate) fn unchecked_shift(
         self,
         mut to_market: Self,
+        receiver: &Pubkey,
         params: &ShiftParams,
         from_market_token_vault: &'a AccountInfo<'info>,
         to_market_token_account: &'a AccountInfo<'info>,
@@ -509,6 +528,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             deposit_params.initial_short_token_amount = short_amount;
             deposit_params.min_market_token_amount = params.min_to_market_token_amount;
             op.unchecked_deposit(
+                receiver,
                 to_market_token_account,
                 &deposit_params,
                 (None, None),

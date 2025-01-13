@@ -231,20 +231,15 @@ impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
         self.oracle.validate_time(self)
     }
 
-    fn validate_market_and_deposit(&self) -> Result<()> {
+    fn validate_before_execution(&self) -> Result<()> {
         let market = self.market.load()?;
         market.validate(&self.store.key())?;
-
-        self.deposit
-            .load()?
-            .validate_for_execution(self.market_token_mint, &market)?;
-
         Ok(())
     }
 
     #[inline(never)]
     fn perfrom_deposit(self) -> Result<()> {
-        self.validate_market_and_deposit()?;
+        self.validate_before_execution()?;
         {
             let deposit = self.deposit.load()?;
             RevertibleLiquidityMarketOperation::new(
@@ -259,6 +254,7 @@ impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
             )?
             .op()?
             .unchecked_deposit(
+                &deposit.header().receiver(),
                 &self.market_token_receiver,
                 &deposit.params,
                 (

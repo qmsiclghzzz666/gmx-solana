@@ -211,10 +211,6 @@ impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
 
         from_market.validate_shiftable(&to_market)?;
 
-        self.shift
-            .load()?
-            .validate_for_execution(&self.to_market_token_mint.to_account_info(), &to_market)?;
-
         Ok(())
     }
 
@@ -251,6 +247,7 @@ impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
 
         let (from_market, to_market, _) = from_market.unchecked_shift(
             to_market,
+            &shift.header().receiver(),
             &shift.params,
             &self.from_market_token_vault,
             &self.to_market_token_account,

@@ -4,7 +4,7 @@ use std::{
 };
 
 use anchor_lang::prelude::*;
-use anchor_spl::{token::Mint, token_interface};
+use anchor_spl::token_interface;
 use gmsol_utils::InitSpace;
 
 use crate::{
@@ -525,7 +525,7 @@ impl Glv {
 }
 
 /// GLV Update Params.
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Default)]
 pub struct UpdateGlvParams {
     /// Minimum amount for the first GLV deposit.
     pub min_tokens_for_first_deposit: Option<u64>,
@@ -707,7 +707,6 @@ impl GlvDeposit {
     ///
     /// # CHECK
     /// - This deposit must have been initialized.
-    /// - The `market` and `market_token` must match.
     /// - The `glv` and `glv_token` must match.
     /// - The `market_token` must be a valid token account.
     /// - The `glv_token` must be a valid token account.
@@ -717,29 +716,9 @@ impl GlvDeposit {
     /// - The address of `glv_token` must match the glv token address of this deposit.
     pub(crate) fn unchecked_validate_for_execution(
         &self,
-        market_token: &Account<Mint>,
-        market: &Market,
         glv_token: &InterfaceAccount<token_interface::Mint>,
         glv: &Glv,
-        glv_address: &Pubkey,
     ) -> Result<()> {
-        require_eq!(
-            market_token.key(),
-            self.tokens.market_token(),
-            CoreError::MarketTokenMintMismatched
-        );
-
-        let supply = market_token.supply;
-
-        if supply == 0 && self.is_market_deposit_required() {
-            // The receiver of the market tokens is GLV.
-            Deposit::validate_first_deposit(
-                glv_address,
-                self.params.deposit.min_market_token_amount,
-                market,
-            )?;
-        }
-
         require_eq!(
             glv_token.key(),
             self.tokens.glv_token(),
@@ -750,7 +729,7 @@ impl GlvDeposit {
 
         if supply == 0 {
             Self::validate_first_deposit(
-                &self.header.receiver(),
+                &self.header().receiver(),
                 self.params.min_glv_token_amount,
                 glv,
             )?;
