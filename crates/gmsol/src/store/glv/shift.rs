@@ -367,8 +367,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvShiftBuilder<'a, C> {
                     &shift.0,
                     &store,
                     &token_map,
-                    &from_market,
-                    &to_market,
+                    &*from_market,
+                    &*to_market,
                 )?;
                 self.hint = Some(hint.clone());
                 hint

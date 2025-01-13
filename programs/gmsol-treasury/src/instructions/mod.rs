@@ -1,7 +1,7 @@
 /// Instructions for [`Config`](crate::states::Config).
 pub mod config;
 
-/// Instructions for [`TreasuryConfig`](crate::states::TreasuryConfig).
+/// Instructions for [`TreasuryVaultConfig`](crate::states::TreasuryVaultConfig).
 pub mod treasury;
 
 /// Instructions for interacting with the store program.

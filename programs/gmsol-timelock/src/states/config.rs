@@ -4,8 +4,9 @@ use gmsol_store::{states::Seed, CoreError};
 /// Timelock Config.
 #[account(zero_copy)]
 pub struct TimelockConfig {
+    version: u8,
     pub(crate) bump: u8,
-    padding_0: [u8; 7],
+    padding_0: [u8; 6],
     delay: u32,
     padding_1: [u8; 4],
     pub(crate) store: Pubkey,

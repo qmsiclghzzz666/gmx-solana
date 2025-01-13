@@ -424,8 +424,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
                     .client
                     .find_market_address(shift.0.header().store(), &to_market_token);
                 let to_market = self.client.market(&to_market).await?;
-                let hint =
-                    ExecuteShiftHint::new(&shift.0, &store, &token_map, &from_market, &to_market)?;
+                let hint = ExecuteShiftHint::new(
+                    &shift.0,
+                    &store,
+                    &token_map,
+                    &*from_market,
+                    &*to_market,
+                )?;
                 self.hint = Some(hint.clone());
                 hint
             }

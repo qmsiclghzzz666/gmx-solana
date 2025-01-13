@@ -12,7 +12,8 @@ use super::{
 
 /// Shift.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Shift {
     /// Action header.
     pub(crate) header: ActionHeader,
@@ -20,6 +21,9 @@ pub struct Shift {
     pub(crate) tokens: TokenAccounts,
     /// Shift params.
     pub(crate) params: ShiftParams,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl Seed for Shift {
@@ -61,13 +65,17 @@ impl Shift {
     }
 }
 
-#[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokenAccounts {
     pub(crate) from_market_token: TokenAndAccount,
     pub(crate) to_market_token: TokenAndAccount,
     pub(crate) long_token: Pubkey,
     pub(crate) short_token: Pubkey,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl TokenAccounts {
@@ -102,11 +110,15 @@ impl TokenAccounts {
     }
 }
 
-#[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShiftParams {
     pub(crate) from_market_token_amount: u64,
     pub(crate) min_to_market_token_amount: u64,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 64],
 }
 
 impl ShiftParams {

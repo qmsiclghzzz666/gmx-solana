@@ -27,7 +27,7 @@ enum Command {
     /// Initialize Treasury.
     InitTreasury { index: u8 },
     /// Set treasury.
-    SetTreasury { treasury_config: Pubkey },
+    SetTreasury { treasury_vault_config: Pubkey },
     /// Set GT factor.
     SetGtFactor { factor: u128 },
     /// Set Buyback factor.
@@ -124,11 +124,15 @@ impl Args {
                 rpc
             }
             Command::InitTreasury { index } => {
-                let (rpc, address) = client.initialize_treasury(store, *index).swap_output(());
+                let (rpc, address) = client
+                    .initialize_treasury_vault_config(store, *index)
+                    .swap_output(());
                 println!("{address}");
                 rpc
             }
-            Command::SetTreasury { treasury_config } => client.set_treasury(store, treasury_config),
+            Command::SetTreasury {
+                treasury_vault_config,
+            } => client.set_treasury_vault_config(store, treasury_vault_config),
             Command::SetGtFactor { factor } => client.set_gt_factor(store, *factor)?,
             Command::SetBuybackFactor { factor } => client.set_buyback_factor(store, *factor)?,
             Command::InsertToken { token } => {
@@ -184,7 +188,7 @@ impl Args {
                     let store_account = client.store(store).await?;
                     let time_window = store_account.gt().exchange_time_window();
                     let (deposit, gt_exchange_vault) = client
-                        .deposit_into_treasury_valut(
+                        .deposit_to_treasury_valut(
                             store,
                             None,
                             &token_mint,
@@ -207,7 +211,7 @@ impl Args {
                 let time_window = store_account.gt().exchange_time_window();
 
                 let (rpc, gt_exchange_vault) = client
-                    .deposit_into_treasury_valut(
+                    .deposit_to_treasury_valut(
                         store,
                         None,
                         token_mint,
@@ -278,7 +282,7 @@ impl Args {
                 extra_swap_path,
                 fund,
             } => {
-                let config = client.find_config_address(store);
+                let config = client.find_treasury_config_address(store);
                 let receiver = client.find_treasury_receiver_address(&config);
                 let amount = match amount {
                     Some(amount) => *amount,
@@ -324,7 +328,7 @@ impl Args {
                 client.cancel_treasury_swap(store, order, None).await?
             }
             Command::Receiver => {
-                let config = client.find_config_address(store);
+                let config = client.find_treasury_config_address(store);
                 let receiver = client.find_treasury_receiver_address(&config);
                 println!("{receiver}");
                 return Ok(());

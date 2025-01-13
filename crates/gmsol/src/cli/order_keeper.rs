@@ -13,7 +13,10 @@ use gmsol::{
         PythPullOracleContext, PythPullOracleOps,
     },
     store::glv::GlvOps,
-    types::{Deposit, DepositCreated, Order, OrderCreated, Withdrawal, WithdrawalCreated},
+    types::{
+        common::ActionHeader, Deposit, DepositCreated, Order, OrderCreated, Withdrawal,
+        WithdrawalCreated,
+    },
     utils::{
         builder::{MakeTransactionBuilder, SetExecutionFee},
         ComputeBudget, SendTransactionOptions, ZeroCopy,
@@ -159,13 +162,15 @@ impl KeeperArgs {
                 execute,
                 ignore_store,
             } => {
+                let store_offset = bytemuck::offset_of!(ActionHeader, store);
                 let filter_store = !*ignore_store;
                 match action {
                     Action::Deposit => {
                         let actions = client
                             .store_accounts::<ZeroCopy<Deposit>>(
-                                filter_store
-                                    .then(|| StoreFilter::new(store, 8).ignore_disc_offset(false)),
+                                filter_store.then(|| {
+                                    StoreFilter::new(store, store_offset).ignore_disc_offset(false)
+                                }),
                                 None,
                             )
                             .await?;
@@ -190,8 +195,9 @@ impl KeeperArgs {
                     Action::Withdrawal => {
                         let actions = client
                             .store_accounts::<ZeroCopy<Withdrawal>>(
-                                filter_store
-                                    .then(|| StoreFilter::new(store, 8).ignore_disc_offset(false)),
+                                filter_store.then(|| {
+                                    StoreFilter::new(store, store_offset).ignore_disc_offset(false)
+                                }),
                                 None,
                             )
                             .await?;
@@ -222,8 +228,9 @@ impl KeeperArgs {
                     Action::Order => {
                         let actions = client
                             .store_accounts::<ZeroCopy<Order>>(
-                                filter_store
-                                    .then(|| StoreFilter::new(store, 8).ignore_disc_offset(false)),
+                                filter_store.then(|| {
+                                    StoreFilter::new(store, store_offset).ignore_disc_offset(false)
+                                }),
                                 None,
                             )
                             .await?;

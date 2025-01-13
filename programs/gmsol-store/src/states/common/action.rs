@@ -10,6 +10,50 @@ use crate::{
 
 const MAX_FLAGS: usize = 8;
 
+/// Action Header.
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ActionHeader {
+    version: u8,
+    /// Action State.
+    action_state: u8,
+    /// The bump seed.
+    pub(crate) bump: u8,
+    flags: ActionFlagContainer,
+    padding_0: [u8; 4],
+    /// Action id.
+    pub id: u64,
+    /// Store.
+    pub store: Pubkey,
+    /// Market.
+    pub market: Pubkey,
+    /// Owner.
+    pub owner: Pubkey,
+    /// Nonce bytes.
+    pub nonce: [u8; 32],
+    /// Max execution lamports.
+    pub(crate) max_execution_lamports: u64,
+    /// Last updated timestamp.
+    pub(crate) updated_at: i64,
+    /// Last updated slot.
+    pub(crate) updated_at_slot: u64,
+    /// Creator.
+    pub(crate) creator: Pubkey,
+    /// Rent receiver.
+    rent_receiver: Pubkey,
+    /// The output funds receiver.
+    receiver: Pubkey,
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 256],
+}
+
+impl Default for ActionHeader {
+    fn default() -> Self {
+        bytemuck::Zeroable::zeroed()
+    }
+}
+
 /// Action State.
 #[non_exhaustive]
 #[repr(u8)]
@@ -76,43 +120,6 @@ impl ActionState {
     pub fn is_completed(&self) -> bool {
         matches!(self, Self::Completed)
     }
-}
-
-/// Action Header.
-#[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct ActionHeader {
-    /// Action id.
-    pub(crate) id: u64,
-    /// Store.
-    pub(crate) store: Pubkey,
-    /// Market.
-    pub(crate) market: Pubkey,
-    /// Owner.
-    pub(crate) owner: Pubkey,
-    /// Nonce bytes.
-    pub(crate) nonce: [u8; 32],
-    /// Max execution lamports.
-    pub(crate) max_execution_lamports: u64,
-    /// Last updated timestamp.
-    pub(crate) updated_at: i64,
-    /// Last updated slot.
-    pub(crate) updated_at_slot: u64,
-    /// Action State.
-    action_state: u8,
-    /// The bump seed.
-    pub(crate) bump: u8,
-    flags: ActionFlagContainer,
-    padding_0: [u8; 5],
-    /// Creator.
-    pub(crate) creator: Pubkey,
-    /// Rent receiver.
-    rent_receiver: Pubkey,
-    /// The output funds receiver.
-    receiver: Pubkey,
-    padding_1: [u8; 32],
-    padding_2: [u8; 64],
-    reserved: [u8; 128],
 }
 
 /// Action Flags.

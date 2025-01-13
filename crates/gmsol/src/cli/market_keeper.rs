@@ -28,8 +28,8 @@ use gmsol::{
     utils::TransactionBuilder,
 };
 use gmsol_store::states::{
-    Factor, MarketConfigKey, PriceProviderKind, TokenConfigBuilder, DEFAULT_HEARTBEAT_DURATION,
-    DEFAULT_PRECISION,
+    Factor, MarketConfigKey, PriceProviderKind, UpdateTokenConfigParams,
+    DEFAULT_HEARTBEAT_DURATION, DEFAULT_PRECISION,
 };
 use indexmap::IndexMap;
 use rand::{rngs::StdRng, SeedableRng};
@@ -463,7 +463,7 @@ impl Args {
                 synthetic: fake_decimals,
                 update,
             } => {
-                let mut builder = TokenConfigBuilder::default()
+                let mut builder = UpdateTokenConfigParams::default()
                     .with_heartbeat_duration(*heartbeat_duration)
                     .with_precision(*precision)
                     .with_expected_provider(*expected_provider);
@@ -970,7 +970,7 @@ fn default_precision() -> u8 {
     DEFAULT_PRECISION
 }
 
-impl<'a> TryFrom<&'a TokenConfig> for TokenConfigBuilder {
+impl<'a> TryFrom<&'a TokenConfig> for UpdateTokenConfigParams {
     type Error = gmsol::Error;
 
     fn try_from(config: &'a TokenConfig) -> Result<Self, Self::Error> {

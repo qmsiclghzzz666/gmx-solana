@@ -13,8 +13,9 @@ use super::{
 };
 
 /// Deposit.
-#[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Deposit {
     /// Header.
     pub(crate) header: ActionHeader,
@@ -24,8 +25,11 @@ pub struct Deposit {
     pub(crate) params: DepositParams,
     /// Swap params.
     pub(crate) swap: SwapParams,
-    padding_1: [u8; 4],
-    reserve: [u8; 128],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    padding_0: [u8; 4],
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    #[cfg_attr(feature = "debug", debug(skip))]
+    reserved: [u8; 128],
 }
 
 /// PDA for first deposit owner.
@@ -115,8 +119,9 @@ impl Action for Deposit {
 }
 
 /// Token Accounts.
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[account(zero_copy)]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokenAccounts {
     /// Initial long token accounts.
     pub initial_long_token: TokenAndAccount,
@@ -124,6 +129,9 @@ pub struct TokenAccounts {
     pub initial_short_token: TokenAndAccount,
     /// Market token account.
     pub(crate) market_token: TokenAndAccount,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl TokenAccounts {
@@ -139,8 +147,9 @@ impl TokenAccounts {
 }
 
 /// Deposit Params.
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[account(zero_copy)]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DepositParams {
     /// The amount of initial long tokens to deposit.
     pub(crate) initial_long_token_amount: u64,
@@ -148,6 +157,8 @@ pub struct DepositParams {
     pub(crate) initial_short_token_amount: u64,
     /// The minimum acceptable amount of market tokens to receive.
     pub(crate) min_market_token_amount: u64,
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    #[cfg_attr(feature = "debug", debug(skip))]
     reserved: [u8; 64],
 }
 

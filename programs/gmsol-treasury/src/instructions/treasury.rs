@@ -22,15 +22,15 @@ use crate::{
     constants,
     states::{
         config::{Config, ReceiverSigner},
-        treasury::TreasuryConfig,
+        treasury::TreasuryVaultConfig,
         GtBank,
     },
 };
 
-/// The accounts definition for [`initialize_treasury`](crate::gmsol_treasury::initialize_treasury).
+/// The accounts definition for [`initialize_treasury_vault_config`](crate::gmsol_treasury::initialize_treasury_vault_config).
 #[derive(Accounts)]
 #[instruction(index: u8)]
-pub struct InitializeTreasury<'info> {
+pub struct InitializeTreasuryVaultConfig<'info> {
     /// Authority.
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -40,15 +40,15 @@ pub struct InitializeTreasury<'info> {
     /// Config to initialize with.
     #[account(has_one = store)]
     pub config: AccountLoader<'info, Config>,
-    /// Treasury config account to initialize.
+    /// Treasury vault config account to initialize.
     #[account(
         init,
         payer = authority,
-        space = 8 + TreasuryConfig::INIT_SPACE,
-        seeds = [TreasuryConfig::SEED, config.key().as_ref(), &[index]],
+        space = 8 + TreasuryVaultConfig::INIT_SPACE,
+        seeds = [TreasuryVaultConfig::SEED, config.key().as_ref(), &[index]],
         bump,
     )]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// Store program.
     pub store_program: Program<'info, GmsolStore>,
     /// The system program.
@@ -58,19 +58,19 @@ pub struct InitializeTreasury<'info> {
 /// Initialize [`Treasury`] account.
 /// # CHECK
 /// Only [`TREASURY_ADMIN`](crate::roles::TREASURY_ADMIN) can use.
-pub(crate) fn unchecked_initialize_treasury(
-    ctx: Context<InitializeTreasury>,
+pub(crate) fn unchecked_initialize_treasury_vault_config(
+    ctx: Context<InitializeTreasuryVaultConfig>,
     index: u8,
 ) -> Result<()> {
-    ctx.accounts.treasury_config.load_init()?.init(
-        ctx.bumps.treasury_config,
+    ctx.accounts.treasury_vault_config.load_init()?.init(
+        ctx.bumps.treasury_vault_config,
         index,
         &ctx.accounts.config.key(),
     );
     Ok(())
 }
 
-impl<'info> WithStore<'info> for InitializeTreasury<'info> {
+impl<'info> WithStore<'info> for InitializeTreasuryVaultConfig<'info> {
     fn store_program(&self) -> AccountInfo<'info> {
         self.store_program.to_account_info()
     }
@@ -80,7 +80,7 @@ impl<'info> WithStore<'info> for InitializeTreasury<'info> {
     }
 }
 
-impl<'info> CpiAuthentication<'info> for InitializeTreasury<'info> {
+impl<'info> CpiAuthentication<'info> for InitializeTreasuryVaultConfig<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
     }
@@ -90,9 +90,9 @@ impl<'info> CpiAuthentication<'info> for InitializeTreasury<'info> {
     }
 }
 
-/// The accounts definition for [`insert_token_to_treasury`](crate::gmsol_treasury::insert_token_to_treasury).
+/// The accounts definition for [`insert_token_to_treasury_vault`](crate::gmsol_treasury::insert_token_to_treasury_vault).
 #[derive(Accounts)]
-pub struct InsertTokenToTreasury<'info> {
+pub struct InsertTokenToTreasuryVault<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
@@ -101,12 +101,12 @@ pub struct InsertTokenToTreasury<'info> {
     /// Config.
     #[account(
         has_one = store,
-        // Insert to an unauthorized treasury config is allowed.
+        // Insert to an unauthorized treasury vault config is allowed.
     )]
     pub config: AccountLoader<'info, Config>,
-    /// Treasury config.
+    /// Treasury vault config.
     #[account(mut, has_one = config)]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// Token to insert.
     pub token: InterfaceAccount<'info, Mint>,
     /// Store program.
@@ -116,12 +116,12 @@ pub struct InsertTokenToTreasury<'info> {
 /// Insert a token to the [`Treasury`] account.
 /// # CHECK
 /// Only [`TREASURY_ADMIN`](crate::roles::TREASURY_ADMIN) can use.
-pub(crate) fn unchecked_insert_token_to_treasury(
-    ctx: Context<InsertTokenToTreasury>,
+pub(crate) fn unchecked_insert_token_to_treasury_vault(
+    ctx: Context<InsertTokenToTreasuryVault>,
 ) -> Result<()> {
     let token = ctx.accounts.token.key();
     ctx.accounts
-        .treasury_config
+        .treasury_vault_config
         .load_mut()?
         .insert_token(&token)?;
     msg!(
@@ -131,7 +131,7 @@ pub(crate) fn unchecked_insert_token_to_treasury(
     Ok(())
 }
 
-impl<'info> WithStore<'info> for InsertTokenToTreasury<'info> {
+impl<'info> WithStore<'info> for InsertTokenToTreasuryVault<'info> {
     fn store_program(&self) -> AccountInfo<'info> {
         self.store_program.to_account_info()
     }
@@ -141,7 +141,7 @@ impl<'info> WithStore<'info> for InsertTokenToTreasury<'info> {
     }
 }
 
-impl<'info> CpiAuthentication<'info> for InsertTokenToTreasury<'info> {
+impl<'info> CpiAuthentication<'info> for InsertTokenToTreasuryVault<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
     }
@@ -151,9 +151,9 @@ impl<'info> CpiAuthentication<'info> for InsertTokenToTreasury<'info> {
     }
 }
 
-/// The accounts definition for [`remove_token_from_treasury`](crate::gmsol_treasury::remove_token_from_treasury).
+/// The accounts definition for [`remove_token_from_treasury_vault`](crate::gmsol_treasury::remove_token_from_treasury_vault).
 #[derive(Accounts)]
-pub struct RemoveTokenFromTreasury<'info> {
+pub struct RemoveTokenFromTreasuryVault<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
@@ -162,12 +162,12 @@ pub struct RemoveTokenFromTreasury<'info> {
     /// Config.
     #[account(
         has_one = store,
-        // Remove from an unauthorized treasury config is allowed.
+        // Remove from an unauthorized treasury vault config is allowed.
     )]
     pub config: AccountLoader<'info, Config>,
-    /// Treasury Config.
+    /// Treasury Vault Config.
     #[account(mut, has_one = config)]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// Token to remove.
     /// CHECK: only used as a identifier.
     pub token: UncheckedAccount<'info>,
@@ -178,12 +178,12 @@ pub struct RemoveTokenFromTreasury<'info> {
 /// Remove a token from the [`Treasury`] account.
 /// # CHECK
 /// Only [`TREASURY_ADMIN`](crate::roles::TREASURY_ADMIN) can use.
-pub(crate) fn unchecked_remove_token_from_treasury(
-    ctx: Context<RemoveTokenFromTreasury>,
+pub(crate) fn unchecked_remove_token_from_treasury_vault(
+    ctx: Context<RemoveTokenFromTreasuryVault>,
 ) -> Result<()> {
     let token = ctx.accounts.token.key;
     ctx.accounts
-        .treasury_config
+        .treasury_vault_config
         .load_mut()?
         .remove_token(token)?;
     msg!(
@@ -193,7 +193,7 @@ pub(crate) fn unchecked_remove_token_from_treasury(
     Ok(())
 }
 
-impl<'info> WithStore<'info> for RemoveTokenFromTreasury<'info> {
+impl<'info> WithStore<'info> for RemoveTokenFromTreasuryVault<'info> {
     fn store_program(&self) -> AccountInfo<'info> {
         self.store_program.to_account_info()
     }
@@ -203,7 +203,7 @@ impl<'info> WithStore<'info> for RemoveTokenFromTreasury<'info> {
     }
 }
 
-impl<'info> CpiAuthentication<'info> for RemoveTokenFromTreasury<'info> {
+impl<'info> CpiAuthentication<'info> for RemoveTokenFromTreasuryVault<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
     }
@@ -224,12 +224,12 @@ pub struct ToggleTokenFlag<'info> {
     /// Config.
     #[account(
         has_one = store,
-        // Toggle flags of an unauthorized treasury config is allowed.
+        // Toggle flags of an unauthorized treasury vault config is allowed.
     )]
     pub config: AccountLoader<'info, Config>,
-    /// Treasury Config.
+    /// Treasury Vault Config.
     #[account(mut, has_one = config)]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// Token.
     pub token: InterfaceAccount<'info, Mint>,
     /// Store program.
@@ -244,12 +244,16 @@ pub(crate) fn unchecked_toggle_token_flag(
     flag: &str,
     value: bool,
 ) -> Result<()> {
-    let previous = ctx.accounts.treasury_config.load_mut()?.toggle_token_flag(
-        &ctx.accounts.token.key(),
-        flag.parse()
-            .map_err(|_| error!(CoreError::InvalidArgument))?,
-        value,
-    )?;
+    let previous = ctx
+        .accounts
+        .treasury_vault_config
+        .load_mut()?
+        .toggle_token_flag(
+            &ctx.accounts.token.key(),
+            flag.parse()
+                .map_err(|_| error!(CoreError::InvalidArgument))?,
+            value,
+        )?;
     msg!(
         "[Treasury] toggled token config flag {}: {} -> {}",
         flag,
@@ -279,9 +283,9 @@ impl<'info> CpiAuthentication<'info> for ToggleTokenFlag<'info> {
     }
 }
 
-/// The accounts definition for [`deposit_into_treasury`](crate::gmsol_treasury::deposit_into_treasury).
+/// The accounts definition for [`deposit_to_treasury_vault`](crate::gmsol_treasury::deposit_to_treasury_vault).
 #[derive(Accounts)]
-pub struct DepositIntoTreasury<'info> {
+pub struct DepositToTreasuryVault<'info> {
     /// Authority.
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -290,16 +294,16 @@ pub struct DepositIntoTreasury<'info> {
     /// Config.
     #[account(
         has_one = store,
-        // Only allow depositing into the authorized treausry.
-        constraint = config.load()?.treasury_config() == Some(&treasury_config.key()) @ CoreError::InvalidArgument,
+        // Only allow depositing into the authorized treausry vault.
+        constraint = config.load()?.treasury_vault_config() == Some(&treasury_vault_config.key()) @ CoreError::InvalidArgument,
     )]
     pub config: AccountLoader<'info, Config>,
     /// Treasury Config.
     #[account(
         has_one = config,
-        constraint = treasury_config.load()?.is_deposit_allowed(&token.key())? @ CoreError::InvalidArgument,
+        constraint = treasury_vault_config.load()?.is_deposit_allowed(&token.key())? @ CoreError::InvalidArgument,
     )]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// Receiver.
     #[account(
         seeds = [constants::RECEIVER_SEED, config.key().as_ref()],
@@ -320,11 +324,11 @@ pub struct DepositIntoTreasury<'info> {
     /// GT bank.
     #[account(
         mut,
-        has_one = treasury_config,
+        has_one = treasury_vault_config,
         has_one = gt_exchange_vault,
         seeds = [
             GtBank::SEED,
-            treasury_config.key().as_ref(),
+            treasury_vault_config.key().as_ref(),
             gt_exchange_vault.key().as_ref(),
         ],
         bump = gt_bank.load()?.bump,
@@ -342,7 +346,7 @@ pub struct DepositIntoTreasury<'info> {
     /// Treasury vault.
     #[account(
         mut,
-        associated_token::authority = treasury_config,
+        associated_token::authority = treasury_vault_config,
         associated_token::mint = token,
     )]
     pub treasury_vault: InterfaceAccount<'info, TokenAccount>,
@@ -364,7 +368,9 @@ pub struct DepositIntoTreasury<'info> {
 /// Deposit tokens from the receiver vault to the treasury vault.
 /// # CHECK
 /// Only [`TREASURY_KEEPER`](crate::roles::TREASURY_KEEPER) can use.
-pub(crate) fn unchecked_deposit_into_treasury(ctx: Context<DepositIntoTreasury>) -> Result<()> {
+pub(crate) fn unchecked_deposit_to_treasury_vault(
+    ctx: Context<DepositToTreasuryVault>,
+) -> Result<()> {
     use gmsol_model::utils::apply_factor;
     use gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
 
@@ -411,7 +417,7 @@ pub(crate) fn unchecked_deposit_into_treasury(ctx: Context<DepositIntoTreasury>)
     Ok(())
 }
 
-impl<'info> WithStore<'info> for DepositIntoTreasury<'info> {
+impl<'info> WithStore<'info> for DepositToTreasuryVault<'info> {
     fn store_program(&self) -> AccountInfo<'info> {
         self.store_program.to_account_info()
     }
@@ -421,7 +427,7 @@ impl<'info> WithStore<'info> for DepositIntoTreasury<'info> {
     }
 }
 
-impl<'info> CpiAuthentication<'info> for DepositIntoTreasury<'info> {
+impl<'info> CpiAuthentication<'info> for DepositToTreasuryVault<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
     }
@@ -431,7 +437,7 @@ impl<'info> CpiAuthentication<'info> for DepositIntoTreasury<'info> {
     }
 }
 
-impl<'info> DepositIntoTreasury<'info> {
+impl<'info> DepositToTreasuryVault<'info> {
     fn transfer_checked_ctx_for_treasury(
         &self,
     ) -> CpiContext<'_, '_, '_, 'info, TransferChecked<'info>> {
@@ -461,9 +467,9 @@ impl<'info> DepositIntoTreasury<'info> {
     }
 }
 
-/// The accounts definition for [`withdraw_from_treasury`](crate::gmsol_treasury::withdraw_from_treasury).
+/// The accounts definition for [`withdraw_from_treasury_vault`](crate::gmsol_treasury::withdraw_from_treasury_vault).
 #[derive(Accounts)]
-pub struct WithdrawFromTreasury<'info> {
+pub struct WithdrawFromTreasuryVault<'info> {
     /// Authority.
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -474,21 +480,21 @@ pub struct WithdrawFromTreasury<'info> {
     #[account(
         has_one = store,
         // Only allow withdrawing from the authroized treausry.
-        constraint = config.load()?.treasury_config() == Some(&treasury_config.key()) @ CoreError::InvalidArgument,
+        constraint = config.load()?.treasury_vault_config() == Some(&treasury_vault_config.key()) @ CoreError::InvalidArgument,
     )]
     pub config: AccountLoader<'info, Config>,
-    /// Treasury Config.
+    /// Treasury Vault Config.
     #[account(
         has_one = config,
-        constraint = treasury_config.load()?.is_withdrawal_allowed(&token.key())? @ CoreError::InvalidArgument,
+        constraint = treasury_vault_config.load()?.is_withdrawal_allowed(&token.key())? @ CoreError::InvalidArgument,
     )]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// Token.
     pub token: InterfaceAccount<'info, Mint>,
     /// Treasury vault.
     #[account(
         mut,
-        associated_token::authority = treasury_config,
+        associated_token::authority = treasury_vault_config,
         associated_token::mint =  token,
     )]
     pub treasury_vault: InterfaceAccount<'info, TokenAccount>,
@@ -504,18 +510,18 @@ pub struct WithdrawFromTreasury<'info> {
 /// Withdraw tokens from the treasury vault.
 /// # CHECK
 /// Only [`TREASURY_WITHDRAWER`](crate::roles::TREASURY_WITHDRAWER) can use.
-pub(crate) fn unchecked_withdraw_from_treasury(
-    ctx: Context<WithdrawFromTreasury>,
+pub(crate) fn unchecked_withdraw_from_treasury_vault(
+    ctx: Context<WithdrawFromTreasuryVault>,
     amount: u64,
     decimals: u8,
 ) -> Result<()> {
-    let signer = ctx.accounts.treasury_config.load()?.signer();
+    let signer = ctx.accounts.treasury_vault_config.load()?.signer();
     let cpi_ctx = ctx.accounts.transfer_checked_ctx();
     transfer_checked(cpi_ctx.with_signer(&[&signer.as_seeds()]), amount, decimals)?;
     Ok(())
 }
 
-impl<'info> WithStore<'info> for WithdrawFromTreasury<'info> {
+impl<'info> WithStore<'info> for WithdrawFromTreasuryVault<'info> {
     fn store_program(&self) -> AccountInfo<'info> {
         self.store_program.to_account_info()
     }
@@ -525,7 +531,7 @@ impl<'info> WithStore<'info> for WithdrawFromTreasury<'info> {
     }
 }
 
-impl<'info> CpiAuthentication<'info> for WithdrawFromTreasury<'info> {
+impl<'info> CpiAuthentication<'info> for WithdrawFromTreasuryVault<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
     }
@@ -535,7 +541,7 @@ impl<'info> CpiAuthentication<'info> for WithdrawFromTreasury<'info> {
     }
 }
 
-impl<'info> WithdrawFromTreasury<'info> {
+impl<'info> WithdrawFromTreasuryVault<'info> {
     fn transfer_checked_ctx(&self) -> CpiContext<'_, '_, '_, 'info, TransferChecked<'info>> {
         CpiContext::new(
             self.token_program.to_account_info(),
@@ -554,10 +560,10 @@ impl<'info> WithdrawFromTreasury<'info> {
 /// Remaining accounts expected by this instruction:
 ///
 ///   - 0..N. `[]` N feed accounts sorted by token addresses, where N represents the total number of tokens defined in
-///     the GT bank or the treasury config.
+///     the GT bank or the treasury vault config.
 ///   - N..(N+M). `[]` M token mint accounts, where M represents the total number of tokens defined in
-///     the treasury config.
-///   - (N+M)..(N+2M). `[]` M treasury vault accounts.
+///     the treasury vault config.
+///   - (N+M)..(N+2M). `[]` M treasury vault token accounts.
 #[derive(Accounts)]
 pub struct ConfirmGtBuyback<'info> {
     /// Authority.
@@ -570,14 +576,14 @@ pub struct ConfirmGtBuyback<'info> {
     #[account(
         has_one = store,
         // Only allow confirming buyback with the authorized treausry.
-        constraint = config.load()?.treasury_config() == Some(&treasury_config.key()) @ CoreError::InvalidArgument,
+        constraint = config.load()?.treasury_vault_config() == Some(&treasury_vault_config.key()) @ CoreError::InvalidArgument,
     )]
     pub config: AccountLoader<'info, Config>,
-    /// Treasury Config.
+    /// Treasury Vault Config.
     #[account(
         has_one = config,
     )]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// GT exchange vault.
     #[account(
         mut,
@@ -589,7 +595,7 @@ pub struct ConfirmGtBuyback<'info> {
     /// GT Bank.
     #[account(
         mut,
-        has_one = treasury_config,
+        has_one = treasury_vault_config,
         has_one = gt_exchange_vault,
     )]
     pub gt_bank: AccountLoader<'info, GtBank>,
@@ -644,7 +650,7 @@ impl<'info> ConfirmGtBuyback<'info> {
         remaining_accounts: &'info [AccountInfo<'info>],
         num_tokens: usize,
     ) -> Result<(&'info [AccountInfo<'info>], &'info [AccountInfo<'info>])> {
-        let num_treasury_tokens = self.treasury_config.load()?.num_tokens();
+        let num_treasury_tokens = self.treasury_vault_config.load()?.num_tokens();
         let treasury_tokens_end = num_tokens
             .checked_add(num_treasury_tokens)
             .ok_or_else(|| error!(CoreError::Internal))?;
@@ -661,8 +667,8 @@ impl<'info> ConfirmGtBuyback<'info> {
         let mints = &remaining_accounts[num_tokens..treasury_tokens_end];
         let vaults = &remaining_accounts[treasury_tokens_end..end];
 
-        let treasury_config_key = self.treasury_config.key();
-        for (idx, token) in self.treasury_config.load()?.tokens().enumerate() {
+        let treasury_vault_config_key = self.treasury_vault_config.key();
+        for (idx, token) in self.treasury_vault_config.load()?.tokens().enumerate() {
             let mint = &mints[idx];
             require_eq!(mint.key(), token, CoreError::TokenMintMismatched);
             let vault = &vaults[idx];
@@ -674,11 +680,15 @@ impl<'info> ConfirmGtBuyback<'info> {
             let vault = InterfaceAccount::<TokenAccount>::try_from(vault)?;
 
             require_eq!(vault.mint, mint.key(), CoreError::TokenMintMismatched);
-            require_eq!(vault.owner, treasury_config_key, CoreError::InvalidArgument);
+            require_eq!(
+                vault.owner,
+                treasury_vault_config_key,
+                CoreError::InvalidArgument
+            );
             require!(
                 is_associated_token_account_with_program_id(
                     &vault.key(),
-                    &treasury_config_key,
+                    &treasury_vault_config_key,
                     &token,
                     token_program_id
                 ),
@@ -702,7 +712,7 @@ impl<'info> ConfirmGtBuyback<'info> {
             .gt_bank
             .load()?
             .tokens()
-            .chain(self.treasury_config.load()?.tokens())
+            .chain(self.treasury_vault_config.load()?.tokens())
             .collect::<BTreeSet<_>>();
 
         let (feeds, vaults) =

@@ -204,7 +204,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
             None => {
                 let market = self.market_address();
                 let market = self.client.market(&market).await?;
-                let hint = CreateGlvDepositHint::new(&market);
+                let hint = CreateGlvDepositHint::new(&*market);
                 self.hint = Some(hint.clone());
                 Ok(hint)
             }

@@ -10,14 +10,17 @@ use super::treasury::MAX_TOKENS;
 
 /// GT Bank.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct GtBank {
+    version: u8,
     pub(crate) bump: u8,
     flags: GtBankFlagsContainer,
-    padding: [u8; 14],
-    pub(crate) treasury_config: Pubkey,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    padding: [u8; 13],
+    pub(crate) treasury_vault_config: Pubkey,
     pub(crate) gt_exchange_vault: Pubkey,
     remaining_confirmed_gt_amount: u64,
+    #[cfg_attr(feature = "debug", debug(skip))]
     reserved: [u8; 256],
     balances: TokenBalances,
 }
@@ -34,7 +37,7 @@ impl GtBank {
     pub(crate) fn try_init(
         &mut self,
         bump: u8,
-        treasury_config: Pubkey,
+        treasury_vault_config: Pubkey,
         gt_exchange_vault: Pubkey,
     ) -> Result<()> {
         require!(
@@ -42,7 +45,7 @@ impl GtBank {
             CoreError::PreconditionsAreNotMet
         );
         self.bump = bump;
-        self.treasury_config = treasury_config;
+        self.treasury_vault_config = treasury_vault_config;
         self.gt_exchange_vault = gt_exchange_vault;
         self.flags.set_flag(GtBankFlags::Initialized, true);
         Ok(())
@@ -75,10 +78,10 @@ impl GtBank {
             .map(|(k, b)| (Pubkey::new_from_array(*k), b.amount))
     }
 
-    /// Get treasury config address.
+    /// Get treasury vault config address.
     #[cfg(feature = "utils")]
-    pub fn treasury_config(&self) -> &Pubkey {
-        &self.treasury_config
+    pub fn treasury_vault_config(&self) -> &Pubkey {
+        &self.treasury_vault_config
     }
 
     /// Get GT exchange vault address.
@@ -104,7 +107,7 @@ impl GtBank {
     pub fn to_feeds(
         &self,
         map: &impl gmsol_store::states::TokenMapAccess,
-        treasury_config: &super::TreasuryConfig,
+        treasury_vault_config: &super::TreasuryVaultConfig,
     ) -> Result<gmsol_store::states::common::TokensWithFeed> {
         use std::collections::BTreeSet;
 
@@ -112,7 +115,7 @@ impl GtBank {
 
         let tokens = self
             .tokens()
-            .chain(treasury_config.tokens())
+            .chain(treasury_vault_config.tokens())
             .collect::<BTreeSet<_>>();
         let records = tokens
             .iter()
@@ -211,7 +214,7 @@ impl GtBank {
 
     pub(crate) fn signer(&self) -> GtBankSigner {
         GtBankSigner {
-            treasury_config: self.treasury_config,
+            treasury_vault_config: self.treasury_vault_config,
             gt_exchange_vault: self.gt_exchange_vault,
             bump_bytes: [self.bump],
         }
@@ -240,7 +243,7 @@ impl GtBank {
 
 /// Gt Bank Signer.
 pub struct GtBankSigner {
-    treasury_config: Pubkey,
+    treasury_vault_config: Pubkey,
     gt_exchange_vault: Pubkey,
     bump_bytes: [u8; 1],
 }
@@ -250,7 +253,7 @@ impl GtBankSigner {
     pub fn as_seeds(&self) -> [&[u8]; 4] {
         [
             GtBank::SEED,
-            self.treasury_config.as_ref(),
+            self.treasury_vault_config.as_ref(),
             self.gt_exchange_vault.as_ref(),
             &self.bump_bytes,
         ]

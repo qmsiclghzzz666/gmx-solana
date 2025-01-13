@@ -5,10 +5,11 @@ use crate::{utils::pubkey::to_bytes, CoreError};
 
 /// Zero-copy price structure for storing min max prices.
 #[zero_copy]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct SmallPrices {
     decimal_multipler: u8,
     flags: u8,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 2],
     min: u32,
     max: u32,

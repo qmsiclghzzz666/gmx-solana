@@ -15,7 +15,7 @@ pub const MAX_ROLE_NAME_LEN: usize = 32;
 pub const MAX_ROLES: usize = 32;
 
 /// Max number of members.
-pub const MAX_MEMBERS: usize = 16;
+pub const MAX_MEMBERS: usize = 64;
 
 /// The key of a Role.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, PartialEq, Eq, PartialOrd, Ord)]

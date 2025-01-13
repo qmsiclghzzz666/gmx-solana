@@ -6,8 +6,9 @@ use crate::{states::TokenMapAccess, utils::pubkey::optional_address, CoreError};
 use super::{swap::HasSwapParams, TokenRecord, TokensWithFeed};
 
 /// Token Account.
+#[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[account(zero_copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokenAndAccount {
     /// Token.
     token: Pubkey,

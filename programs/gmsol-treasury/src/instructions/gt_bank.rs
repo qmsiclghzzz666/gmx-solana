@@ -17,7 +17,7 @@ use gmsol_store::{
 };
 use gmsol_utils::InitSpace;
 
-use crate::states::{Config, GtBank, TreasuryConfig};
+use crate::states::{Config, GtBank, TreasuryVaultConfig};
 
 /// The accounts definition for [`prepare_gt_bank`](crate::gmsol_treasury::prepare_gt_bank).
 #[derive(Accounts)]
@@ -32,14 +32,14 @@ pub struct PrepareGtBank<'info> {
     #[account(
         has_one = store,
         // Only allow creating GT bank for the authorized treausry.
-        constraint = config.load()?.treasury_config() == Some(&treasury_config.key()) @ CoreError::InvalidArgument,
+        constraint = config.load()?.treasury_vault_config() == Some(&treasury_vault_config.key()) @ CoreError::InvalidArgument,
     )]
     pub config: AccountLoader<'info, Config>,
     /// Treasury Config.
     #[account(
         has_one = config,
     )]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// GT exchange vault.
     #[account(
         has_one = store,
@@ -54,7 +54,7 @@ pub struct PrepareGtBank<'info> {
         space = 8 + GtBank::INIT_SPACE,
         seeds = [
             GtBank::SEED,
-            treasury_config.key().as_ref(),
+            treasury_vault_config.key().as_ref(),
             gt_exchange_vault.key().as_ref(),
         ],
         bump,
@@ -71,12 +71,12 @@ pub struct PrepareGtBank<'info> {
 /// Only [`TREASURY_KEEPER`](crate::roles::TREASURY_KEEPER) can use.
 pub(crate) fn unchecked_prepare_gt_bank(ctx: Context<PrepareGtBank>) -> Result<()> {
     let bump = ctx.bumps.gt_bank;
-    let treasury_config = ctx.accounts.treasury_config.key();
+    let treasury_vault_config = ctx.accounts.treasury_vault_config.key();
     let gt_exchange_vault = ctx.accounts.gt_exchange_vault.key();
 
     match ctx.accounts.gt_bank.load_init() {
         Ok(mut gt_bank) => {
-            gt_bank.try_init(bump, treasury_config, gt_exchange_vault)?;
+            gt_bank.try_init(bump, treasury_vault_config, gt_exchange_vault)?;
             drop(gt_bank);
             ctx.accounts.gt_bank.exit(&crate::ID)?;
         }
@@ -95,8 +95,8 @@ pub(crate) fn unchecked_prepare_gt_bank(ctx: Context<PrepareGtBank>) -> Result<(
         let gt_bank = ctx.accounts.gt_bank.load()?;
         require_eq!(gt_bank.bump, bump, CoreError::InvalidArgument);
         require_eq!(
-            gt_bank.treasury_config,
-            treasury_config,
+            gt_bank.treasury_vault_config,
+            treasury_vault_config,
             CoreError::InvalidArgument
         );
         require_eq!(
@@ -143,23 +143,23 @@ pub struct SyncGtBank<'info> {
     #[account(
         has_one = store,
         // Only allow depositing into the authorized treausry.
-        constraint = config.load()?.treasury_config() == Some(&treasury_config.key()) @ CoreError::InvalidArgument,
+        constraint = config.load()?.treasury_vault_config() == Some(&treasury_vault_config.key()) @ CoreError::InvalidArgument,
     )]
     pub config: AccountLoader<'info, Config>,
-    /// Treasury Config.
+    /// Treasury Vault Config.
     #[account(
         has_one = config,
         // As long as the treasury allows withdrawals of the given token,
         // deposits from GT Bank remain permitted. Disabling deposits for
         // that token won't affect GT Bank deposits already made, which
         // in turn helps the treasury recover those funds.
-        constraint = treasury_config.load()?.is_withdrawal_allowed(&token.key())? @ CoreError::InvalidArgument,
+        constraint = treasury_vault_config.load()?.is_withdrawal_allowed(&token.key())? @ CoreError::InvalidArgument,
     )]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// GT bank.
     #[account(
         mut,
-        has_one = treasury_config,
+        has_one = treasury_vault_config,
     )]
     pub gt_bank: AccountLoader<'info, GtBank>,
     /// Token.
@@ -167,7 +167,7 @@ pub struct SyncGtBank<'info> {
     /// Treasury vault.
     #[account(
         mut,
-        associated_token::authority = treasury_config,
+        associated_token::authority = treasury_vault_config,
         associated_token::mint =  token,
     )]
     pub treasury_vault: InterfaceAccount<'info, TokenAccount>,
@@ -273,14 +273,14 @@ pub struct CompleteGtExchange<'info> {
     #[account(
         has_one = store,
         // Only allow completing GT exchange with the authorized treasury.
-        constraint = config.load()?.treasury_config() == Some(&treasury_config.key()) @ CoreError::InvalidArgument,
+        constraint = config.load()?.treasury_vault_config() == Some(&treasury_vault_config.key()) @ CoreError::InvalidArgument,
     )]
     pub config: AccountLoader<'info, Config>,
     /// Treasury Config.
     #[account(
         has_one = config,
     )]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// GT exchange vault.
     /// CHECK: check by CPI.
     #[account(mut)]
@@ -288,7 +288,7 @@ pub struct CompleteGtExchange<'info> {
     /// GT bank.
     #[account(
         mut,
-        has_one = treasury_config,
+        has_one = treasury_vault_config,
         has_one = gt_exchange_vault,
     )]
     pub gt_bank: AccountLoader<'info, GtBank>,

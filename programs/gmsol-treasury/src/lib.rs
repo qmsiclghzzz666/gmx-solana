@@ -26,10 +26,10 @@ pub mod gmsol_treasury {
         instructions::initialize_config(ctx)
     }
 
-    /// Set treasury.
+    /// Set treasury vault config.
     #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_ADMIN))]
-    pub fn set_treasury(ctx: Context<SetTreasury>) -> Result<()> {
-        instructions::unchecked_set_treasury(ctx)
+    pub fn set_treasury_vault_config(ctx: Context<SetTreasuryVaultConfig>) -> Result<()> {
+        instructions::unchecked_set_treasury_vault_config(ctx)
     }
 
     /// Set GT factor.
@@ -44,28 +44,33 @@ pub mod gmsol_treasury {
         instructions::unchecked_set_buyback_factor(ctx, factor)
     }
 
-    /// Initialize a [`TreasuryConfig`](crate::states::TreasuryConfig) account.
+    /// Initialize a [`TreasuryVaultConfig`](crate::states::TreasuryVaultConfig) account.
     #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_ADMIN))]
-    pub fn initialize_treasury(ctx: Context<InitializeTreasury>, index: u8) -> Result<()> {
-        instructions::unchecked_initialize_treasury(ctx, index)
+    pub fn initialize_treasury_vault_config(
+        ctx: Context<InitializeTreasuryVaultConfig>,
+        index: u8,
+    ) -> Result<()> {
+        instructions::unchecked_initialize_treasury_vault_config(ctx, index)
     }
 
-    /// Insert a token to the given [`TreasuryConfig`](crate::states::TreasuryConfig) account.
+    /// Insert a token to the given [`TreasuryVaultConfig`](crate::states::TreasuryVaultConfig) account.
     ///
     /// # Errors
-    /// - The [`token`](InsertTokenToTreasury::token) must not have been inserted.
+    /// - The [`token`](InsertTokenToTreasuryVault::token) must not have been inserted.
     #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_ADMIN))]
-    pub fn insert_token_to_treasury(ctx: Context<InsertTokenToTreasury>) -> Result<()> {
-        instructions::unchecked_insert_token_to_treasury(ctx)
+    pub fn insert_token_to_treasury_vault(ctx: Context<InsertTokenToTreasuryVault>) -> Result<()> {
+        instructions::unchecked_insert_token_to_treasury_vault(ctx)
     }
 
-    /// Remove a token from the given [`TreasuryConfig`](crate::states::TreasuryConfig) account.
+    /// Remove a token from the given [`TreasuryVaultConfig`](crate::states::TreasuryVaultConfig) account.
     ///
     /// # Errors
-    /// - The [`token`](RemoveTokenFromTreasury::token) must have been inserted.
+    /// - The [`token`](RemoveTokenFromTreasuryVault::token) must have been inserted.
     #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_ADMIN))]
-    pub fn remove_token_from_treasury(ctx: Context<RemoveTokenFromTreasury>) -> Result<()> {
-        instructions::unchecked_remove_token_from_treasury(ctx)
+    pub fn remove_token_from_treasury_vault(
+        ctx: Context<RemoveTokenFromTreasuryVault>,
+    ) -> Result<()> {
+        instructions::unchecked_remove_token_from_treasury_vault(ctx)
     }
 
     /// Toggle a flag of the given token.
@@ -86,20 +91,20 @@ pub mod gmsol_treasury {
         instructions::unchecked_toggle_token_flag(ctx, &flag, value)
     }
 
-    /// Deposit into a treasury vault.
+    /// Deposit to treasury vault.
     #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_KEEPER))]
-    pub fn deposit_into_treasury(ctx: Context<DepositIntoTreasury>) -> Result<()> {
-        instructions::unchecked_deposit_into_treasury(ctx)
+    pub fn deposit_to_treasury_vault(ctx: Context<DepositToTreasuryVault>) -> Result<()> {
+        instructions::unchecked_deposit_to_treasury_vault(ctx)
     }
 
-    /// Withdraw from a treasury vault.
+    /// Withdraw from treasury vault.
     #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_WITHDRAWER))]
-    pub fn withdraw_from_treasury(
-        ctx: Context<WithdrawFromTreasury>,
+    pub fn withdraw_from_treasury_vault(
+        ctx: Context<WithdrawFromTreasuryVault>,
         amount: u64,
         decimals: u8,
     ) -> Result<()> {
-        instructions::unchecked_withdraw_from_treasury(ctx, amount, decimals)
+        instructions::unchecked_withdraw_from_treasury_vault(ctx, amount, decimals)
     }
 
     /// Confirm GT buyback.

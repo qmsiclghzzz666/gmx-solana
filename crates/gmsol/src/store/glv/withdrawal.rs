@@ -172,7 +172,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
             None => {
                 let market = self.market_address();
                 let market = self.client.market(&market).await?;
-                let hint = CreateGlvWithdrawalHint::new(&market);
+                let hint = CreateGlvWithdrawalHint::new(&*market);
                 self.hint = Some(hint.clone());
                 Ok(hint)
             }

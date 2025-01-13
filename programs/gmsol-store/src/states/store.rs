@@ -16,12 +16,14 @@ const MAX_LEN: usize = 32;
 
 /// Data Store.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct Store {
+    version: u8,
     bump: [u8; 1],
     key_seed: [u8; 32],
     key: [u8; MAX_LEN],
-    padding_0: [u8; 7],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    padding_0: [u8; 6],
     role: RoleStore,
     /// Store authority.
     pub authority: Pubkey,
@@ -29,19 +31,25 @@ pub struct Store {
     pub token_map: Pubkey,
     /// Disabled features.
     disabled_features: DisabledFeatures,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 12],
     /// Treasury Config.
     treasury: Treasury,
     /// Amounts.
     pub(crate) amount: Amounts,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    padding_2: [u8; 8],
     /// Factors.
     pub(crate) factor: Factors,
     /// Addresses.
     pub(crate) address: Addresses,
     /// GT State.
     gt: GtState,
-    reserve: [u8; 1024],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    reserved: [u8; 1024],
 }
+
+static_assertions::const_assert!(Store::INIT_SPACE + 8 <= 10240);
 
 impl InitSpace for Store {
     const INIT_SPACE: usize = std::mem::size_of::<Self>();
@@ -363,10 +371,11 @@ impl StoreWalletSigner {
 
 /// Treasury.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct Treasury {
     /// Receiver.
     receiver: Pubkey,
+    #[cfg_attr(feature = "debug", debug(skip))]
     reserved: [u8; 128],
 }
 
@@ -388,16 +397,16 @@ impl Treasury {
 }
 
 /// Amounts.
-#[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct Amounts {
     pub(crate) claimable_time_window: Amount,
     pub(crate) recent_time_window: Amount,
     pub(crate) request_expiration: Amount,
     pub(crate) oracle_max_age: Amount,
     pub(crate) oracle_max_timestamp_range: Amount,
-    reserved_1: [Amount; 27],
-    reserved_2: [Amount; 96],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    reserved: [Amount; 128],
 }
 
 /// Amount keys.
@@ -454,13 +463,13 @@ impl Amounts {
 }
 
 /// Factors.
-#[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct Factors {
     pub(crate) oracle_ref_price_deviation: Factor,
     pub(crate) order_fee_discount_for_referred_user: Factor,
-    reserved_1: [Factor; 30],
-    reserved_2: [Factor; 32],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    reserved: [Factor; 64],
 }
 
 /// Factor keys.
@@ -505,10 +514,11 @@ impl Factors {
 }
 
 /// Addresses.
-#[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct Addresses {
     pub(crate) holding: Pubkey,
+    #[cfg_attr(feature = "debug", debug(skip))]
     reserved: [Pubkey; 31],
 }
 

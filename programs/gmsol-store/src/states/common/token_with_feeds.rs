@@ -13,6 +13,7 @@ use super::PriceProviderKind;
 /// Tokens with feed.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokensWithFeed {
     /// Tokens that require prices,
     /// which must be of the same length with `feeds`.
@@ -30,6 +31,7 @@ pub struct TokensWithFeed {
 /// A record of token config.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokenRecord {
     token: Pubkey,
     feed: Pubkey,

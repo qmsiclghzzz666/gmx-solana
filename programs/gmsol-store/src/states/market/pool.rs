@@ -138,6 +138,7 @@ impl gmsol_model::Pool for Pool {
 /// Market Pools.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Pools {
     /// Primary Pool.
     primary: PoolStorage,
@@ -171,10 +172,8 @@ pub struct Pools {
     collateral_sum_for_short: PoolStorage,
     /// Total borrowing pool.
     total_borrowing: PoolStorage,
-    /// Point pool.
-    point: PoolStorage,
     #[cfg_attr(feature = "debug", debug(skip))]
-    reserved: [PoolStorage; 4],
+    reserved: [PoolStorage; 16],
 }
 
 impl Pools {
@@ -200,8 +199,6 @@ impl Pools {
         self.collateral_sum_for_short.set_is_pure(is_pure);
         // Total borrowing pool must be impure.
         self.total_borrowing.set_is_pure(false);
-        // Point pool must be impure.
-        self.point.set_is_pure(false);
     }
 
     pub(super) fn get(&self, kind: PoolKind) -> Option<&PoolStorage> {
@@ -226,7 +223,6 @@ impl Pools {
             PoolKind::CollateralSumForLong => &self.collateral_sum_for_long,
             PoolKind::CollateralSumForShort => &self.collateral_sum_for_short,
             PoolKind::TotalBorrowing => &self.total_borrowing,
-            PoolKind::Point => &self.point,
             _ => return None,
         };
         Some(pool)
@@ -254,7 +250,6 @@ impl Pools {
             PoolKind::CollateralSumForLong => &mut self.collateral_sum_for_long,
             PoolKind::CollateralSumForShort => &mut self.collateral_sum_for_short,
             PoolKind::TotalBorrowing => &mut self.total_borrowing,
-            PoolKind::Point => &mut self.point,
             _ => return None,
         };
         Some(pool)

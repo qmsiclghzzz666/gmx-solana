@@ -237,7 +237,7 @@ use self::{
         glv::UpdateGlvParams,
         market::{config::EntryArgs, status::MarketStatus},
         order::UpdateOrderParams,
-        token_config::TokenConfigBuilder,
+        token_config::UpdateTokenConfigParams,
         FactorKey, PriceProviderKind,
     },
     utils::internal,
@@ -723,7 +723,7 @@ pub mod gmsol_store {
     pub fn push_to_token_map(
         ctx: Context<PushToTokenMap>,
         name: String,
-        builder: TokenConfigBuilder,
+        builder: UpdateTokenConfigParams,
         enable: bool,
         new: bool,
     ) -> Result<()> {
@@ -761,7 +761,7 @@ pub mod gmsol_store {
         name: String,
         token: Pubkey,
         token_decimals: u8,
-        builder: TokenConfigBuilder,
+        builder: UpdateTokenConfigParams,
         enable: bool,
         new: bool,
     ) -> Result<()> {

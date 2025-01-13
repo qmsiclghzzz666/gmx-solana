@@ -7,8 +7,10 @@ use super::{Market, Seed};
 
 /// Position.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Position {
+    version: u8,
     /// Bump seed.
     pub bump: u8,
     /// Store.
@@ -16,7 +18,8 @@ pub struct Position {
     /// Position kind (the representation of [`PositionKind`]).
     pub kind: u8,
     /// Padding.
-    pub padding_0: [u8; 14],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    pub padding_0: [u8; 13],
     /// Owner.
     pub owner: Pubkey,
     /// The market token of the position market.
@@ -25,8 +28,10 @@ pub struct Position {
     pub collateral_token: Pubkey,
     /// Position State.
     pub state: PositionState,
-    // /// Reserved.
-    // reserved: [u8; 128],
+    /// Reserved.
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 256],
 }
 
 impl Default for Position {
@@ -92,7 +97,6 @@ impl Position {
         self.kind = kind as u8;
         self.bump = bump;
         self.store = store;
-        self.padding_0 = [0; 14];
         self.owner = *owner;
         self.market_token = *market_token;
         self.collateral_token = *collateral_token;
@@ -132,10 +136,10 @@ impl AsRef<Position> for Position {
 }
 
 /// Position State.
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[account(zero_copy)]
+#[zero_copy]
 #[derive(BorshDeserialize, BorshSerialize, InitSpace)]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PositionState {
     /// Trade id.
     pub trade_id: u64,
@@ -159,15 +163,11 @@ pub struct PositionState {
     pub long_token_claimable_funding_amount_per_size: u128,
     /// Short token claimable funding amount per size.
     pub short_token_claimable_funding_amount_per_size: u128,
-    // /// Reserved.
-    // #[cfg_attr(feature = "serde", serde(skip, default = "default_reserved_state"))]
-    // reserved: [u8; 128],
+    /// Reserved.
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
-
-// #[cfg(feature = "serde")]
-// fn default_reserved_state() -> [u8; 128] {
-//     [0; 128]
-// }
 
 impl gmsol_model::PositionState<{ constants::MARKET_DECIMALS }> for PositionState {
     type Num = u128;

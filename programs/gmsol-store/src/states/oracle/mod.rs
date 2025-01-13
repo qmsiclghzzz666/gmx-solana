@@ -55,8 +55,11 @@ gmsol_utils::flags!(OracleFlag, MAX_FLAGS, u8);
 
 /// Oracle Account.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct Oracle {
+    version: u8,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    padding_0: [u8; 7],
     /// Store.
     pub store: Pubkey,
     /// This address is authorized to **directly** modify
@@ -67,7 +70,9 @@ pub struct Oracle {
     min_oracle_slot: u64,
     primary: PriceMap,
     flags: OracleFlagContainer,
-    padding_0: [u8; 3],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    padding_1: [u8; 3],
+    #[cfg_attr(feature = "debug", debug(skip))]
     reserved: [u8; 256],
 }
 

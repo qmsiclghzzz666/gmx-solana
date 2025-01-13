@@ -12,8 +12,9 @@ const MAX_FLAGS: usize = 8;
 /// Instruction Header.
 #[account(zero_copy)]
 pub struct InstructionHeader {
+    version: u8,
     flags: InstructionFlagContainer,
-    padding_0: [u8; 7],
+    padding_0: [u8; 6],
     /// Approved ts.
     approved_at: i64,
     /// Executor.

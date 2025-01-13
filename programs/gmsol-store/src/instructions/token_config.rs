@@ -3,8 +3,8 @@ use anchor_spl::token::Mint;
 
 use crate::{
     states::{
-        FeedConfig, PriceProviderKind, Store, TokenConfigBuilder, TokenMapAccess,
-        TokenMapAccessMut, TokenMapHeader, TokenMapLoader,
+        FeedConfig, PriceProviderKind, Store, TokenMapAccess, TokenMapAccessMut, TokenMapHeader,
+        TokenMapLoader, UpdateTokenConfigParams,
     },
     utils::internal,
     CoreError,
@@ -64,7 +64,7 @@ pub struct PushToTokenMap<'info> {
 pub(crate) fn unchecked_push_to_token_map(
     ctx: Context<PushToTokenMap>,
     name: &str,
-    builder: TokenConfigBuilder,
+    builder: UpdateTokenConfigParams,
     enable: bool,
     new: bool,
 ) -> Result<()> {
@@ -121,7 +121,7 @@ pub(crate) fn unchecked_push_to_token_map_synthetic(
     name: &str,
     token: Pubkey,
     token_decimals: u8,
-    builder: TokenConfigBuilder,
+    builder: UpdateTokenConfigParams,
     enable: bool,
     new: bool,
 ) -> Result<()> {
@@ -389,7 +389,7 @@ fn do_push_token_map<'info>(
     name: &str,
     token: &Pubkey,
     token_decimals: u8,
-    builder: TokenConfigBuilder,
+    builder: UpdateTokenConfigParams,
     enable: bool,
     new: bool,
 ) -> Result<()> {

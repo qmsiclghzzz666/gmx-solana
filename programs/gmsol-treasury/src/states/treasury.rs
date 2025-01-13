@@ -4,27 +4,30 @@ use gmsol_store::{states::Seed, utils::pubkey::to_bytes, CoreError};
 
 pub(crate) const MAX_TOKENS: usize = 16;
 
-/// Treasury config account.
+/// Treasury vault config account.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct TreasuryConfig {
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+pub struct TreasuryVaultConfig {
+    version: u8,
     pub(crate) bump: u8,
     index: u8,
-    padding: [u8; 14],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    padding: [u8; 13],
     pub(crate) config: Pubkey,
+    #[cfg_attr(feature = "debug", debug(skip))]
     reserved: [u8; 256],
     tokens: TokenMap,
 }
 
-impl Seed for TreasuryConfig {
-    const SEED: &'static [u8] = b"treasury";
+impl Seed for TreasuryVaultConfig {
+    const SEED: &'static [u8] = b"treasury_vault_config";
 }
 
-impl gmsol_utils::InitSpace for TreasuryConfig {
+impl gmsol_utils::InitSpace for TreasuryVaultConfig {
     const INIT_SPACE: usize = std::mem::size_of::<Self>();
 }
 
-impl TreasuryConfig {
+impl TreasuryVaultConfig {
     pub(crate) fn init(&mut self, bump: u8, index: u8, config: &Pubkey) {
         self.bump = bump;
         self.index = index;
@@ -84,8 +87,8 @@ impl TreasuryConfig {
             .get_flag(TokenFlag::AllowWithdrawal))
     }
 
-    pub(crate) fn signer(&self) -> TreasurySigner {
-        TreasurySigner {
+    pub(crate) fn signer(&self) -> TreasuryVaultSigner {
+        TreasuryVaultSigner {
             config: self.config,
             index_bytes: [self.index],
             bump_bytes: [self.bump],
@@ -105,18 +108,18 @@ impl TreasuryConfig {
     }
 }
 
-/// Treasury Signer.
-pub struct TreasurySigner {
+/// Treasury Vault Signer.
+pub struct TreasuryVaultSigner {
     config: Pubkey,
     index_bytes: [u8; 1],
     bump_bytes: [u8; 1],
 }
 
-impl TreasurySigner {
+impl TreasuryVaultSigner {
     /// As signer seeds.
     pub fn as_seeds(&self) -> [&[u8]; 4] {
         [
-            TreasuryConfig::SEED,
+            TreasuryVaultConfig::SEED,
             self.config.as_ref(),
             &self.index_bytes,
             &self.bump_bytes,

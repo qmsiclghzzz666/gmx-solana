@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     ops::Deref,
+    sync::Arc,
 };
 
 use anchor_client::{
@@ -613,7 +614,7 @@ pub struct ExecuteOrderBuilder<'a, C> {
 pub struct ExecuteOrderHint {
     kind: OrderKind,
     store_program_id: Pubkey,
-    store: Store,
+    store: Arc<Store>,
     market_token: Pubkey,
     position: Option<Pubkey>,
     owner: Pubkey,
@@ -750,7 +751,7 @@ where
         &mut self,
         order: &Order,
         market: &Market,
-        store: &Store,
+        store: &Arc<Store>,
         map: &impl TokenMapAccess,
         user: Option<&UserHeader>,
     ) -> crate::Result<&mut Self> {
@@ -766,7 +767,7 @@ where
         self.hint = Some(ExecuteOrderHint {
             kind,
             store_program_id: *self.client.store_program_id(),
-            store: *store,
+            store: store.clone(),
             market_token,
             position: params.position().copied(),
             owner,

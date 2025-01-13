@@ -14,7 +14,7 @@ use gmsol_store::{
 use gmsol_timelock::states::{Executor, TimelockConfig};
 use gmsol_treasury::{
     constants::RECEIVER_SEED,
-    states::{Config, GtBank, TreasuryConfig},
+    states::{Config, GtBank, TreasuryVaultConfig},
 };
 use gmsol_utils::to_seed;
 
@@ -291,32 +291,32 @@ pub fn find_price_feed_pda(
 }
 
 /// Find the PDA for global treasury config.
-pub fn find_config_pda(store: &Pubkey, treasury_program_id: &Pubkey) -> (Pubkey, u8) {
+pub fn find_treasury_config_pda(store: &Pubkey, treasury_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[Config::SEED, store.as_ref()], treasury_program_id)
 }
 
-/// Find the PDA for a treasury config.
-pub fn find_treasury_config_pda(
+/// Find the PDA for a treasury vault config.
+pub fn find_treasury_vault_config_pda(
     config: &Pubkey,
     index: u8,
     treasury_program_id: &Pubkey,
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[TreasuryConfig::SEED, config.as_ref(), &[index]],
+        &[TreasuryVaultConfig::SEED, config.as_ref(), &[index]],
         treasury_program_id,
     )
 }
 
 /// Find the PDA for a GT bank.
 pub fn find_gt_bank_pda(
-    treasury_config: &Pubkey,
+    treasury_vault_config: &Pubkey,
     gt_exchange_vault: &Pubkey,
     treasury_program_id: &Pubkey,
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
             GtBank::SEED,
-            treasury_config.as_ref(),
+            treasury_vault_config.as_ref(),
             gt_exchange_vault.as_ref(),
         ],
         treasury_program_id,

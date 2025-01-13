@@ -29,6 +29,7 @@ use crate::{
     utils::{
         account_with_context, accounts_lazy_with_context,
         transaction_builder::rpc_builder::{Config, Program},
+        workarounds::zero_copy::SharedZeroCopy,
         ProgramAccountsConfig, PubsubClient, RpcBuilder, SubscriptionConfig, TransactionBuilder,
         WithContext, ZeroCopy,
     },
@@ -433,23 +434,23 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Find treasury global config address.
-    pub fn find_config_address(&self, store: &Pubkey) -> Pubkey {
-        crate::pda::find_config_pda(store, self.treasury_program_id()).0
+    pub fn find_treasury_config_address(&self, store: &Pubkey) -> Pubkey {
+        crate::pda::find_treasury_config_pda(store, self.treasury_program_id()).0
     }
 
-    /// Find treasury config address.
-    pub fn find_treasury_config_address(&self, config: &Pubkey, index: u8) -> Pubkey {
-        crate::pda::find_treasury_config_pda(config, index, self.treasury_program_id()).0
+    /// Find treasury vault config address.
+    pub fn find_treasury_vault_config_address(&self, config: &Pubkey, index: u8) -> Pubkey {
+        crate::pda::find_treasury_vault_config_pda(config, index, self.treasury_program_id()).0
     }
 
     /// Find GT bank address.
     pub fn find_gt_bank_address(
         &self,
-        treasury_config: &Pubkey,
+        treasury_vault_config: &Pubkey,
         gt_exchange_vault: &Pubkey,
     ) -> Pubkey {
         crate::pda::find_gt_bank_pda(
-            treasury_config,
+            treasury_vault_config,
             gt_exchange_vault,
             self.treasury_program_id(),
         )
@@ -561,9 +562,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Fetch [`Store`](types::Store) account with its address.
-    pub async fn store(&self, address: &Pubkey) -> crate::Result<types::Store> {
+    pub async fn store(&self, address: &Pubkey) -> crate::Result<Arc<types::Store>> {
         Ok(self
-            .account::<ZeroCopy<types::Store>>(address)
+            .account::<SharedZeroCopy<types::Store>>(address)
             .await?
             .ok_or(crate::Error::NotFound)?
             .0)
@@ -651,9 +652,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Fetch [`Market`](types::Market) account with its address.
-    pub async fn market(&self, address: &Pubkey) -> crate::Result<types::Market> {
+    pub async fn market(&self, address: &Pubkey) -> crate::Result<Arc<types::Market>> {
         Ok(self
-            .account::<ZeroCopy<types::Market>>(address)
+            .account::<SharedZeroCopy<types::Market>>(address)
             .await?
             .ok_or(crate::Error::NotFound)?
             .0)
@@ -782,14 +783,14 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let mut filters = Vec::default();
         if let Some(owner) = owner {
             filters.push(RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
-                8 + 1 + 32 + 32 + 8 + 8 + 8 + 1 + 32,
+                bytemuck::offset_of!(types::common::ActionHeader, owner) + DISC_OFFSET,
                 owner.as_ref().to_owned(),
             )));
         }
         if let Some(market_token) = market_token {
             let market = self.find_market_address(store, market_token);
             filters.push(RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
-                8 + 1 + 32,
+                bytemuck::offset_of!(types::common::ActionHeader, market) + DISC_OFFSET,
                 market.as_ref().to_owned(),
             )));
         }

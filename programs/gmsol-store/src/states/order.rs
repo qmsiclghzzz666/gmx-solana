@@ -51,7 +51,6 @@ pub struct UpdateOrderParams {
 )]
 #[num_enum(error_type(name = CoreError, constructor = CoreError::unknown_order_kind))]
 #[strum(serialize_all = "snake_case")]
-// #[cfg_attr(feature = "debug", derive(Debug))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum OrderKind {
@@ -338,7 +337,8 @@ impl TransferOut {
 
 /// Order.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Order {
     /// Action header.
     pub(crate) header: ActionHeader,
@@ -348,12 +348,16 @@ pub struct Order {
     pub(crate) tokens: TokenAccounts,
     /// Swap params.
     pub(crate) swap: SwapParams,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 4],
     /// Order params.
     pub(crate) params: OrderParams,
     pub(crate) gt_reward: u64,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 8],
-    reserve: [u8; 128],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl Seed for Order {
@@ -613,8 +617,9 @@ impl Order {
 }
 
 /// Token accounts for Order.
-#[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokenAccounts {
     /// Initial collateral.
     pub(crate) initial_collateral: TokenAndAccount,
@@ -624,6 +629,9 @@ pub struct TokenAccounts {
     pub(crate) long_token: TokenAndAccount,
     /// Short token.
     pub(crate) short_token: TokenAndAccount,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl TokenAccounts {
@@ -657,8 +665,9 @@ impl TokenAccounts {
 }
 
 /// Order params.
-#[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OrderParams {
     /// Kind.
     kind: u8,
@@ -666,6 +675,7 @@ pub struct OrderParams {
     side: u8,
     /// Decrease position swap type.
     decrease_position_swap_type: u8,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 5],
     /// Collateral/Output token.
     collateral_token: Pubkey,
@@ -683,7 +693,9 @@ pub struct OrderParams {
     pub(crate) trigger_price: u128,
     /// Acceptable price (in unit price).
     pub(crate) acceptable_price: u128,
-    reserve: [u8; 64],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 64],
 }
 
 impl OrderParams {

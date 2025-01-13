@@ -76,11 +76,14 @@ const MAX_NAME_LEN: usize = 64;
 /// Market.
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Market {
+    version: u8,
     /// Bump Seed.
     pub(crate) bump: u8,
     flags: MarketFlagContainer,
-    padding: [u8; 14],
+    padding: [u8; 13],
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     name: [u8; MAX_NAME_LEN],
     pub(crate) meta: MarketMeta,
     /// Store.
@@ -89,15 +92,19 @@ pub struct Market {
     indexer: Indexer,
     state: State,
     buffer: RevertibleBuffer,
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 256],
 }
 
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct State {
     pools: Pools,
     clocks: Clocks,
     other: OtherState,
     #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 1024],
 }
 
@@ -426,8 +433,9 @@ gmsol_utils::flags!(MarketFlag, MAX_FLAGS, u8);
 
 /// Market State.
 #[zero_copy]
-#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[derive(BorshSerialize, BorshDeserialize, InitSpace)]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OtherState {
     #[cfg_attr(feature = "debug", debug(skip))]
     padding: [u8; 16],
@@ -437,6 +445,7 @@ pub struct OtherState {
     short_token_balance: u64,
     funding_factor_per_second: i128,
     #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 256],
 }
 
@@ -476,6 +485,7 @@ impl OtherState {
 #[zero_copy]
 #[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MarketMeta {
     /// Market token.
     pub market_token_mint: Pubkey,
@@ -563,8 +573,9 @@ impl HasMarketMeta for MarketMeta {
 
 /// Market clocks.
 #[zero_copy]
-#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[derive(BorshSerialize, BorshDeserialize, InitSpace)]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Clocks {
     #[cfg_attr(feature = "debug", debug(skip))]
     padding: [u8; 8],
@@ -620,6 +631,7 @@ impl Clocks {
 /// Market indexer.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Indexer {
     trade_count: u64,
     deposit_count: u64,
@@ -631,6 +643,7 @@ pub struct Indexer {
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 8],
     #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 128],
 }
 

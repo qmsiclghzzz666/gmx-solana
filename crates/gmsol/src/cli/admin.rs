@@ -261,7 +261,7 @@ impl InitializeRoles {
             builder.try_push(client.initialize_store(store_key, None))?;
         }
 
-        let treasury_global_config = client.find_config_address(&store);
+        let treasury_global_config = client.find_treasury_config_address(&store);
 
         builder
             .push_many(

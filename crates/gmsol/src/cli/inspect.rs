@@ -824,7 +824,7 @@ impl InspectArgs {
                         let market = client.find_market_address(store, market_token);
                         let market = client.market(&market).await?;
                         let hermes = Hermes::default();
-                        let prices = hermes.unit_prices_for_market(&token_map, &market).await?;
+                        let prices = hermes.unit_prices_for_market(&token_map, &*market).await?;
                         Some((market, prices))
                     } else {
                         None
@@ -1072,8 +1072,8 @@ impl InspectArgs {
                 println!("{feed:#?}");
             }
             Command::Treasury => {
-                let config = client.find_config_address(store);
-                println!("Global Config: {config}");
+                let config = client.find_treasury_config_address(store);
+                println!("Treasury Config: {config}");
                 let receiver = client.find_treasury_receiver_address(&config);
                 println!("Receiver: {receiver}");
                 let config = client
@@ -1081,9 +1081,11 @@ impl InspectArgs {
                     .await?
                     .ok_or(gmsol::Error::NotFound)?
                     .0;
-                match config.treasury_config() {
-                    Some(treasury_config) => println!("Treasury Config: {treasury_config}"),
-                    None => println!("Treasury Config is not set"),
+                match config.treasury_vault_config() {
+                    Some(treasury_vault_config) => {
+                        println!("Treasury Vault Config: {treasury_vault_config}")
+                    }
+                    None => println!("Treasury Vault Config is not set"),
                 }
             }
             Command::GtBank {
@@ -1099,16 +1101,17 @@ impl InspectArgs {
                         Some(vault) => *vault,
                         None => date.get(store, client).await?,
                     };
-                    let config = client.find_config_address(store);
+                    let config = client.find_treasury_config_address(store);
                     let config = client
                         .account::<ZeroCopy<types::treasury::Config>>(&config)
                         .await?
                         .ok_or(gmsol::Error::NotFound)?
                         .0;
-                    let treasury_config = config.treasury_config().ok_or_else(|| {
-                        gmsol::Error::invalid_argument("treasury config is not set")
-                    })?;
-                    client.find_gt_bank_address(treasury_config, &vault)
+                    let treasury_vault_config =
+                        config.treasury_vault_config().ok_or_else(|| {
+                            gmsol::Error::invalid_argument("treasury vault config is not set")
+                        })?;
+                    client.find_gt_bank_address(treasury_vault_config, &vault)
                 };
 
                 let bank = client
@@ -1120,7 +1123,7 @@ impl InspectArgs {
                     println!("{bank:#?}");
                 } else {
                     println!("Address: {address}");
-                    println!("Treasury: {}", bank.treasury_config());
+                    println!("Treasury Vault Config: {}", bank.treasury_vault_config());
                     println!("GT Exchange Vault: {}", bank.gt_exchange_vault());
                     for (token, balance) in bank.balances() {
                         println!("{token}: {balance}");

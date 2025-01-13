@@ -6,7 +6,7 @@ use gmsol_store::{
 };
 use gmsol_utils::InitSpace;
 
-use crate::states::{config::Config, treasury::TreasuryConfig};
+use crate::states::{config::Config, treasury::TreasuryVaultConfig};
 
 /// The accounts definition for [`initialize_config`](crate::gmsol_treasury::initialize_config).
 #[derive(Accounts)]
@@ -33,13 +33,16 @@ pub(crate) fn initialize_config(ctx: Context<InitializeConfig>) -> Result<()> {
     let mut config = ctx.accounts.config.load_init()?;
     let store = ctx.accounts.store.key();
     config.init(ctx.bumps.config, &store);
-    msg!("[Treasury] initialized the treasury config for {}", store);
+    msg!(
+        "[Treasury] initialized the treasury vault config for {}",
+        store
+    );
     Ok(())
 }
 
-/// The accounts definition for [`set_treasury`](crate::gmsol_treasury::set_treasury).
+/// The accounts definition for [`set_treasury_vault_config`](crate::gmsol_treasury::set_treasury_vault_config).
 #[derive(Accounts)]
-pub struct SetTreasury<'info> {
+pub struct SetTreasuryVaultConfig<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
@@ -48,23 +51,25 @@ pub struct SetTreasury<'info> {
     /// Config to update.
     #[account(mut, has_one = store)]
     pub config: AccountLoader<'info, Config>,
-    /// Treasury.
+    /// Treasury vault config.
     #[account(has_one = config)]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// Store program.
     pub store_program: Program<'info, GmsolStore>,
 }
 
-/// Set config's treasury address.
+/// Set treasury vault config address.
 /// # CHECK
 /// Only [`TREASURY_ADMIN`](crate::roles::TREASURY_ADMIN) can use.
-pub(crate) fn unchecked_set_treasury(ctx: Context<SetTreasury>) -> Result<()> {
-    let address = ctx.accounts.treasury_config.key();
+pub(crate) fn unchecked_set_treasury_vault_config(
+    ctx: Context<SetTreasuryVaultConfig>,
+) -> Result<()> {
+    let address = ctx.accounts.treasury_vault_config.key();
     let previous = ctx
         .accounts
         .config
         .load_mut()?
-        .set_treasury_config(address)?;
+        .set_treasury_vault_config(address)?;
     msg!(
         "[Treasury] the treasury address has been updated from {} to {}",
         previous,
@@ -73,7 +78,7 @@ pub(crate) fn unchecked_set_treasury(ctx: Context<SetTreasury>) -> Result<()> {
     Ok(())
 }
 
-impl<'info> WithStore<'info> for SetTreasury<'info> {
+impl<'info> WithStore<'info> for SetTreasuryVaultConfig<'info> {
     fn store_program(&self) -> AccountInfo<'info> {
         self.store_program.to_account_info()
     }
@@ -83,7 +88,7 @@ impl<'info> WithStore<'info> for SetTreasury<'info> {
     }
 }
 
-impl<'info> CpiAuthentication<'info> for SetTreasury<'info> {
+impl<'info> CpiAuthentication<'info> for SetTreasuryVaultConfig<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
     }

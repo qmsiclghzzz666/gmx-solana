@@ -10,8 +10,9 @@ use crate::{
     },
 };
 
-#[account(zero_copy)]
+#[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub(crate) struct RevertibleBuffer {
     rev: u64,
     padding: [u8; 8],

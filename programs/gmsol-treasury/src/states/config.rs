@@ -4,19 +4,20 @@ use gmsol_utils::InitSpace;
 
 use crate::constants;
 
-/// Global Config account.
+/// Treasury config account.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct Config {
+    version: u8,
     pub(crate) bump: u8,
-    padding_0: [u8; 15],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    padding_0: [u8; 14],
     pub(crate) store: Pubkey,
-    treasury_config: Pubkey,
+    treasury_vault_config: Pubkey,
     gt_factor: u128,
     buyback_factor: u128,
-    padding_1: [u8; 48],
-    padding_2: [u8; 64],
-    reserved: [u8; 128],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    reserved: [u8; 256],
 }
 
 impl Seed for Config {
@@ -33,20 +34,20 @@ impl Config {
         self.store = *store;
     }
 
-    /// Get the treasury config address.
-    pub fn treasury_config(&self) -> Option<&Pubkey> {
-        optional_address(&self.treasury_config)
+    /// Get the treasury vault config address.
+    pub fn treasury_vault_config(&self) -> Option<&Pubkey> {
+        optional_address(&self.treasury_vault_config)
     }
 
-    /// Set the treasury config address.
-    pub(crate) fn set_treasury_config(&mut self, mut address: Pubkey) -> Result<Pubkey> {
+    /// Set the treasury vault config address.
+    pub(crate) fn set_treasury_vault_config(&mut self, mut address: Pubkey) -> Result<Pubkey> {
         require_neq!(
-            self.treasury_config,
+            self.treasury_vault_config,
             address,
             CoreError::PreconditionsAreNotMet
         );
 
-        std::mem::swap(&mut address, &mut self.treasury_config);
+        std::mem::swap(&mut address, &mut self.treasury_vault_config);
 
         Ok(address)
     }

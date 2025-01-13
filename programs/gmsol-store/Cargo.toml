@@ -23,7 +23,7 @@ idl-build = [
 debug = ["derive_more/debug"]
 display = ["utils"]
 utils = ["bytes", "bs58"]
-serde = ["dep:serde", "serde_with"]
+serde = ["dep:serde", "serde_with", "serde_bytes"]
 enum-iter = []
 no-bug-fix = []
 no-mock = ["chainlink-datastreams/no-mock"]
@@ -51,6 +51,7 @@ paste = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_with = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
 indexmap = { workspace = true }
 bytes = { workspace = true, optional = true }
 typed-builder = { workspace = true }

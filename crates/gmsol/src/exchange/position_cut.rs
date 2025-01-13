@@ -96,7 +96,7 @@ impl PositionCutHint {
 
         Self::try_new(
             position,
-            Arc::new(store),
+            store,
             &token_map,
             market,
             meta,

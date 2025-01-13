@@ -7,8 +7,9 @@ use gmsol_store::{
 /// Executor.
 #[account(zero_copy)]
 pub struct Executor {
+    version: u8,
     pub(crate) bump: u8,
-    padding: [u8; 15],
+    padding: [u8; 14],
     pub(crate) store: Pubkey,
     role_name: [u8; MAX_ROLE_NAME_LEN],
     reserved: [u8; 256],

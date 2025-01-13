@@ -6,7 +6,7 @@ use anchor_client::{
 };
 use gmsol_store::{
     accounts, instruction,
-    states::{PriceProviderKind, TokenConfigBuilder},
+    states::{PriceProviderKind, UpdateTokenConfigParams},
 };
 
 use crate::utils::{view, RpcBuilder};
@@ -65,7 +65,7 @@ pub trait TokenConfigOps<C> {
         token_map: &Pubkey,
         name: &str,
         token: &Pubkey,
-        builder: TokenConfigBuilder,
+        builder: UpdateTokenConfigParams,
         enable: bool,
         new: bool,
     ) -> RpcBuilder<C>;
@@ -80,7 +80,7 @@ pub trait TokenConfigOps<C> {
         name: &str,
         token: &Pubkey,
         decimals: u8,
-        builder: TokenConfigBuilder,
+        builder: UpdateTokenConfigParams,
         enable: bool,
         new: bool,
     ) -> RpcBuilder<C>;
@@ -171,7 +171,7 @@ where
         token_map: &Pubkey,
         name: &str,
         token: &Pubkey,
-        builder: TokenConfigBuilder,
+        builder: UpdateTokenConfigParams,
         enable: bool,
         new: bool,
     ) -> RpcBuilder<C> {
@@ -199,7 +199,7 @@ where
         name: &str,
         token: &Pubkey,
         decimals: u8,
-        builder: TokenConfigBuilder,
+        builder: UpdateTokenConfigParams,
         enable: bool,
         new: bool,
     ) -> RpcBuilder<C> {

@@ -36,10 +36,11 @@ use super::{user::UserHeader, Seed};
 const MAX_RANK: usize = 15;
 const MAX_FLAGS: usize = 8;
 
-#[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct GtState {
     decimals: u8,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 7],
     /* States */
     pub(crate) last_minted_at: i64,
@@ -49,23 +50,29 @@ pub struct GtState {
     grow_steps: u64,
     /// Supply of buybackable GT.
     supply: u64,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 8],
     /// Vault for non-buybackable GT.
     gt_vault: u64,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_2: [u8; 16],
     /* Configs */
     minting_cost_grow_factor: u128,
     minting_cost: u128,
     reserve_factor: u128,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_3: [u8; 16],
     exchange_time_window: u32,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_4: [u8; 12],
     max_rank: u64,
     ranks: [u64; MAX_RANK],
     order_fee_discount_factors: [u128; MAX_RANK + 1],
     referral_reward_factors: [u128; MAX_RANK + 1],
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_5: [u8; 32],
-    reserved_1: [u8; 256],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    reserved: [u8; 256],
 }
 
 impl GtState {
@@ -446,7 +453,8 @@ gmsol_utils::flags!(GtExchangeVaultFlag, MAX_FLAGS, u8);
 
 /// GT Exchange Vault.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GtExchangeVault {
     /// Bump seed.
     pub bump: u8,
@@ -457,6 +465,8 @@ pub struct GtExchangeVault {
     amount: u64,
     /// Store.
     pub store: Pubkey,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 64],
 }
 
@@ -578,11 +588,13 @@ gmsol_utils::flags!(GtExchangeFlag, MAX_FLAGS, u8);
 
 /// GT Exchange Account.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GtExchange {
     /// Bump.
     pub bump: u8,
     flags: GtExchangeFlagContainer,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding: [u8; 6],
     amount: u64,
     /// Owner address.
@@ -591,6 +603,8 @@ pub struct GtExchange {
     pub store: Pubkey,
     /// Vault address.
     pub vault: Pubkey,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 64],
 }
 

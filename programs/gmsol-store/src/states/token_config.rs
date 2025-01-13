@@ -50,7 +50,8 @@ gmsol_utils::flags!(Flag, MAX_FLAGS, u8);
 
 #[zero_copy]
 #[derive(PartialEq, Eq)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokenConfig {
     /// Name.
     name: [u8; MAX_NAME_LEN],
@@ -66,6 +67,7 @@ pub struct TokenConfig {
     feeds: [FeedConfig; MAX_FEEDS],
     /// Heartbeat duration.
     heartbeat_duration: u32,
+    #[cfg_attr(feature = "debug", debug(skip))]
     reserved: [u8; 32],
 }
 
@@ -182,7 +184,7 @@ impl TokenConfig {
         name: &str,
         synthetic: bool,
         token_decimals: u8,
-        builder: TokenConfigBuilder,
+        builder: UpdateTokenConfigParams,
         enable: bool,
         init: bool,
     ) -> Result<()> {
@@ -197,7 +199,7 @@ impl TokenConfig {
                 CoreError::TokenDecimalsChanged
             );
         }
-        let TokenConfigBuilder {
+        let UpdateTokenConfigParams {
             heartbeat_duration,
             precision,
             feeds,
@@ -263,7 +265,7 @@ impl InitSpace for TokenConfig {
 /// Price Feed Config.
 #[zero_copy]
 #[derive(PartialEq, Eq)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FeedConfig {
     #[cfg_attr(
@@ -272,7 +274,8 @@ pub struct FeedConfig {
     )]
     feed: Pubkey,
     timestamp_adjustment: u32,
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 28],
 }
 
@@ -316,7 +319,7 @@ impl FeedConfig {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct TokenConfigBuilder {
+pub struct UpdateTokenConfigParams {
     heartbeat_duration: u32,
     precision: u8,
     feeds: Vec<Pubkey>,
@@ -324,7 +327,7 @@ pub struct TokenConfigBuilder {
     expected_provider: Option<u8>,
 }
 
-impl Default for TokenConfigBuilder {
+impl Default for UpdateTokenConfigParams {
     fn default() -> Self {
         Self {
             heartbeat_duration: DEFAULT_HEARTBEAT_DURATION,
@@ -336,7 +339,7 @@ impl Default for TokenConfigBuilder {
     }
 }
 
-impl<'a> From<&'a TokenConfig> for TokenConfigBuilder {
+impl<'a> From<&'a TokenConfig> for UpdateTokenConfigParams {
     fn from(config: &'a TokenConfig) -> Self {
         let (feeds, timestamp_adjustments) = config
             .feeds
@@ -354,7 +357,7 @@ impl<'a> From<&'a TokenConfig> for TokenConfigBuilder {
     }
 }
 
-impl TokenConfigBuilder {
+impl UpdateTokenConfigParams {
     /// Update the feed address for the given price provider.
     /// Return error when the feed was not set before.
     pub fn update_price_feed(
@@ -409,11 +412,15 @@ gmsol_utils::fixed_map!(
 
 /// Header of `TokenMap`.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct TokenMapHeader {
+    version: u8,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    padding_0: [u8; 7],
     /// The authorized store.
     pub store: Pubkey,
     tokens: Tokens,
+    #[cfg_attr(feature = "debug", debug(skip))]
     reserved: [u8; 64],
 }
 

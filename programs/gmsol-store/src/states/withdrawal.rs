@@ -13,7 +13,8 @@ use super::{
 
 /// Withdrawal.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Withdrawal {
     /// Action header.
     pub(crate) header: ActionHeader,
@@ -23,8 +24,11 @@ pub struct Withdrawal {
     pub(crate) params: WithdrawalParams,
     /// Swap params.
     pub(crate) swap: SwapParams,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 4],
-    reserve: [u8; 128],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl Withdrawal {
@@ -73,8 +77,9 @@ impl Closable for Withdrawal {
 }
 
 /// Token Accounts.
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[account(zero_copy)]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokenAccounts {
     /// Final long token accounts.
     pub(crate) final_long_token: TokenAndAccount,
@@ -82,6 +87,9 @@ pub struct TokenAccounts {
     pub(crate) final_short_token: TokenAndAccount,
     /// Market token account.
     pub(crate) market_token: TokenAndAccount,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl TokenAccounts {
@@ -117,8 +125,9 @@ impl TokenAccounts {
 }
 
 /// Withdrawal params.
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[account(zero_copy)]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WithdrawalParams {
     /// Market token amount to burn.
     pub market_token_amount: u64,
@@ -126,6 +135,8 @@ pub struct WithdrawalParams {
     pub min_long_token_amount: u64,
     /// The minimum acceptable amount of final short tokens to receive.
     pub min_short_token_amount: u64,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 64],
 }
 

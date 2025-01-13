@@ -13,9 +13,10 @@ const MAX_STEPS: usize = 10;
 const MAX_TOKENS: usize = 2 * MAX_STEPS + 2 + 3;
 
 /// Swap params.
-#[account(zero_copy)]
+#[zero_copy]
 #[derive(Default)]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SwapParams {
     /// The length of primary swap path.
     primary_length: u8,

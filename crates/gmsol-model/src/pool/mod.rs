@@ -109,6 +109,4 @@ pub enum PoolKind {
     CollateralSumForShort,
     /// Total borrowing.
     TotalBorrowing,
-    /// Point (used for general-purpose rewards).
-    Point,
 }

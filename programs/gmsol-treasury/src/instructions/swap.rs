@@ -17,7 +17,7 @@ use gmsol_store::{
 
 use crate::{
     constants,
-    states::{config::ReceiverSigner, Config, TreasuryConfig},
+    states::{config::ReceiverSigner, Config, TreasuryVaultConfig},
 };
 
 /// The accounts definition for [`create_swap`](crate::gmsol_treasury::create_swap).
@@ -32,17 +32,17 @@ pub struct CreateSwap<'info> {
     /// Config.
     #[account(
         has_one = store,
-        // Only allow using the authorized treasury config.
-        constraint = config.load()?.treasury_config() == Some(&treasury_config.key()) @ CoreError::InvalidArgument,
+        // Only allow using the authorized treasury vault config.
+        constraint = config.load()?.treasury_vault_config() == Some(&treasury_vault_config.key()) @ CoreError::InvalidArgument,
     )]
     pub config: AccountLoader<'info, Config>,
     /// Treasury Config.
     #[account(
         has_one = config,
-        constraint = !treasury_config.load()?.is_deposit_allowed(&swap_in_token.key()).unwrap_or(false) @ CoreError::InvalidArgument,
-        constraint = treasury_config.load()?.is_deposit_allowed(&swap_out_token.key())? @ CoreError::InvalidArgument,
+        constraint = !treasury_vault_config.load()?.is_deposit_allowed(&swap_in_token.key()).unwrap_or(false) @ CoreError::InvalidArgument,
+        constraint = treasury_vault_config.load()?.is_deposit_allowed(&swap_out_token.key())? @ CoreError::InvalidArgument,
     )]
-    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    pub treasury_vault_config: AccountLoader<'info, TreasuryVaultConfig>,
     /// Swap in token.
     pub swap_in_token: Account<'info, Mint>,
     /// Swap out token.

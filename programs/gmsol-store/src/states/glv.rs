@@ -31,7 +31,7 @@ pub const MAX_FLAGS: usize = 8;
 
 /// Glv.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct Glv {
     version: u8,
     /// Bump seed.
@@ -39,6 +39,7 @@ pub struct Glv {
     bump_bytes: [u8; 1],
     /// Index.
     pub(crate) index: u8,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 4],
     pub(crate) store: Pubkey,
     pub(crate) glv_token: Pubkey,
@@ -47,9 +48,11 @@ pub struct Glv {
     shift_last_executed_at: i64,
     pub(crate) min_tokens_for_first_deposit: u64,
     shift_min_interval_secs: u32,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 4],
     shift_max_price_impact_factor: u128,
-    reserve: [u8; 256],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    reserved: [u8; 256],
     /// Market config map with market token addresses as keys.
     markets: GlvMarkets,
 }
@@ -526,6 +529,7 @@ impl Glv {
 
 /// GLV Update Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Default)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct UpdateGlvParams {
     /// Minimum amount for the first GLV deposit.
     pub min_tokens_for_first_deposit: Option<u64>,
@@ -564,10 +568,11 @@ gmsol_utils::flags!(GlvMarketFlag, MAX_FLAGS, u8);
 
 /// Market Config for GLV.
 #[zero_copy]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct GlvMarketConfig {
     max_amount: u64,
     flags: GlvMarketFlagContainer,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding: [u8; 7],
     max_value: u128,
 }
@@ -654,8 +659,9 @@ pub(crate) struct SplitAccountsForGlv<'info> {
 }
 
 /// Glv Deposit.
-#[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlvDeposit {
     /// Header.
     pub(crate) header: ActionHeader,
@@ -665,8 +671,11 @@ pub struct GlvDeposit {
     pub(crate) params: GlvDepositParams,
     /// Swap params.
     pub(crate) swap: SwapParams,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 4],
-    reserve: [u8; 128],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl Action for GlvDeposit {
@@ -795,8 +804,9 @@ impl HasSwapParams for GlvDeposit {
 }
 
 /// Token and accounts.
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[account(zero_copy)]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlvDepositTokenAccounts {
     /// Initial long token and account.
     pub initial_long_token: TokenAndAccount,
@@ -806,6 +816,9 @@ pub struct GlvDepositTokenAccounts {
     pub(crate) market_token: TokenAndAccount,
     /// GLV token and account.
     pub(crate) glv_token: TokenAndAccount,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl GlvDepositTokenAccounts {
@@ -839,8 +852,9 @@ impl GlvDepositTokenAccounts {
 }
 
 /// GLV Deposit Params.
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[account(zero_copy)]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlvDepositParams {
     /// Deposit params.
     pub(crate) deposit: DepositParams,
@@ -848,12 +862,15 @@ pub struct GlvDepositParams {
     pub(crate) market_token_amount: u64,
     /// The minimum acceptable amount of glv tokens to receive.
     pub(crate) min_glv_token_amount: u64,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 64],
 }
 
 /// Glv Withdrawal.
-#[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlvWithdrawal {
     /// Header.
     pub(crate) header: ActionHeader,
@@ -863,8 +880,11 @@ pub struct GlvWithdrawal {
     pub(crate) params: GlvWithdrawalParams,
     /// Swap params.
     pub(crate) swap: SwapParams,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 4],
-    reserve: [u8; 128],
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl GlvWithdrawal {
@@ -919,8 +939,9 @@ impl HasSwapParams for GlvWithdrawal {
 }
 
 /// Token and accounts.
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[account(zero_copy)]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlvWithdrawalTokenAccounts {
     /// Final ong token and account.
     pub(crate) final_long_token: TokenAndAccount,
@@ -930,6 +951,9 @@ pub struct GlvWithdrawalTokenAccounts {
     pub(crate) market_token: TokenAndAccount,
     /// GLV token and account.
     pub(crate) glv_token: TokenAndAccount,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl GlvWithdrawalTokenAccounts {
@@ -991,8 +1015,9 @@ impl GlvWithdrawalTokenAccounts {
 }
 
 /// GLV Withdrawal Params.
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[account(zero_copy)]
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlvWithdrawalParams {
     /// The amount of GLV tokens to burn.
     pub(crate) glv_token_amount: u64,
@@ -1000,14 +1025,20 @@ pub struct GlvWithdrawalParams {
     pub min_final_long_token_amount: u64,
     /// The minimum acceptable amount of final short tokens to receive.
     pub min_final_short_token_amount: u64,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 64],
 }
 
 /// Glv Shift.
-#[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlvShift {
     pub(crate) shift: Shift,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    reserved: [u8; 128],
 }
 
 impl Action for GlvShift {

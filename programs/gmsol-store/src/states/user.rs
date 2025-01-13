@@ -10,13 +10,15 @@ use super::Seed;
 
 /// Header of `User` Account.
 #[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UserHeader {
     /// Version of the user account.
     pub(crate) version: u8,
     /// The bump seed.
     pub(crate) bump: u8,
     flags: UserFlagContainer,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 13],
     /// The owner of this user account.
     pub(crate) owner: Pubkey,
@@ -26,6 +28,8 @@ pub struct UserHeader {
     pub(crate) referral: Referral,
     /// GT State.
     pub(crate) gt: GtState,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 128],
 }
 
@@ -127,7 +131,8 @@ pub type ReferralCodeBytes = [u8; 8];
 
 /// Referral.
 #[zero_copy]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Referral {
     /// The (owner) address of the referrer.
     ///
@@ -137,6 +142,8 @@ pub struct Referral {
     pub(crate) code: Pubkey,
     /// Number of referee.
     referee_count: u128,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 64],
 }
 
@@ -230,16 +237,20 @@ impl Seed for ReferralCode {
 
 /// GT State.
 #[zero_copy]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GtState {
     pub(crate) rank: u8,
     padding_0: [u8; 7],
     pub(crate) last_minted_at: i64,
     pub(crate) total_minted: u64,
     pub(crate) amount: u64,
+    #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 32],
     pub(crate) paid_fee_value: u128,
     pub(crate) minted_fee_value: u128,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 64],
 }
 
