@@ -39,6 +39,10 @@ impl OrderCreated {
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct PositionIncreased {
+    /// Revision.
+    pub rev: u64,
+    /// Market token.
+    pub market_token: Pubkey,
     /// Report.
     pub report: IncreasePositionReport<u128, i128>,
 }
@@ -49,9 +53,17 @@ impl gmsol_utils::InitSpace for PositionIncreased {
 
 impl Event for PositionIncreased {}
 
-impl From<IncreasePositionReport<u128, i128>> for PositionIncreased {
-    fn from(report: IncreasePositionReport<u128, i128>) -> Self {
-        Self { report }
+impl PositionIncreased {
+    pub(crate) fn from_report(
+        rev: u64,
+        market_token: Pubkey,
+        report: IncreasePositionReport<u128, i128>,
+    ) -> Self {
+        Self {
+            rev,
+            market_token,
+            report,
+        }
     }
 }
 
@@ -59,6 +71,10 @@ impl From<IncreasePositionReport<u128, i128>> for PositionIncreased {
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct PositionDecreased {
+    /// Revision.
+    pub rev: u64,
+    /// Market token.
+    pub market_token: Pubkey,
     /// Report.
     pub report: Box<DecreasePositionReport<u128, i128>>,
 }
@@ -69,9 +85,17 @@ impl gmsol_utils::InitSpace for PositionDecreased {
 
 impl Event for PositionDecreased {}
 
-impl From<Box<DecreasePositionReport<u128, i128>>> for PositionDecreased {
-    fn from(report: Box<DecreasePositionReport<u128, i128>>) -> Self {
-        Self { report }
+impl PositionDecreased {
+    pub(crate) fn from_report(
+        rev: u64,
+        market_token: Pubkey,
+        report: Box<DecreasePositionReport<u128, i128>>,
+    ) -> Self {
+        Self {
+            rev,
+            market_token,
+            report,
+        }
     }
 }
 

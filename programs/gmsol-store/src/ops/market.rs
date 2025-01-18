@@ -16,7 +16,7 @@ use crate::{
                 liquidity_market::RevertibleLiquidityMarket,
                 market::SwapPricingKind,
                 swap_market::{SwapDirection, SwapMarkets},
-                Revertible, RevertibleMarket,
+                Revertible, RevertibleMarket, Revision,
             },
             utils::ValidateMarketBalances,
             HasMarketMeta,
@@ -266,6 +266,8 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
 
         self.event_emitter
             .emit_cpi(&MarketFeesUpdated::from_reports(
+                self.market.rev(),
+                self.market.market_meta().market_token_mint,
                 distribute_position_impact,
                 borrowing,
                 funding,
@@ -360,8 +362,11 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
 
             params.validate_market_token_amount(minted)?;
 
-            self.event_emitter
-                .emit_cpi(&DepositExecuted::from(report))?;
+            self.event_emitter.emit_cpi(&DepositExecuted::from_report(
+                self.market.rev(),
+                self.market.market_meta().market_token_mint,
+                report,
+            ))?;
             msg!("[Deposit] executed");
 
             minted
@@ -412,7 +417,11 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
                 .validate_market_balances(long_amount, short_amount)?;
 
             self.event_emitter
-                .emit_cpi(&WithdrawalExecuted::from(report))?;
+                .emit_cpi(&WithdrawalExecuted::from_report(
+                    self.market.rev(),
+                    self.market.market_meta().market_token_mint,
+                    report,
+                ))?;
             msg!("[Withdrawal] executed");
 
             (long_amount, short_amount)

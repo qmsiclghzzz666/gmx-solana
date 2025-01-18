@@ -10,6 +10,8 @@ use crate::{
     },
 };
 
+use super::Revision;
+
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -64,6 +66,10 @@ impl RevertibleBuffer {
             .cache_get_mut_with(self.rev, || storage.other)
     }
 
+    pub(super) fn rev(&self) -> u64 {
+        self.rev
+    }
+
     pub(super) fn start_revertible_operation(&mut self) {
         self.rev = self.rev.checked_add(1).expect("rev overflow");
     }
@@ -109,6 +115,7 @@ impl RevertibleBuffer {
             .collect();
 
         let event = MarketStateUpdatedRef::new(
+            self.rev(),
             *market_token,
             updated_pool_kinds,
             updated_pools,
@@ -125,10 +132,8 @@ impl RevertibleBuffer {
     }
 }
 
-pub(super) trait Cache {
+pub(super) trait Cache: Revision {
     fn is_dirty(&self, rev: u64) -> bool;
-
-    fn rev(&self) -> u64;
 
     fn set_rev(&mut self, rev: u64) -> u64;
 
@@ -154,13 +159,15 @@ pub(super) trait Cache {
 
 macro_rules! impl_cache {
     ($cache:ty) => {
+        impl Revision for $cache {
+            fn rev(&self) -> u64 {
+                self.rev
+            }
+        }
+
         impl Cache for $cache {
             fn is_dirty(&self, rev: u64) -> bool {
                 self.rev() == rev
-            }
-
-            fn rev(&self) -> u64 {
-                self.rev
             }
 
             fn set_rev(&mut self, mut rev: u64) -> u64 {

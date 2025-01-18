@@ -18,7 +18,7 @@ use crate::{
                 market::RevertibleMarket,
                 revertible_position::RevertiblePosition,
                 swap_market::{SwapDirection, SwapMarkets},
-                Revertible,
+                Revertible, Revision,
             },
             utils::{Adl, ValidateMarketBalances},
         },
@@ -906,6 +906,8 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
 
             self.event_emitter
                 .emit_cpi(&MarketFeesUpdated::from_reports(
+                    market.rev(),
+                    market.market_meta().market_token_mint,
                     distribute_position_impact,
                     borrowing,
                     funding,
@@ -1356,7 +1358,11 @@ fn execute_increase_position(
 
         position
             .event_emitter()
-            .emit_cpi(&PositionIncreased::from(report))?;
+            .emit_cpi(&PositionIncreased::from_report(
+                position.market().rev(),
+                position.market().market_meta().market_token_mint,
+                report,
+            ))?;
         msg!("[Position] increased");
 
         (long_amount, short_amount, paid_order_fee_value)
@@ -1591,7 +1597,11 @@ fn execute_decrease_position(
     msg!("[Position] decreased");
     position
         .event_emitter()
-        .emit_cpi(&PositionDecreased::from(report))?;
+        .emit_cpi(&PositionDecreased::from_report(
+            position.market().rev(),
+            position.market().market_meta().market_token_mint,
+            report,
+        ))?;
 
     Ok((should_remove_position, paid_order_fee_value))
 }

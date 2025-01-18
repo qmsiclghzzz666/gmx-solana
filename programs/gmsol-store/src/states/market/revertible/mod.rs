@@ -27,3 +27,9 @@ pub trait Revertible {
     /// - Should panic if the commitment cannot be done.
     fn commit(self);
 }
+
+/// Type that has a revision.
+pub trait Revision {
+    /// Get the revision.
+    fn rev(&self) -> u64;
+}

@@ -10,7 +10,7 @@ use crate::{
 
 use super::{
     market::{RevertibleMarket, SwapPricingKind},
-    Revertible,
+    Revertible, Revision,
 };
 
 /// Convert a [`RevertibleMarket`] to a [`LiquidityMarketMut`](gmsol_model::LiquidityMarketMut).
@@ -83,6 +83,12 @@ impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
 impl<'a, 'info> Key for RevertibleLiquidityMarket<'a, 'info> {
     fn key(&self) -> Pubkey {
         self.base.key()
+    }
+}
+
+impl<'a, 'info> Revision for RevertibleLiquidityMarket<'a, 'info> {
+    fn rev(&self) -> u64 {
+        self.base().rev()
     }
 }
 

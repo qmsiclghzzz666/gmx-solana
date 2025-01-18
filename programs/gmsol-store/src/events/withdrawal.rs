@@ -34,6 +34,10 @@ impl WithdrawalCreated {
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct WithdrawalExecuted {
+    /// Revision.
+    pub rev: u64,
+    /// Market token.
+    pub market_token: Pubkey,
     /// Report.
     pub report: WithdrawReport<u128>,
 }
@@ -44,9 +48,17 @@ impl gmsol_utils::InitSpace for WithdrawalExecuted {
 
 impl Event for WithdrawalExecuted {}
 
-impl From<WithdrawReport<u128>> for WithdrawalExecuted {
-    fn from(report: WithdrawReport<u128>) -> Self {
-        Self { report }
+impl WithdrawalExecuted {
+    pub(crate) fn from_report(
+        rev: u64,
+        market_token: Pubkey,
+        report: WithdrawReport<u128>,
+    ) -> Self {
+        Self {
+            rev,
+            market_token,
+            report,
+        }
     }
 }
 

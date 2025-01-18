@@ -33,6 +33,10 @@ impl DepositCreated {
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct DepositExecuted {
+    /// Revision.
+    pub rev: u64,
+    /// Market token.
+    pub market_token: Pubkey,
     /// Report.
     pub report: DepositReport<u128, i128>,
 }
@@ -43,9 +47,17 @@ impl gmsol_utils::InitSpace for DepositExecuted {
 
 impl Event for DepositExecuted {}
 
-impl From<DepositReport<u128, i128>> for DepositExecuted {
-    fn from(report: DepositReport<u128, i128>) -> Self {
-        Self { report }
+impl DepositExecuted {
+    pub(crate) fn from_report(
+        rev: u64,
+        market_token: Pubkey,
+        report: DepositReport<u128, i128>,
+    ) -> Self {
+        Self {
+            rev,
+            market_token,
+            report,
+        }
     }
 }
 

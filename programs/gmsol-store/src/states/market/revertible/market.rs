@@ -23,7 +23,7 @@ use crate::{
     CoreError,
 };
 
-use super::Revertible;
+use super::{Revertible, Revision};
 
 /// Swap Pricing Kind.
 #[derive(Clone, Copy)]
@@ -49,6 +49,12 @@ pub struct RevertibleMarket<'a, 'info> {
 impl<'a, 'info> Key for RevertibleMarket<'a, 'info> {
     fn key(&self) -> Pubkey {
         self.market.meta.market_token_mint
+    }
+}
+
+impl<'a, 'info> Revision for RevertibleMarket<'a, 'info> {
+    fn rev(&self) -> u64 {
+        self.market.buffer.rev()
     }
 }
 

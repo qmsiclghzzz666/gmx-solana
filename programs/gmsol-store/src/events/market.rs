@@ -20,6 +20,10 @@ use super::Event;
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct MarketFeesUpdated {
+    /// Revision.
+    pub rev: u64,
+    /// Market token.
+    pub market_token: Pubkey,
     /// Position impact distribution report.
     pub position_impact_distribution: DistributePositionImpactReport<u128>,
     /// Update borrowing state report.
@@ -39,11 +43,15 @@ impl Event for MarketFeesUpdated {}
 impl MarketFeesUpdated {
     /// Create from reports.
     pub fn from_reports(
+        rev: u64,
+        market_token: Pubkey,
         position_impact_distribution: DistributePositionImpactReport<u128>,
         update_borrowing_state: UpdateBorrowingReport<u128>,
         update_funding_state: UpdateFundingReport<u128, i128>,
     ) -> Self {
         Self {
+            rev,
+            market_token,
             position_impact_distribution,
             update_borrowing_state,
             update_funding_state,
@@ -55,6 +63,8 @@ impl MarketFeesUpdated {
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct MarketStateUpdated {
+    /// Revision.
+    rev: u64,
     /// Market token.
     market_token: Pubkey,
     /// Updated pool kinds.
@@ -69,7 +79,8 @@ pub struct MarketStateUpdated {
 
 impl MarketStateUpdated {
     const fn space(num_pools: usize, num_clocks: usize, num_other: usize) -> usize {
-        32 + (4 + PoolKind::INIT_SPACE * num_pools)
+        8 + 32
+            + (4 + PoolKind::INIT_SPACE * num_pools)
             + (4 + Pool::INIT_SPACE * num_pools)
             + (4 + Clocks::INIT_SPACE * num_clocks)
             + (4 + OtherState::INIT_SPACE * num_other)
@@ -103,6 +114,8 @@ impl MarketStateUpdated {
 /// for serialization.
 #[derive(BorshSerialize)]
 pub(crate) struct MarketStateUpdatedRef<'a> {
+    /// Revision.
+    rev: u64,
     /// Market token.
     market_token: Pubkey,
     /// Updated pool kinds.
@@ -117,6 +130,7 @@ pub(crate) struct MarketStateUpdatedRef<'a> {
 
 impl<'a> MarketStateUpdatedRef<'a> {
     pub(crate) fn new(
+        rev: u64,
         market_token: Pubkey,
         pool_kinds: Vec<PoolKind>,
         pools: Vec<&'a Pool>,
@@ -125,6 +139,7 @@ impl<'a> MarketStateUpdatedRef<'a> {
     ) -> Self {
         assert_eq!(pool_kinds.len(), pools.len());
         Self {
+            rev,
             market_token,
             pool_kinds,
             pools,

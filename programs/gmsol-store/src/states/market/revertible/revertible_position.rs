@@ -6,7 +6,7 @@ use gmsol_model::{action::decrease_position::DecreasePositionSwapType, num::Unsi
 use crate::{
     constants,
     events::{EventEmitter, SwapExecuted, TradeData},
-    states::{position::PositionState, HasMarketMeta, Position},
+    states::{market::revertible::Revision, position::PositionState, HasMarketMeta, Position},
     CoreError,
 };
 
@@ -157,6 +157,7 @@ impl<'a, 'info> gmsol_model::PositionMut<{ constants::MARKET_DECIMALS }>
         msg!("[Decrease Position Swap] swapped");
         let market_token = self.market.market_meta().market_token_mint;
         self.event_emitter().emit_cpi(&SwapExecuted::new(
+            self.market.rev(),
             market_token,
             report.clone(),
             Some(ty),

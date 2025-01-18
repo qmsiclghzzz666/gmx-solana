@@ -12,7 +12,7 @@ use crate::{
     CoreError, ModelError,
 };
 
-use super::{market::RevertibleMarket, Revertible};
+use super::{market::RevertibleMarket, Revertible, Revision};
 
 /// A map of markets used for swaps where the key is the market token mint address.
 pub struct SwapMarkets<'a, 'info> {
@@ -72,6 +72,7 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
     ) -> Result<(u64, u64)>
     where
         M: Key
+            + Revision
             + HasMarketMeta
             + gmsol_model::Bank<Pubkey, Num = u64>
             + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>,
@@ -225,9 +226,12 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
                     .map_err(ModelError::from)?;
                 market.validate_market_balances(0, 0)?;
             }
-            market
-                .event_emitter()
-                .emit_cpi(&SwapExecuted::new(*market_token, report, None))?;
+            market.event_emitter().emit_cpi(&SwapExecuted::new(
+                market.rev(),
+                *market_token,
+                report,
+                None,
+            ))?;
         }
         msg!("[Swap] swapped along the path");
         Ok(())
@@ -248,6 +252,7 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
     ) -> Result<u64>
     where
         M: Key
+            + Revision
             + gmsol_model::Bank<Pubkey, Num = u64>
             + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>
             + HasMarketMeta,
@@ -394,7 +399,20 @@ where
             Self::From(p) | Self::Into(p) => p.key(),
         }
     }
+}
 
+impl<'a, M> Revision for SwapDirection<'a, M>
+where
+    M: Revision,
+{
+    fn rev(&self) -> u64 {
+        match self {
+            Self::From(p) | Self::Into(p) => p.rev(),
+        }
+    }
+}
+
+impl<'a, M> SwapDirection<'a, M> {
     fn current_market_mut(&mut self) -> &mut M {
         match self {
             Self::From(m) | Self::Into(m) => m,
@@ -414,8 +432,10 @@ where
 
 impl<'a, M> SwapDirection<'a, M>
 where
-    M: HasMarketMeta + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>,
-    M: Key,
+    M: Key
+        + Revision
+        + HasMarketMeta
+        + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>,
 {
     fn swap_with_current(
         &mut self,
@@ -439,7 +459,7 @@ where
             .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
         *token_in = *current.market_meta().opposite_token(token_in)?;
         msg!("[Swap] swapped in current market");
-        event_emitter.emit_cpi(&SwapExecuted::new(self.current(), report, None))?;
+        event_emitter.emit_cpi(&SwapExecuted::new(self.rev(), self.current(), report, None))?;
         Ok(())
     }
 }
