@@ -1,6 +1,6 @@
 IDL_OUT_DIR := "idl-out"
 FEATURES := "cli,u128"
-DEVNET_FEATURES := "devnet"
+DEVNET_FEATURES := "devnet,test-only"
 SCRIPTS := "./scripts"
 TARGET := "./target"
 

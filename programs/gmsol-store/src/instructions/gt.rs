@@ -122,6 +122,7 @@ pub(crate) fn unchecked_gt_set_referral_reward_factors(
 }
 
 /// CHECK: only GT_CONTROLLER is authorized to use this instruction.
+#[cfg(feature = "test-only")]
 pub(crate) fn unchecked_gt_set_exchange_time_window(
     ctx: Context<ConfigurateGt>,
     window: u32,

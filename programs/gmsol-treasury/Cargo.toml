@@ -25,6 +25,7 @@ multi-store = ["gmsol-store/multi-store"]
 enum-iter = []
 utils = []
 devnet = ["gmsol-store/devnet"]
+test-only = ["gmsol-store/test-only"]
 
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }

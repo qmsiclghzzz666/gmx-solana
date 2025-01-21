@@ -18,6 +18,7 @@ idl-build = ["anchor-lang/idl-build"]
 no-mock = []
 multi-store = []
 devnet = []
+test-only = []
 
 [dependencies]
 anchor-lang = { workspace = true }

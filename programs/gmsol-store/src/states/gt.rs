@@ -208,7 +208,8 @@ impl GtState {
         self.gt_vault
     }
 
-    pub(crate) fn set_exchange_time_window(&mut self, window: u32) -> Result<()> {
+    /// Set exchange time window.
+    pub fn set_exchange_time_window(&mut self, window: u32) -> Result<()> {
         require_neq!(window, 0, CoreError::InvalidArgument);
         self.exchange_time_window = window;
         Ok(())

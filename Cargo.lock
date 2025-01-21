@@ -2204,6 +2204,7 @@ dependencies = [
  "bs58 0.5.1",
  "bytemuck",
  "bytes",
+ "cfg-if",
  "chainlink-datastreams",
  "chainlink_solana",
  "clap 4.5.20",

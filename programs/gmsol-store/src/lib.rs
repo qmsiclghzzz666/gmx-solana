@@ -2550,7 +2550,14 @@ pub mod gmsol_store {
     /// - The `window` must be greater than 0 seconds to ensure a valid exchange period.
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_exchange_time_window(ctx: Context<ConfigurateGt>, window: u32) -> Result<()> {
-        instructions::unchecked_gt_set_exchange_time_window(ctx, window)
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "test-only")] {
+                instructions::unchecked_gt_set_exchange_time_window(ctx, window)
+            } else {
+                msg!("Trying to set the GT exchange time window to {}, but this is a test-only instruction", window);
+                Err(CoreError::Unimplemented.into())
+            }
+        }
     }
 
     /// Prepare a GT exchange vault.
@@ -3379,6 +3386,8 @@ pub enum CoreError {
     /// Internal error.
     #[msg("internal error")]
     Internal,
+    /// Unimplemented.
+    Unimplemented,
     /// Not an Admin.
     #[msg("not an admin")]
     NotAnAdmin,

@@ -29,6 +29,7 @@ no-bug-fix = []
 no-mock = ["chainlink-datastreams/no-mock"]
 multi-store = []
 devnet = []
+test-only = []
 
 [dependencies]
 bytemuck = { workspace = true }
@@ -60,3 +61,4 @@ derive_more = { workspace = true, optional = true }
 chainlink-datastreams = { workspace = true }
 rust_decimal = { workspace = true }
 switchboard-on-demand = { workspace = true }
+cfg-if = { workspace = true }
