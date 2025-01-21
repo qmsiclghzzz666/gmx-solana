@@ -96,7 +96,7 @@ impl<'info> RevokeRole<'info> {
         CpiContext::new(
             self.store_program.to_account_info(),
             StoreRevokeRole {
-                authority: self.executor.to_account_info(),
+                authority: self.wallet.to_account_info(),
                 store: self.store.to_account_info(),
             },
         )
