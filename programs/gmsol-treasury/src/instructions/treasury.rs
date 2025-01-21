@@ -549,7 +549,7 @@ impl<'info> WithdrawFromTreasuryVault<'info> {
                 from: self.treasury_vault.to_account_info(),
                 mint: self.token.to_account_info(),
                 to: self.target.to_account_info(),
-                authority: self.config.to_account_info(),
+                authority: self.treasury_vault_config.to_account_info(),
             },
         )
     }
