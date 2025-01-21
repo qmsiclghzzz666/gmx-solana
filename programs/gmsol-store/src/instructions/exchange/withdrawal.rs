@@ -195,7 +195,7 @@ pub struct CloseWithdrawal<'info> {
     #[account(constraint = withdrawal.load()?.tokens.final_long_token() == final_long_token.key() @ CoreError::TokenMintMismatched)]
     pub final_long_token: Box<Account<'info, Mint>>,
     /// Final short token.
-    #[account(constraint = withdrawal.load()?.tokens.final_long_token() == final_long_token.key() @ CoreError::TokenMintMismatched)]
+    #[account(constraint = withdrawal.load()?.tokens.final_short_token() == final_short_token.key() @ CoreError::TokenMintMismatched)]
     pub final_short_token: Box<Account<'info, Mint>>,
     /// The withdrawal to close.
     #[account(
