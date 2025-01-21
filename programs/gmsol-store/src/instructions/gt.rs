@@ -146,7 +146,12 @@ pub struct PrepareGtExchangeVault<'info> {
         init_if_needed,
         space = 8 + GtExchangeVault::INIT_SPACE,
         payer = payer,
-        seeds = [GtExchangeVault::SEED, store.key().as_ref(), &time_window_index.to_be_bytes()],
+        seeds = [
+            GtExchangeVault::SEED,
+            store.key().as_ref(),
+            &time_window_index.to_be_bytes(),
+            &store.load()?.gt().exchange_time_window().to_be_bytes(),
+        ],
         bump,
     )]
     pub vault: AccountLoader<'info, GtExchangeVault>,
@@ -156,14 +161,9 @@ pub struct PrepareGtExchangeVault<'info> {
 pub(crate) fn prepare_gt_exchange_vault(
     ctx: Context<PrepareGtExchangeVault>,
     time_window_index: i64,
-    time_window: u32,
 ) -> Result<()> {
     let store = ctx.accounts.store.load()?;
-    require_eq!(
-        store.gt().exchange_time_window(),
-        time_window,
-        CoreError::InvalidArgument
-    );
+    let time_window = store.gt().exchange_time_window();
 
     match ctx.accounts.vault.load_init() {
         Ok(mut vault) => {
@@ -230,7 +230,12 @@ pub struct RequestGtExchange<'info> {
         mut,
         constraint = vault.load()?.is_initialized() @ CoreError::InvalidArgument,
         has_one = store,
-        seeds = [GtExchangeVault::SEED, store.key().as_ref(), &vault.load()?.time_window_index().to_be_bytes()],
+        seeds = [
+            GtExchangeVault::SEED,
+            store.key().as_ref(),
+            &vault.load()?.time_window_index().to_be_bytes(),
+            &vault.load()?.time_window_u32().to_be_bytes(),
+        ],
         bump = vault.load()?.bump,
     )]
     pub vault: AccountLoader<'info, GtExchangeVault>,
@@ -321,7 +326,12 @@ pub struct ConfirmGtExchangeVault<'info> {
         mut,
         constraint = vault.load()?.is_initialized() @ CoreError::InvalidUserAccount,
         has_one = store,
-        seeds = [GtExchangeVault::SEED, store.key().as_ref(), &vault.load()?.time_window_index().to_be_bytes()],
+        seeds = [
+            GtExchangeVault::SEED,
+            store.key().as_ref(),
+            &vault.load()?.time_window_index().to_be_bytes(),
+            &vault.load()?.time_window_u32().to_be_bytes(),
+        ],
         bump = vault.load()?.bump,
     )]
     pub vault: AccountLoader<'info, GtExchangeVault>,
@@ -373,8 +383,6 @@ pub struct CloseGtExchange<'info> {
         constraint = vault.load()?.is_initialized() @ CoreError::InvalidArgument,
         constraint = vault.load()?.is_confirmed() @ CoreError::PreconditionsAreNotMet,
         has_one = store,
-        seeds = [GtExchangeVault::SEED, store.key().as_ref(), &vault.load()?.time_window_index().to_be_bytes()],
-        bump = vault.load()?.bump,
     )]
     pub vault: AccountLoader<'info, GtExchangeVault>,
     #[account(

@@ -404,8 +404,19 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Find GT exchange vault address.
-    pub fn find_gt_exchange_vault_address(&self, store: &Pubkey, time_window_index: i64) -> Pubkey {
-        crate::pda::find_gt_exchange_vault_pda(store, time_window_index, self.store_program_id()).0
+    pub fn find_gt_exchange_vault_address(
+        &self,
+        store: &Pubkey,
+        time_window_index: i64,
+        time_window: u32,
+    ) -> Pubkey {
+        crate::pda::find_gt_exchange_vault_pda(
+            store,
+            time_window_index,
+            time_window,
+            self.store_program_id(),
+        )
+        .0
     }
 
     /// Find GT exchange address.

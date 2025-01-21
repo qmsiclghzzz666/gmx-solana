@@ -2578,13 +2578,11 @@ pub mod gmsol_store {
     ///   - Properly initialized, owned by the `store`, and have matching `time_window_index`
     ///     and `time_window` values
     /// - The provided `time_window_index` must match the current time window index.
-    /// - The provided `time_window` must match the current GT exchange time window.
     pub fn prepare_gt_exchange_vault(
         ctx: Context<PrepareGtExchangeVault>,
         time_window_index: i64,
-        time_window: u32,
     ) -> Result<()> {
-        instructions::prepare_gt_exchange_vault(ctx, time_window_index, time_window)
+        instructions::prepare_gt_exchange_vault(ctx, time_window_index)
     }
 
     /// Confirm GT exchange vault.

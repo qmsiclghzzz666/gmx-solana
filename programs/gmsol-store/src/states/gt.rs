@@ -513,6 +513,11 @@ impl GtExchangeVault {
         self.time_window
     }
 
+    /// Get time window as `u32`.
+    pub fn time_window_u32(&self) -> u32 {
+        self.time_window.try_into().expect("invalid vault")
+    }
+
     /// Validate that this vault is confirmable.
     pub fn validate_confirmable(&self) -> Result<()> {
         require!(self.is_initialized(), CoreError::PreconditionsAreNotMet);

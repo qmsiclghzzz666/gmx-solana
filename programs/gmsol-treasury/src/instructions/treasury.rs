@@ -316,7 +316,12 @@ pub struct DepositToTreasuryVault<'info> {
         constraint = store.load()?.gt().exchange_time_window() as i64 == gt_exchange_vault.load()?.time_window() @ CoreError::InvalidArgument,
         constraint = gt_exchange_vault.load()?.is_initialized() @ CoreError::InvalidArgument,
         constraint = gt_exchange_vault.load()?.validate_depositable().map(|_| true)?,
-        seeds = [GtExchangeVault::SEED, store.key().as_ref(), &gt_exchange_vault.load()?.time_window_index().to_be_bytes()],
+        seeds = [
+            GtExchangeVault::SEED,
+            store.key().as_ref(),
+            &gt_exchange_vault.load()?.time_window_index().to_be_bytes(),
+            &gt_exchange_vault.load()?.time_window_u32().to_be_bytes(),
+        ],
         bump = gt_exchange_vault.load()?.bump,
         seeds::program = gmsol_store::ID,
     )]

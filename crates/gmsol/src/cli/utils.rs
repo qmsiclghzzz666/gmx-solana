@@ -296,7 +296,7 @@ impl SelectGtExchangeVaultByDate {
             .map_err(gmsol::Error::unknown)?
             .as_secs();
         let index = ts / time_window as u64;
-        Ok(client.find_gt_exchange_vault_address(store, index as i64))
+        Ok(client.find_gt_exchange_vault_address(store, index as i64, time_window))
     }
 }
 

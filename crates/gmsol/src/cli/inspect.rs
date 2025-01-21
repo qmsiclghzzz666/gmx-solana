@@ -1053,7 +1053,7 @@ impl InspectArgs {
                     None => {
                         let time_window = client.store(store).await?.gt().exchange_time_window();
                         let time_window_index = current_time_window_index(time_window)?;
-                        client.find_gt_exchange_vault_address(store, time_window_index)
+                        client.find_gt_exchange_vault_address(store, time_window_index, time_window)
                     }
                 };
                 let vault = client

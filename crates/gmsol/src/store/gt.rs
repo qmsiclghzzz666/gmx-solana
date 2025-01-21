@@ -65,6 +65,7 @@ pub trait GtOps<C> {
         &self,
         store: &Pubkey,
         time_window_index: i64,
+        time_window: u32,
         amount: u64,
     ) -> RpcBuilder<C>;
 
@@ -78,6 +79,7 @@ pub trait GtOps<C> {
         Ok(self.request_gt_exchange_with_time_window_index(
             store,
             current_time_window_index(time_window)?,
+            time_window,
             amount,
         ))
     }
@@ -154,7 +156,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
         time_window_index: i64,
         time_window: u32,
     ) -> RpcBuilder<C, Pubkey> {
-        let vault = self.find_gt_exchange_vault_address(store, time_window_index);
+        let vault = self.find_gt_exchange_vault_address(store, time_window_index, time_window);
         self.store_rpc()
             .accounts(accounts::PrepareGtExchangeVault {
                 payer: self.payer(),
@@ -162,10 +164,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
                 vault,
                 system_program: system_program::ID,
             })
-            .args(instruction::PrepareGtExchangeVault {
-                time_window_index,
-                time_window,
-            })
+            .args(instruction::PrepareGtExchangeVault { time_window_index })
             .with_output(vault)
     }
 
@@ -185,10 +184,11 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
         &self,
         store: &Pubkey,
         time_window_index: i64,
+        time_window: u32,
         amount: u64,
     ) -> RpcBuilder<C> {
         let owner = self.payer();
-        let vault = self.find_gt_exchange_vault_address(store, time_window_index);
+        let vault = self.find_gt_exchange_vault_address(store, time_window_index, time_window);
         self.store_rpc()
             .accounts(accounts::RequestGtExchange {
                 owner,
