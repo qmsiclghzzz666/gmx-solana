@@ -37,6 +37,8 @@ enum Command {
         buffers: Vec<Pubkey>,
         #[arg(long)]
         executor: Option<Pubkey>,
+        #[arg(long)]
+        rent_receiver: Option<Pubkey>,
     },
     /// Execute a timelocked instruction.
     Execute { buffers: Vec<Pubkey> },
@@ -120,12 +122,17 @@ impl Args {
                     )
                     .await?
             }
-            Command::Cancel { buffers, executor } => {
+            Command::Cancel {
+                buffers,
+                executor,
+                rent_receiver,
+            } => {
                 client
                     .cancel_timelocked_instructions(
                         store,
                         buffers.iter().copied(),
                         executor.as_ref(),
+                        rent_receiver.as_ref(),
                     )
                     .await?
             }

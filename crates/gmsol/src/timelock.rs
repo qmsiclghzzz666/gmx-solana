@@ -62,6 +62,7 @@ pub trait TimelockOps<C> {
         store: &Pubkey,
         buffer: &Pubkey,
         executor_hint: Option<&Pubkey>,
+        rent_receiver_hint: Option<&Pubkey>,
     ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
 
     /// Cancel timelocked instruction.
@@ -70,6 +71,7 @@ pub trait TimelockOps<C> {
         store: &Pubkey,
         buffers: impl IntoIterator<Item = Pubkey>,
         executor_hint: Option<&Pubkey>,
+        rent_receiver_hint: Option<&Pubkey>,
     ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
 
     /// Execute timelocked instruction.
@@ -77,7 +79,7 @@ pub trait TimelockOps<C> {
         &self,
         store: &Pubkey,
         buffer: &Pubkey,
-        hint: Option<(&Pubkey, &[AccountMeta])>,
+        hint: Option<ExecuteTimelockedInstructionHint<'_>>,
     ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
 
     /// Timelock-bypassed revoke role.
@@ -297,16 +299,20 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
         store: &Pubkey,
         buffer: &Pubkey,
         executor_hint: Option<&Pubkey>,
+        rent_receiver_hint: Option<&Pubkey>,
     ) -> crate::Result<RpcBuilder<C>> {
-        let executor = match executor_hint {
-            Some(address) => *address,
-            None => {
+        let (executor, rent_receiver) = match (executor_hint, rent_receiver_hint) {
+            (Some(executor), Some(rent_receiver)) => (*executor, *rent_receiver),
+            _ => {
                 let instruction_header = self
                     .account::<ZeroCopy<InstructionHeader>>(buffer)
                     .await?
                     .ok_or(crate::Error::NotFound)?
                     .0;
-                *instruction_header.executor()
+                (
+                    *instruction_header.executor(),
+                    *instruction_header.rent_receiver(),
+                )
             }
         };
         Ok(self
@@ -316,6 +322,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 authority: self.payer(),
                 store: *store,
                 executor,
+                rent_receiver,
                 instruction: *buffer,
                 store_program: *self.store_program_id(),
             }))
@@ -326,20 +333,24 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
         store: &Pubkey,
         buffers: impl IntoIterator<Item = Pubkey>,
         executor_hint: Option<&Pubkey>,
+        rent_receiver_hint: Option<&Pubkey>,
     ) -> crate::Result<RpcBuilder<C>> {
         let mut buffers = buffers.into_iter().peekable();
         let buffer = buffers
             .peek()
             .ok_or_else(|| crate::Error::invalid_argument("no instructions to appove"))?;
-        let executor = match executor_hint {
-            Some(address) => *address,
-            None => {
+        let (executor, rent_receiver) = match (executor_hint, rent_receiver_hint) {
+            (Some(executor), Some(rent_receiver)) => (*executor, *rent_receiver),
+            _ => {
                 let instruction_header = self
                     .account::<ZeroCopy<InstructionHeader>>(buffer)
                     .await?
                     .ok_or(crate::Error::NotFound)?
                     .0;
-                *instruction_header.executor()
+                (
+                    *instruction_header.executor(),
+                    *instruction_header.rent_receiver(),
+                )
             }
         };
         Ok(self
@@ -349,6 +360,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 authority: self.payer(),
                 store: *store,
                 executor,
+                rent_receiver,
                 store_program: *self.store_program_id(),
             })
             .accounts(
@@ -366,18 +378,24 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
         &self,
         store: &Pubkey,
         buffer: &Pubkey,
-        hint: Option<(&Pubkey, &[AccountMeta])>,
+        hint: Option<ExecuteTimelockedInstructionHint<'_>>,
     ) -> crate::Result<RpcBuilder<C>> {
-        let (executor, mut accounts) = match hint {
-            Some((executor, accounts)) => (*executor, accounts.to_owned()),
+        let (executor, rent_receiver, mut accounts) = match hint {
+            Some(hint) => (
+                *hint.executor,
+                *hint.rent_receiver,
+                hint.accounts.to_owned(),
+            ),
             None => {
                 let buffer = self
                     .instruction_buffer(buffer)
                     .await?
                     .ok_or(crate::Error::NotFound)?;
                 let executor = buffer.header().executor();
+                let rent_receiver = buffer.header().rent_receiver();
                 (
                     *executor,
+                    *rent_receiver,
                     buffer.accounts().map(AccountMeta::from).collect(),
                 )
             }
@@ -399,6 +417,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 timelock_config: self.find_timelock_config_address(store),
                 executor,
                 wallet,
+                rent_receiver,
                 instruction: *buffer,
                 store_program: *self.store_program_id(),
             })
@@ -455,4 +474,15 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 system_program: system_program::ID,
             })
     }
+}
+
+/// Execute timelocked instruction hint.
+#[derive(Debug)]
+pub struct ExecuteTimelockedInstructionHint<'a> {
+    /// Executor.
+    pub executor: &'a Pubkey,
+    /// Rent receiver.
+    pub rent_receiver: &'a Pubkey,
+    /// Accounts.
+    pub accounts: &'a [AccountMeta],
 }

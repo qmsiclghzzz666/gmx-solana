@@ -4,7 +4,10 @@ use anchor_lang::{
     prelude::*,
     solana_program::instruction::{AccountMeta, Instruction},
 };
-use gmsol_store::CoreError;
+use gmsol_store::{
+    utils::pubkey::{optional_address, DEFAULT_PUBKEY},
+    CoreError,
+};
 use gmsol_utils::InitSpace;
 
 const MAX_FLAGS: usize = 8;
@@ -26,6 +29,9 @@ pub struct InstructionHeader {
     /// Data length.
     data_len: u16,
     padding_1: [u8; 12],
+    pub(crate) rent_receiver: Pubkey,
+    approver: Pubkey,
+    reserved: [u8; 64],
 }
 
 impl InstructionHeader {
@@ -37,13 +43,21 @@ impl InstructionHeader {
     }
 
     /// Approve.
-    pub(crate) fn approve(&mut self) -> Result<()> {
+    pub(crate) fn approve(&mut self, approver: Pubkey) -> Result<()> {
         require!(!self.is_approved(), CoreError::PreconditionsAreNotMet);
+        require_eq!(
+            self.approver,
+            DEFAULT_PUBKEY,
+            CoreError::PreconditionsAreNotMet
+        );
+
+        require_neq!(approver, DEFAULT_PUBKEY, CoreError::InvalidArgument);
 
         let clock = Clock::get()?;
 
         self.flags.set_flag(InstructionFlag::Approved, true);
         self.approved_at = clock.unix_timestamp;
+        self.approver = approver;
 
         Ok(())
     }
@@ -56,6 +70,11 @@ impl InstructionHeader {
     /// Get the approved timestamp.
     pub fn approved_at(&self) -> Option<i64> {
         self.is_approved().then_some(self.approved_at)
+    }
+
+    /// Get approver.
+    pub fn apporver(&self) -> Option<&Pubkey> {
+        optional_address(&self.approver)
     }
 
     /// Return whether the instruction is executable.
@@ -71,6 +90,11 @@ impl InstructionHeader {
     /// Get executor.
     pub fn executor(&self) -> &Pubkey {
         &self.executor
+    }
+
+    /// Get rent receiver.
+    pub fn rent_receiver(&self) -> &Pubkey {
+        &self.rent_receiver
     }
 }
 
@@ -137,6 +161,7 @@ pub trait InstructionLoader<'info> {
     fn load_and_init_instruction(
         &self,
         executor: Pubkey,
+        rent_receiver: Pubkey,
         program_id: Pubkey,
         data: &[u8],
         accounts: &[AccountInfo<'info>],
@@ -169,6 +194,7 @@ impl<'info> InstructionLoader<'info> for AccountLoader<'info, InstructionHeader>
     fn load_and_init_instruction(
         &self,
         executor: Pubkey,
+        rent_receiver: Pubkey,
         program_id: Pubkey,
         instruction_data: &[u8],
         instruction_accounts: &[AccountInfo<'info>],
@@ -185,6 +211,7 @@ impl<'info> InstructionLoader<'info> for AccountLoader<'info, InstructionHeader>
             header.program_id = program_id;
             header.num_accounts = num_accounts;
             header.data_len = data_len;
+            header.rent_receiver = rent_receiver;
 
             drop(header);
 

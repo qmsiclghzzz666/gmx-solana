@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, solana_program::program::invoke_signed};
 use gmsol_store::{
     program::GmsolStore,
-    states::{Seed, MAX_ROLE_NAME_LEN},
+    states::{Seed, Store, MAX_ROLE_NAME_LEN},
     utils::{fixed_str::fixed_str_to_bytes, CpiAuthenticate, CpiAuthentication, WithStore},
     CoreError,
 };
@@ -78,6 +78,7 @@ pub(crate) fn unchecked_create_instruction_buffer<'info>(
 
     ctx.accounts.instruction_buffer.load_and_init_instruction(
         ctx.accounts.executor.key(),
+        ctx.accounts.authority.key(),
         ctx.accounts.instruction_program.key(),
         data,
         &remaining_accounts[0..num_accounts],
@@ -105,20 +106,6 @@ impl<'info> CpiAuthentication<'info> for CreateInstructionBuffer<'info> {
     fn on_error(&self) -> Result<()> {
         err!(CoreError::PermissionDenied)
     }
-}
-
-fn validate_timelocked_role<'info>(
-    ctx: &Context<impl CpiAuthenticate<'info>>,
-    role: &str,
-) -> Result<()> {
-    let timelocked_role = roles::timelocked_role(role);
-    CpiAuthenticate::only(ctx, &timelocked_role)?;
-    msg!(
-        "[Timelock] approving `{}` instruction by a `{}`",
-        role,
-        timelocked_role
-    );
-    Ok(())
 }
 
 /// The accounts definition for [`approve_instruction`](crate::gmsol_timelock::approve_instruction).
@@ -152,7 +139,10 @@ pub struct ApproveInstruction<'info> {
 /// Approve instruction.
 pub(crate) fn approve_instruction(ctx: Context<ApproveInstruction>, role: &str) -> Result<()> {
     validate_timelocked_role(&ctx, role)?;
-    ctx.accounts.instruction.load_mut()?.approve()
+    ctx.accounts
+        .instruction
+        .load_mut()?
+        .approve(ctx.accounts.authority.key())
 }
 
 impl<'info> WithStore<'info> for ApproveInstruction<'info> {
@@ -208,6 +198,7 @@ pub(crate) fn approve_instructions<'info>(
     validate_timelocked_role(&ctx, role)?;
 
     let executor = ctx.accounts.executor.key();
+    let approver = ctx.accounts.authority.key();
     for account in ctx.remaining_accounts {
         require!(account.is_writable, ErrorCode::AccountNotMutable);
         let loader = AccountLoader::<InstructionHeader>::try_from(account)?;
@@ -216,7 +207,7 @@ pub(crate) fn approve_instructions<'info>(
             executor,
             CoreError::InvalidArgument
         );
-        loader.load_mut()?.approve()?;
+        loader.load_mut()?.approve(approver)?;
     }
 
     Ok(())
@@ -253,8 +244,16 @@ pub struct CancelInstruction<'info> {
     /// Executor.
     #[account(has_one = store)]
     pub executor: AccountLoader<'info, Executor>,
+    /// Rent receiver.
+    /// CHECK: only used to receive funds.
+    pub rent_receiver: UncheckedAccount<'info>,
     /// Instruction to cancel.
-    #[account(mut, has_one = executor, close = authority)]
+    #[account(
+        mut,
+        has_one = executor,
+        has_one = rent_receiver,
+        close = rent_receiver,
+    )]
     pub instruction: AccountLoader<'info, InstructionHeader>,
     /// Store program.
     pub store_program: Program<'info, GmsolStore>,
@@ -298,27 +297,37 @@ pub struct CancelInstructions<'info> {
     /// Executor.
     #[account(has_one = store)]
     pub executor: AccountLoader<'info, Executor>,
+    /// Rent receiver.
+    /// CHECK: only used to receive funds.
+    pub rent_receiver: UncheckedAccount<'info>,
     /// Store program.
     pub store_program: Program<'info, GmsolStore>,
 }
 
-/// Cancel instructions.
+/// Cancel instructions that sharing the same `executor` and `rent_receiver`.
 /// # CHECK
 /// Only [`TIMELOCK_ADMIN`](crate::roles::TIMELOCK_ADMIN) can use.
 pub(crate) fn unchecked_cancel_instructions<'info>(
     ctx: Context<'_, '_, 'info, 'info, CancelInstructions<'info>>,
 ) -> Result<()> {
     let executor = ctx.accounts.executor.key();
+    let rent_receiver = ctx.accounts.rent_receiver.key();
 
     for account in ctx.remaining_accounts {
         require!(account.is_writable, ErrorCode::AccountNotMutable);
         let loader = AccountLoader::<InstructionHeader>::try_from(account)?;
-        require_eq!(
-            *loader.load()?.executor(),
-            executor,
-            CoreError::InvalidArgument
-        );
-        loader.close(ctx.accounts.authority.to_account_info())?;
+
+        {
+            let header = loader.load()?;
+            require_eq!(*header.executor(), executor, CoreError::InvalidArgument);
+            require_eq!(
+                *header.rent_receiver(),
+                rent_receiver,
+                CoreError::InvalidArgument
+            );
+        }
+
+        loader.close(ctx.accounts.rent_receiver.to_account_info())?;
     }
 
     Ok(())
@@ -350,8 +359,7 @@ pub struct ExecuteInstruction<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
-    /// CHECK: check by CPI.
-    pub store: UncheckedAccount<'info>,
+    pub store: AccountLoader<'info, Store>,
     /// Timelock config.
     #[account(has_one = store)]
     pub timelock_config: AccountLoader<'info, TimelockConfig>,
@@ -365,8 +373,16 @@ pub struct ExecuteInstruction<'info> {
         bump,
     )]
     pub wallet: SystemAccount<'info>,
+    /// Rent receiver.
+    /// CHECK: only used to receive funds.
+    pub rent_receiver: UncheckedAccount<'info>,
     /// Instruction to execute.
-    #[account(mut, has_one = executor, close = authority)]
+    #[account(
+        mut,
+        has_one = executor,
+        has_one = rent_receiver,
+        close = rent_receiver,
+    )]
     pub instruction: AccountLoader<'info, InstructionHeader>,
     /// Store program.
     pub store_program: Program<'info, GmsolStore>,
@@ -379,6 +395,20 @@ pub(crate) fn unchecked_execute_instruction(ctx: Context<ExecuteInstruction>) ->
     let remaining_accounts = ctx.remaining_accounts;
 
     let instruction = ctx.accounts.instruction.load_instruction()?;
+
+    // Validate that the approver still have the required role.
+    {
+        let store = ctx.accounts.store.load()?;
+        let approver = instruction
+            .header()
+            .apporver()
+            .ok_or_else(|| error!(CoreError::PreconditionsAreNotMet))?;
+        let timelocked_role = roles::timelocked_role(ctx.accounts.executor.load()?.role_name()?);
+        require!(
+            store.has_role(approver, &timelocked_role)?,
+            CoreError::PreconditionsAreNotMet
+        );
+    }
 
     let delay = ctx.accounts.timelock_config.load()?.delay();
     require!(
@@ -414,4 +444,18 @@ impl<'info> CpiAuthentication<'info> for ExecuteInstruction<'info> {
     fn on_error(&self) -> Result<()> {
         err!(CoreError::PermissionDenied)
     }
+}
+
+fn validate_timelocked_role<'info>(
+    ctx: &Context<impl CpiAuthenticate<'info>>,
+    role: &str,
+) -> Result<()> {
+    let timelocked_role = roles::timelocked_role(role);
+    CpiAuthenticate::only(ctx, &timelocked_role)?;
+    msg!(
+        "[Timelock] approving `{}` instruction by a `{}`",
+        role,
+        timelocked_role
+    );
+    Ok(())
 }

@@ -73,7 +73,7 @@ pub mod gmsol_timelock {
         instructions::unchecked_cancel_instruction(ctx)
     }
 
-    /// Cancel multiple instructions.
+    /// Cancel multiple instructions that sharing the same `executor` and `rent_receiver`.
     #[access_control(CpiAuthenticate::only(&ctx, roles::TIMELOCK_ADMIN))]
     pub fn cancel_instructions<'info>(
         ctx: Context<'_, '_, 'info, 'info, CancelInstructions<'info>>,
