@@ -94,7 +94,7 @@ pub mod gmsol_timelock {
     }
 
     /// Set expected price provider.
-    #[access_control(CpiAuthenticate::only(&ctx, roles::TIMELOCKED_ADMIN))]
+    #[access_control(CpiAuthenticate::only(&ctx, roles::TIMELOCKED_MARKET_KEEPER))]
     pub fn set_expected_price_provider(
         ctx: Context<SetExpectedPriceProvider>,
         new_expected_price_provider: u8,
