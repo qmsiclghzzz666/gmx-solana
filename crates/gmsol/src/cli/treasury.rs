@@ -1,5 +1,10 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use anchor_spl::{associated_token::get_associated_token_address, token_interface::TokenAccount};
+use anchor_spl::{
+    associated_token::{
+        get_associated_token_address, get_associated_token_address_with_program_id,
+    },
+    token_interface::TokenAccount,
+};
 use gmsol::{
     chainlink::{self, pull_oracle::ChainlinkPullOracleFactory},
     client::SystemProgramOps,
@@ -109,6 +114,18 @@ enum Command {
     CancelSwap { order: Pubkey },
     /// Get Receiver Address.
     Receiver,
+    /// Withdraw from the treasury vault.
+    Withdraw {
+        token: Pubkey,
+        #[arg(long)]
+        token_program_id: Option<Pubkey>,
+        #[arg(long, short)]
+        amount: u64,
+        #[arg(long, short)]
+        decimals: u8,
+        #[arg(long)]
+        target: Option<Pubkey>,
+    },
 }
 
 impl Args {
@@ -356,6 +373,32 @@ impl Args {
                 let receiver = client.find_treasury_receiver_address(&config);
                 println!("{receiver}");
                 return Ok(());
+            }
+            Command::Withdraw {
+                token,
+                token_program_id,
+                amount,
+                decimals,
+                target,
+            } => {
+                let target = target.unwrap_or_else(|| {
+                    get_associated_token_address_with_program_id(
+                        &client.payer(),
+                        token,
+                        &token_program_id.unwrap_or(anchor_spl::token::ID),
+                    )
+                });
+                client
+                    .withdraw_from_treasury_vault(
+                        store,
+                        None,
+                        token,
+                        token_program_id.as_ref(),
+                        *amount,
+                        *decimals,
+                        &target,
+                    )
+                    .await?
             }
         };
         crate::utils::send_or_serialize_rpc(
