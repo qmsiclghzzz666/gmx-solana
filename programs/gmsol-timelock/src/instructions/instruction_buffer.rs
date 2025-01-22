@@ -246,6 +246,7 @@ pub struct CancelInstruction<'info> {
     pub executor: AccountLoader<'info, Executor>,
     /// Rent receiver.
     /// CHECK: only used to receive funds.
+    #[account(mut)]
     pub rent_receiver: UncheckedAccount<'info>,
     /// Instruction to cancel.
     #[account(
@@ -299,6 +300,7 @@ pub struct CancelInstructions<'info> {
     pub executor: AccountLoader<'info, Executor>,
     /// Rent receiver.
     /// CHECK: only used to receive funds.
+    #[account(mut)]
     pub rent_receiver: UncheckedAccount<'info>,
     /// Store program.
     pub store_program: Program<'info, GmsolStore>,
@@ -375,6 +377,7 @@ pub struct ExecuteInstruction<'info> {
     pub wallet: SystemAccount<'info>,
     /// Rent receiver.
     /// CHECK: only used to receive funds.
+    #[account(mut)]
     pub rent_receiver: UncheckedAccount<'info>,
     /// Instruction to execute.
     #[account(
