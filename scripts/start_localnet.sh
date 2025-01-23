@@ -16,8 +16,8 @@ RUST_LOG=trace \
   --upgradeable-program rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ external-programs/pyth-receiver.so $ADDRESS \
   --upgradeable-program pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT external-programs/pyth-push-oracle.so $ADDRESS \
   --upgradeable-program HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ external-programs/wormhole.so $ADDRESS \
-  --upgradeable-program Gmso1YHcDFwzxBjXP4F6Hr35BZqWiQUzTwCN6Z2di3e target/verifiable/gmsol_store.so $ADDRESS \
-  --upgradeable-program GTtRSYha5h8S26kPFHgYKUf8enEgabkTFwW7UToXAHoY target/verifiable/gmsol_treasury.so $ADDRESS \
-  --upgradeable-program timeAUGcp4UHrmnW5W6mhJDA7mjpFsVrEePTKd1Ed7P target/verifiable/gmsol_timelock.so $ADDRESS \
+  --upgradeable-program Gmso1nWurDFJKAPJQHppr5JqL4XKQUMh8ExkCoMT5FHr target/verifiable/gmsol_store.so $ADDRESS \
+  --upgradeable-program GThp71jtyLH45yadPsTRSFPJXJaMt7Zthc9aZA4MgNmK target/verifiable/gmsol_treasury.so $ADDRESS \
+  --upgradeable-program TimeBQ7gQyWyQMD3bTteAdy7hTVDNWSwELdSVZHfSXL target/verifiable/gmsol_timelock.so $ADDRESS \
   --upgradeable-program 4nMxSRfeW7W2zFbN8FJ4YDvuTzEzCo1e6GzJxJLnDUoZ target/verifiable/mock_chainlink_verifier.so $ADDRESS \
   $@

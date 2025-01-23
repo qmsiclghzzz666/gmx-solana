@@ -161,9 +161,9 @@ cargo gmsol -ul -w $GMSOL_KEEPER market insert-token-configs $GMSOL_TOKENS --tok
 cargo gmsol -ul -w $GMSOL_KEEPER market create-markets $GMSOL_MARKETS --enable
 cargo gmsol -ul -w $GMSOL_KEEPER market update-configs $GMSOL_MARKET_CONFIGS
 
-cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting B4qyuQJdUPqQeKVN6D6T96rNiDCmgXgvBqqKSCfMMuF3 --enable
-cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting ACycDYCpDWxZWLuig6oGSVXmAm8czZ4en4Nk5cug9q1V --enable
-cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting Feuv6GdnXPec1ELiXDYLH3XJkmDX9BgvrYVK68oGb6MC --enable
+cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting HhLa62Wzhb8AXSWHMBT8cCSWtjqKujh1VfvSPbjuBkyP --enable
+cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting BS1atVNQs2CFwf8EuLivrVxm14SBXoiYdMBfg7budTQg --enable
+cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting DmZeSpGmGwNWSv66CrbXijGjLwZD5E6zkx4aKHgn266M --enable
 
 export COMMON_ALT=$(cargo gmsol -ul alt extend --init common $ORACLE)
 export MARKET_ALT=$(cargo gmsol -ul alt extend --init market)
