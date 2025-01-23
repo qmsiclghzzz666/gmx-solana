@@ -6,6 +6,7 @@ use gmsol::{
         glv::{GlvMarketFlag, UpdateGlvParams},
         GlvDeposit, GlvShift, GlvWithdrawal,
     },
+    utils::instruction::InstructionSerialization,
 };
 use solana_sdk::pubkey::Pubkey;
 
@@ -203,7 +204,7 @@ impl Args {
         client: &GMSOLClient,
         store: &Pubkey,
         timelock: Option<TimelockCtx<'_>>,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {
         let selected = &self.glv_token;

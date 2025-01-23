@@ -10,7 +10,10 @@ use gmsol::{
     client::SystemProgramOps,
     pyth::{pull_oracle::PythPullOracleWithHermes, Hermes, PythPullOracle},
     treasury::{CreateTreasurySwapOptions, TreasuryOps},
-    utils::builder::{MakeTransactionBuilder, WithPullOracle},
+    utils::{
+        builder::{MakeTransactionBuilder, WithPullOracle},
+        instruction::InstructionSerialization,
+    },
 };
 use gmsol_model::{BalanceExt, BaseMarket};
 use gmsol_treasury::states::treasury::TokenFlag;
@@ -134,7 +137,7 @@ impl Args {
         client: &GMSOLClient,
         store: &Pubkey,
         timelock: Option<TimelockCtx<'_>>,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {
         let req = match &self.command {

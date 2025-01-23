@@ -1,7 +1,7 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol::{
     store::{roles::RolesOps, store_ops::StoreOps},
-    utils::TransactionBuilder,
+    utils::{instruction::InstructionSerialization, TransactionBuilder},
 };
 use gmsol_store::states::RoleKey;
 use gmsol_timelock::roles as timelock_roles;
@@ -64,7 +64,7 @@ impl AdminArgs {
         client: &GMSOLClient,
         store_key: &str,
         timelock: Option<TimelockCtx<'_>>,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
@@ -93,7 +93,7 @@ impl AdminArgs {
                 confirm,
             } => {
                 let rpc = client.transfer_store_authority(&store, new_authority);
-                if *confirm || serialize_only {
+                if *confirm || serialize_only.is_some() {
                     crate::utils::send_or_serialize_rpc(
                         &store,
                         rpc,
@@ -127,7 +127,7 @@ impl AdminArgs {
                 confirm,
             } => {
                 let rpc = client.transfer_receiver(&store, new_receiver);
-                if *confirm || serialize_only {
+                if *confirm || serialize_only.is_some() {
                     crate::utils::send_or_serialize_rpc(
                         &store,
                         rpc,
@@ -246,7 +246,7 @@ impl InitializeRoles {
         &self,
         client: &GMSOLClient,
         store_key: &str,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
 

@@ -1,5 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::store::config::ConfigOps;
+use gmsol::{store::config::ConfigOps, utils::instruction::InstructionSerialization};
 use gmsol_store::states::{AddressKey, Amount, AmountKey, Factor, FactorKey};
 
 use crate::GMSOLClient;
@@ -38,7 +38,7 @@ impl ControllerArgs {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
     ) -> gmsol::Result<()> {
         match &self.command {
             Command::InsertAmount { amount, key } => {

@@ -214,6 +214,11 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         }
     }
 
+    /// Get payer address.
+    pub fn payer_address(&self) -> Pubkey {
+        self.cfg.payer()
+    }
+
     /// Set cluster.
     pub fn cluster(mut self, url: &str) -> crate::Result<Self> {
         self.cfg.cluster = url.parse().map_err(crate::Error::invalid_argument)?;

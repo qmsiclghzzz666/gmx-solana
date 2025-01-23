@@ -1,5 +1,7 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::{alt::AddressLookupTableOps, types::TokenMapAccess};
+use gmsol::{
+    alt::AddressLookupTableOps, types::TokenMapAccess, utils::instruction::InstructionSerialization,
+};
 
 use crate::GMSOLClient;
 
@@ -42,7 +44,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
     ) -> gmsol::Result<()> {
         match &self.command {
             Command::Extend {

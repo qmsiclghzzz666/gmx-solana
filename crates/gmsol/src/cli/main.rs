@@ -9,7 +9,7 @@ use anchor_client::{
 };
 use clap::Parser;
 use eyre::eyre;
-use gmsol::utils::LocalSignerRef;
+use gmsol::utils::{instruction::InstructionSerialization, LocalSignerRef};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
@@ -65,10 +65,10 @@ struct Cli {
     /// Whether to create a timelocked buffer for this instruction.
     #[arg(long)]
     timelock: Option<String>,
-    /// Print the Based64 encoded serialized instructions,
+    /// Print the serialized instructions,
     /// instead of sending the transaction.
     #[arg(long, group = "tx-opts")]
-    serialize_only: bool,
+    serialize_only: Option<InstructionSerialization>,
     /// Whether to skip preflight.
     #[arg(long, group = "ts-opts")]
     skip_preflight: bool,
@@ -138,7 +138,7 @@ impl Cli {
         wallet_manager: &mut Option<Rc<RemoteWalletManager>>,
     ) -> eyre::Result<(LocalSignerRef, Option<LocalSignerRef>)> {
         if let Some(payer) = self.payer {
-            if self.serialize_only {
+            if self.serialize_only.is_some() {
                 let payer = NullSigner::new(&payer);
                 Ok((gmsol::utils::local_signer(payer), None))
             } else {
@@ -267,7 +267,7 @@ impl Cli {
             }
             Command::Inspect(args) => args.run(&client, &store).await?,
             Command::Exchange(args) => {
-                if self.serialize_only {
+                if self.serialize_only.is_some() {
                     eyre::bail!("serialize-only mode not supported");
                 }
                 args.run(&client, &store).await?

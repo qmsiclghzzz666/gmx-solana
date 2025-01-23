@@ -25,7 +25,7 @@ use gmsol::{
         market::config::{MarketConfigBuffer, MarketConfigFlag},
         FactorKey, DEFAULT_TIMESTAMP_ADJUSTMENT,
     },
-    utils::TransactionBuilder,
+    utils::{instruction::InstructionSerialization, TransactionBuilder},
 };
 use gmsol_store::states::{
     Factor, MarketConfigKey, PriceProviderKind, UpdateTokenConfigParams,
@@ -346,7 +346,7 @@ impl Args {
         client: &GMSOLClient,
         store: &Pubkey,
         timelock: Option<TimelockCtx<'_>>,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
     ) -> gmsol::Result<()> {
         match &self.command {
             Command::InitOracle {
@@ -385,7 +385,7 @@ impl Args {
                 .await?
             }
             Command::CreateTokenMap => {
-                if serialize_only {
+                if serialize_only.is_some() {
                     return Err(gmsol::Error::invalid_argument(
                         "serialize-only mode is not supported for this command",
                     ));
@@ -394,7 +394,7 @@ impl Args {
                 let (rpc, map) = client.initialize_token_map(store, &token_map);
                 crate::utils::send_or_serialize(
                     rpc.into_anchor_request_without_compute_budget(),
-                    false,
+                    None,
                     |signature| {
                         tracing::info!("created token config map {map} at tx {signature}");
                         println!("{map}");
@@ -704,7 +704,7 @@ impl Args {
                 .await?;
             }
             Command::CreateBuffer { expire_after } => {
-                if serialize_only {
+                if serialize_only.is_some() {
                     return Err(gmsol::Error::invalid_argument(
                         "serialize-only mode is not supported for this command",
                     ));
@@ -717,7 +717,7 @@ impl Args {
                 );
                 crate::utils::send_or_serialize(
                     rpc.into_anchor_request_without_compute_budget(),
-                    false,
+                    None,
                     |signature| {
                         let pubkey = buffer_keypair.pubkey();
                         tracing::info!("created market config buffer `{pubkey}` at tx {signature}");
@@ -1019,7 +1019,7 @@ async fn insert_token_configs(
     client: &GMSOLClient,
     store: &Pubkey,
     token_map: &Pubkey,
-    serialize_only: bool,
+    serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
     set_token_map: bool,
     max_transaction_size: Option<usize>,
@@ -1093,7 +1093,7 @@ pub struct Market {
 async fn create_markets(
     client: &GMSOLClient,
     store: &Pubkey,
-    serialize_only: bool,
+    serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
     enable: bool,
     max_transaction_size: Option<usize>,
@@ -1157,7 +1157,7 @@ impl MarketConfigMap {
         store: &Pubkey,
         buffer: Option<&Pubkey>,
         expire_after: &humantime::Duration,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
         max_transaction_size: Option<usize>,
         batch: NonZeroUsize,
@@ -1226,7 +1226,7 @@ impl MarketConfigs {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
         max_transaction_size: Option<usize>,
         receiver: Option<&Pubkey>,

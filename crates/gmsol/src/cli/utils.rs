@@ -12,7 +12,7 @@ use anchor_client::{
 use eyre::OptionExt;
 use gmsol::{
     timelock::TimelockOps,
-    utils::{RpcBuilder, TransactionBuilder},
+    utils::{instruction::InstructionSerialization, RpcBuilder, TransactionBuilder},
 };
 use prettytable::format::{FormatBuilder, TableFormat};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
@@ -70,16 +70,19 @@ pub(crate) fn generate_discriminator(
 
 pub(crate) async fn send_or_serialize<C, S>(
     req: RequestBuilder<'_, C>,
-    serialize_only: bool,
+    serialize_only: Option<InstructionSerialization>,
     callback: impl FnOnce(Signature) -> gmsol::Result<()>,
 ) -> gmsol::Result<()>
 where
     C: Clone + Deref<Target = S>,
     S: Signer,
 {
-    if serialize_only {
+    if let Some(format) = serialize_only {
         for (idx, ix) in req.instructions()?.into_iter().enumerate() {
-            println!("ix[{idx}]: {}", gmsol::utils::serialize_instruction(&ix)?);
+            println!(
+                "ix[{idx}]: {}",
+                gmsol::utils::serialize_instruction(&ix, format, None)?
+            );
         }
     } else {
         let signature = req.send().await?;
@@ -92,7 +95,7 @@ pub(crate) async fn send_or_serialize_rpc<C, S>(
     store: &Pubkey,
     req: RpcBuilder<'_, C>,
     timelock: Option<(&str, &GMSOLClient)>,
-    serialize_only: bool,
+    serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
     callback: impl FnOnce(Signature) -> gmsol::Result<()>,
 ) -> gmsol::Result<()>
@@ -100,13 +103,16 @@ where
     C: Clone + Deref<Target = S>,
     S: Signer,
 {
-    if serialize_only {
+    if let Some(format) = serialize_only {
         for (idx, ix) in req
             .instructions_with_options(true, None)
             .into_iter()
             .enumerate()
         {
-            println!("ix[{idx}]: {}", gmsol::utils::serialize_instruction(&ix)?);
+            println!(
+                "ix[{idx}]: {}",
+                gmsol::utils::serialize_instruction(&ix, format, Some(&req.payer_address()))?
+            );
         }
     } else if let Some((role, client)) = timelock {
         let mut txn = client.transaction();
@@ -149,7 +155,7 @@ where
 
 pub(crate) async fn send_or_serialize_transactions<C, S>(
     builder: TransactionBuilder<'_, C>,
-    serialize_only: bool,
+    serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
     callback: impl FnOnce(Vec<Signature>, Option<gmsol::Error>) -> gmsol::Result<()>,
 ) -> gmsol::Result<()>
@@ -157,16 +163,20 @@ where
     C: Clone + Deref<Target = S>,
     S: Signer,
 {
-    if serialize_only {
+    if let Some(format) = serialize_only {
         for (idx, rpc) in builder.into_builders().into_iter().enumerate() {
             println!("Transaction {idx}:");
+            let payer_address = rpc.payer_address();
             for (idx, ix) in rpc
                 .into_anchor_request_without_compute_budget()
                 .instructions()?
                 .into_iter()
                 .enumerate()
             {
-                println!("ix[{idx}]: {}", gmsol::utils::serialize_instruction(&ix)?);
+                println!(
+                    "ix[{idx}]: {}",
+                    gmsol::utils::serialize_instruction(&ix, format, Some(&payer_address))?
+                );
             }
             println!();
         }

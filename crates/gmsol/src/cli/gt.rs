@@ -5,7 +5,11 @@ use crate::{
     GMSOLClient, TimelockCtx,
 };
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::{store::gt::GtOps, treasury::TreasuryOps, utils::unsigned_amount_to_decimal};
+use gmsol::{
+    store::gt::GtOps,
+    treasury::TreasuryOps,
+    utils::{instruction::InstructionSerialization, unsigned_amount_to_decimal},
+};
 use prettytable::{row, Table};
 use rust_decimal::Decimal;
 
@@ -73,7 +77,7 @@ impl Args {
         client: &GMSOLClient,
         store: &Pubkey,
         timelock: Option<TimelockCtx<'_>>,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {
         match &self.command {

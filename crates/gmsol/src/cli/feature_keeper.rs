@@ -2,6 +2,7 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol::{
     exchange::ExchangeOps,
     types::feature::{display_feature, ActionDisabledFlag, DomainDisabledFlag},
+    utils::instruction::InstructionSerialization,
 };
 
 use crate::GMSOLClient;
@@ -35,7 +36,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
     ) -> gmsol::Result<()> {
         match self.command {
             Command::Toggle {

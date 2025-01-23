@@ -1,6 +1,10 @@
 use crate::GMSOLClient;
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::{timelock::TimelockOps, types::PriceProviderKind, utils::ZeroCopy};
+use gmsol::{
+    timelock::TimelockOps,
+    types::PriceProviderKind,
+    utils::{instruction::InstructionSerialization, ZeroCopy},
+};
 use gmsol_timelock::states::{Executor, TimelockConfig};
 
 #[derive(clap::Args)]
@@ -66,7 +70,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {
         let req = match &self.command {

@@ -19,6 +19,7 @@ use gmsol::{
     },
     utils::{
         builder::{MakeTransactionBuilder, SetExecutionFee},
+        instruction::InstructionSerialization,
         ComputeBudget, SendTransactionOptions, ZeroCopy,
     },
 };
@@ -144,9 +145,9 @@ impl KeeperArgs {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        serialize_only: bool,
+        serialize_only: Option<InstructionSerialization>,
     ) -> gmsol::Result<()> {
-        if serialize_only {
+        if serialize_only.is_some() {
             return Err(gmsol::Error::invalid_argument(
                 "serialize-only mode is not supported",
             ));
@@ -872,7 +873,7 @@ impl KeeperArgs {
         let worker = async move {
             while let Some(command) = rx.recv().await {
                 tracing::info!(?command, "received new command");
-                match self.with_command(command).run(client, &store, false).await {
+                match self.with_command(command).run(client, &store, None).await {
                     Ok(()) => {
                         tracing::info!("command executed");
                     }
