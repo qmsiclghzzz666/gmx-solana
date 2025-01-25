@@ -232,7 +232,6 @@ pub struct ExecuteIncreaseOrSwapOrder<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             initial_collateral_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -246,7 +245,6 @@ pub struct ExecuteIncreaseOrSwapOrder<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             final_output_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -260,7 +258,6 @@ pub struct ExecuteIncreaseOrSwapOrder<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             long_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -274,7 +271,6 @@ pub struct ExecuteIncreaseOrSwapOrder<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             short_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -641,7 +637,6 @@ pub struct ExecuteDecreaseOrder<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             final_output_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -655,7 +650,6 @@ pub struct ExecuteDecreaseOrder<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             long_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -669,7 +663,6 @@ pub struct ExecuteDecreaseOrder<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             short_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]

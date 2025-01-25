@@ -568,7 +568,6 @@ pub struct ExecuteGlvWithdrawal<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             market_token_withdrawal_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -582,7 +581,6 @@ pub struct ExecuteGlvWithdrawal<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             final_long_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -596,7 +594,6 @@ pub struct ExecuteGlvWithdrawal<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             final_short_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]

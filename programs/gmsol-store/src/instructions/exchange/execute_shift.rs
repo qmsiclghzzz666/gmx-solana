@@ -95,7 +95,6 @@ pub struct ExecuteShift<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             from_market_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]

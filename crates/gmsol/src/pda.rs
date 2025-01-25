@@ -51,7 +51,6 @@ pub fn find_market_vault_address(
             gmsol_store::constants::MARKET_VAULT_SEED,
             store.as_ref(),
             token.as_ref(),
-            &[],
         ],
         store_program_id,
     )

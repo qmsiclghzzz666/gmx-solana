@@ -88,7 +88,6 @@ pub struct InitializeMarket<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             long_token_mint.key().as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -102,7 +101,6 @@ pub struct InitializeMarket<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             short_token_mint.key().as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -253,7 +251,6 @@ pub struct MarketTransferIn<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -649,7 +646,6 @@ pub struct ClaimFeesFromMarket<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             token_mint.key().as_ref(),
-            &[],
         ],
         bump,
     )]

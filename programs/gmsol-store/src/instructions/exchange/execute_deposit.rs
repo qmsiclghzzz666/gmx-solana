@@ -97,7 +97,6 @@ pub struct ExecuteDeposit<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             initial_long_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
@@ -111,7 +110,6 @@ pub struct ExecuteDeposit<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             initial_short_token_vault.mint.as_ref(),
-            &[],
         ],
         bump,
     )]
