@@ -43,7 +43,7 @@ pub struct WithdrawalExecuted {
 }
 
 impl gmsol_utils::InitSpace for WithdrawalExecuted {
-    const INIT_SPACE: usize = WithdrawReport::<u128>::INIT_SPACE;
+    const INIT_SPACE: usize = 8 + 32 + WithdrawReport::<u128>::INIT_SPACE;
 }
 
 impl Event for WithdrawalExecuted {}

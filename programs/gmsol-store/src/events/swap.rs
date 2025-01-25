@@ -21,7 +21,7 @@ pub struct SwapExecuted {
 
 impl gmsol_utils::InitSpace for SwapExecuted {
     const INIT_SPACE: usize =
-        SwapReport::<u128, i128>::INIT_SPACE + 1 + DecreasePositionSwapType::INIT_SPACE;
+        8 + 32 + SwapReport::<u128, i128>::INIT_SPACE + 1 + DecreasePositionSwapType::INIT_SPACE;
 }
 
 impl Event for SwapExecuted {}

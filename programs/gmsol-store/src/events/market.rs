@@ -33,7 +33,9 @@ pub struct MarketFeesUpdated {
 }
 
 impl gmsol_utils::InitSpace for MarketFeesUpdated {
-    const INIT_SPACE: usize = DistributePositionImpactReport::<u128>::INIT_SPACE
+    const INIT_SPACE: usize = 8
+        + 32
+        + DistributePositionImpactReport::<u128>::INIT_SPACE
         + UpdateBorrowingReport::<u128>::INIT_SPACE
         + UpdateFundingReport::<u128, i128>::INIT_SPACE;
 }

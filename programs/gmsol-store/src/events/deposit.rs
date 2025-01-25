@@ -42,7 +42,7 @@ pub struct DepositExecuted {
 }
 
 impl gmsol_utils::InitSpace for DepositExecuted {
-    const INIT_SPACE: usize = DepositReport::<u128, i128>::INIT_SPACE;
+    const INIT_SPACE: usize = 8 + 32 + DepositReport::<u128, i128>::INIT_SPACE;
 }
 
 impl Event for DepositExecuted {}

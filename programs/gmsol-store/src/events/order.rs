@@ -48,7 +48,7 @@ pub struct PositionIncreased {
 }
 
 impl gmsol_utils::InitSpace for PositionIncreased {
-    const INIT_SPACE: usize = IncreasePositionReport::<u128, i128>::INIT_SPACE;
+    const INIT_SPACE: usize = 8 + 32 + IncreasePositionReport::<u128, i128>::INIT_SPACE;
 }
 
 impl Event for PositionIncreased {}
@@ -80,7 +80,7 @@ pub struct PositionDecreased {
 }
 
 impl gmsol_utils::InitSpace for PositionDecreased {
-    const INIT_SPACE: usize = DecreasePositionReport::<u128, i128>::INIT_SPACE;
+    const INIT_SPACE: usize = 8 + 32 + DecreasePositionReport::<u128, i128>::INIT_SPACE;
 }
 
 impl Event for PositionDecreased {}
