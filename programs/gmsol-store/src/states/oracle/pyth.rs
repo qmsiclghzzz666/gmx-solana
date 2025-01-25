@@ -59,6 +59,8 @@ pub fn pyth_price_with_confidence_to_price(
     let mid_price: u64 = price
         .try_into()
         .map_err(|_| error!(CoreError::InvalidPriceFeedPrice))?;
+    // Note: No validation of Pyth’s price volatility has been conducted yet.
+    // Exercise caution when choosing Pyth as the primary oracle.
     let min_price = mid_price
         .checked_sub(confidence)
         .ok_or_else(|| error!(CoreError::InvalidPriceFeedPrice))?;
