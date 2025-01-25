@@ -293,7 +293,7 @@ impl Market {
 
     /// Validate the market.
     pub fn validate(&self, store: &Pubkey) -> Result<()> {
-        require_eq!(*store, self.store, CoreError::StoreMismatched);
+        require_keys_eq!(*store, self.store, CoreError::StoreMismatched);
         require!(self.is_enabled(), CoreError::DisabledMarket);
         Ok(())
     }
@@ -396,13 +396,13 @@ impl Market {
         // It should be possible to allow shift between markets with the compatible tokens in the future,
         // for example, allowing shifting from BTC[WSOL-USDC] to SOL[USDC-WSOL].
 
-        require_eq!(
+        require_keys_eq!(
             self.meta().long_token_mint,
             target.meta().long_token_mint,
             CoreError::TokenMintMismatched,
         );
 
-        require_eq!(
+        require_keys_eq!(
             self.meta().short_token_mint,
             target.meta().short_token_mint,
             CoreError::TokenMintMismatched,

@@ -94,12 +94,12 @@ pub(crate) fn unchecked_prepare_gt_bank(ctx: Context<PrepareGtBank>) -> Result<(
     {
         let gt_bank = ctx.accounts.gt_bank.load()?;
         require_eq!(gt_bank.bump, bump, CoreError::InvalidArgument);
-        require_eq!(
+        require_keys_eq!(
             gt_bank.treasury_vault_config,
             treasury_vault_config,
             CoreError::InvalidArgument
         );
-        require_eq!(
+        require_keys_eq!(
             gt_bank.gt_exchange_vault,
             gt_exchange_vault,
             CoreError::InvalidArgument
@@ -357,7 +357,7 @@ impl<'info> CompleteGtExchange<'info> {
                     .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
                 let mint = &tokens[idx];
-                require_eq!(*mint.key, *token, CoreError::InvalidArgument);
+                require_keys_eq!(*mint.key, *token, CoreError::InvalidArgument);
                 let token_program = if mint.owner == self.token_program.key {
                     self.token_program.to_account_info()
                 } else if mint.owner == self.token_2022_program.key {
@@ -375,7 +375,7 @@ impl<'info> CompleteGtExchange<'info> {
                 )?;
 
                 let target = &targets[idx];
-                require_eq!(
+                require_keys_eq!(
                     anchor_spl::token::accessor::authority(target)?,
                     owner_address
                 );

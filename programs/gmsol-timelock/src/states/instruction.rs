@@ -45,13 +45,13 @@ impl InstructionHeader {
     /// Approve.
     pub(crate) fn approve(&mut self, approver: Pubkey) -> Result<()> {
         require!(!self.is_approved(), CoreError::PreconditionsAreNotMet);
-        require_eq!(
+        require_keys_eq!(
             self.approver,
             DEFAULT_PUBKEY,
             CoreError::PreconditionsAreNotMet
         );
 
-        require_neq!(approver, DEFAULT_PUBKEY, CoreError::InvalidArgument);
+        require_keys_neq!(approver, DEFAULT_PUBKEY, CoreError::InvalidArgument);
 
         let clock = Clock::get()?;
 

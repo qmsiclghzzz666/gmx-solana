@@ -151,18 +151,18 @@ fn validate_position(
 ) -> Result<()> {
     require_eq!(position.bump, bump, CoreError::InvalidPosition);
     require_eq!(position.kind()?, kind, CoreError::InvalidPosition);
-    require_eq!(position.owner, *owner, CoreError::InvalidPosition);
-    require_eq!(
+    require_keys_eq!(position.owner, *owner, CoreError::InvalidPosition);
+    require_keys_eq!(
         position.collateral_token,
         *collateral_token,
         CoreError::InvalidPosition
     );
-    require_eq!(
+    require_keys_eq!(
         position.market_token,
         *market_token,
         CoreError::InvalidPosition
     );
-    require_eq!(position.store, *store, CoreError::InvalidPosition);
+    require_keys_eq!(position.store, *store, CoreError::InvalidPosition);
     Ok(())
 }
 
@@ -802,7 +802,7 @@ impl<'info> CloseOrder<'info> {
             .as_ref()
             .ok_or_else(|| error!(CoreError::InvalidArgument))?;
 
-        require_eq!(
+        require_keys_eq!(
             referrer_user.load()?.owner,
             referrer,
             CoreError::InvalidArgument

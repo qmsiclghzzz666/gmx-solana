@@ -103,7 +103,7 @@ impl UserHeader {
             receiver_user.is_initialized(),
             CoreError::InvalidUserAccount
         );
-        require_eq!(
+        require_keys_eq!(
             receiver_user.referral.code,
             DEFAULT_PUBKEY,
             CoreError::PreconditionsAreNotMet
@@ -149,7 +149,7 @@ pub struct Referral {
 
 impl Referral {
     pub(crate) fn set_code(&mut self, code: &Pubkey) -> Result<()> {
-        require_eq!(self.code, DEFAULT_PUBKEY, CoreError::ReferralCodeHasBeenSet);
+        require_keys_eq!(self.code, DEFAULT_PUBKEY, CoreError::ReferralCodeHasBeenSet);
 
         self.code = *code;
 
@@ -157,7 +157,7 @@ impl Referral {
     }
 
     pub(crate) fn set_referrer(&mut self, referrer_user: &mut UserHeader) -> Result<()> {
-        require_eq!(self.referrer, DEFAULT_PUBKEY, CoreError::ReferrerHasBeenSet,);
+        require_keys_eq!(self.referrer, DEFAULT_PUBKEY, CoreError::ReferrerHasBeenSet,);
 
         require!(
             referrer_user.owner != DEFAULT_PUBKEY,

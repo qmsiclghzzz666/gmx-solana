@@ -55,7 +55,7 @@ pub(crate) fn prepare_trade_event_buffer(
 ) -> Result<()> {
     match ctx.accounts.event.load_init() {
         Ok(mut event) => {
-            require_eq!(event.authority, DEFAULT_PUBKEY, CoreError::Internal);
+            require_keys_eq!(event.authority, DEFAULT_PUBKEY, CoreError::Internal);
             event.store = ctx.accounts.store.key();
             event.authority = ctx.accounts.authority.key();
         }
@@ -69,12 +69,12 @@ pub(crate) fn prepare_trade_event_buffer(
         }
     }
     ctx.accounts.event.exit(&crate::ID)?;
-    require_eq!(
+    require_keys_eq!(
         ctx.accounts.event.load()?.store,
         ctx.accounts.store.key(),
         CoreError::PermissionDenied
     );
-    require_eq!(
+    require_keys_eq!(
         ctx.accounts.event.load()?.authority,
         ctx.accounts.authority.key(),
         CoreError::PermissionDenied

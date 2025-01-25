@@ -185,7 +185,7 @@ pub(crate) fn prepare_gt_exchange_vault(
     {
         let vault = ctx.accounts.vault.load()?;
         require!(vault.is_initialized(), CoreError::PreconditionsAreNotMet);
-        require_eq!(
+        require_keys_eq!(
             vault.store,
             ctx.accounts.store.key(),
             CoreError::StoreMismatched
@@ -296,12 +296,12 @@ impl<'info> RequestGtExchange<'info> {
             self.exchange.load()?.is_initialized(),
             CoreError::PreconditionsAreNotMet
         );
-        require_eq!(
+        require_keys_eq!(
             *self.exchange.load()?.owner(),
             self.owner.key(),
             CoreError::OwnerMismatched,
         );
-        require_eq!(
+        require_keys_eq!(
             *self.exchange.load()?.store(),
             self.store.key(),
             CoreError::StoreMismatched,

@@ -130,7 +130,7 @@ impl Glv {
         market_tokens: &BTreeSet<Pubkey>,
     ) -> Result<()> {
         let expected_glv_token = Self::find_glv_token_pda(store, index, &crate::ID).0;
-        require_eq!(expected_glv_token, *glv_token, CoreError::InvalidArgument);
+        require_keys_eq!(expected_glv_token, *glv_token, CoreError::InvalidArgument);
 
         self.version = 0;
         self.bump = bump;
@@ -170,12 +170,12 @@ impl Glv {
             let meta = market.validated_meta(store)?;
             match &mut tokens {
                 Some((long_token, short_token)) => {
-                    require_eq!(
+                    require_keys_eq!(
                         *long_token,
                         meta.long_token_mint,
                         CoreError::TokenMintMismatched
                     );
-                    require_eq!(
+                    require_keys_eq!(
                         *short_token,
                         meta.short_token_mint,
                         CoreError::TokenMintMismatched
@@ -263,13 +263,13 @@ impl Glv {
     pub(crate) fn insert_market(&mut self, store: &Pubkey, market: &Market) -> Result<()> {
         let meta = market.validated_meta(store)?;
 
-        require_eq!(
+        require_keys_eq!(
             meta.long_token_mint,
             self.long_token,
             CoreError::InvalidArgument
         );
 
-        require_eq!(
+        require_keys_eq!(
             meta.short_token_mint,
             self.short_token,
             CoreError::InvalidArgument
@@ -403,7 +403,7 @@ impl Glv {
                     .0,
             );
 
-            require_eq!(
+            require_keys_eq!(
                 market_token.key(),
                 expected_market_token,
                 CoreError::MarketTokenMintMismatched
@@ -421,7 +421,7 @@ impl Glv {
                 let market = AccountLoader::<Market>::try_from(market)?;
                 let market = market.load()?;
                 let meta = market.validated_meta(store)?;
-                require_eq!(
+                require_keys_eq!(
                     meta.market_token_mint,
                     expected_market_token,
                     CoreError::MarketTokenMintMismatched
@@ -728,7 +728,7 @@ impl GlvDeposit {
         glv_token: &InterfaceAccount<token_interface::Mint>,
         glv: &Glv,
     ) -> Result<()> {
-        require_eq!(
+        require_keys_eq!(
             glv_token.key(),
             self.tokens.glv_token(),
             CoreError::TokenMintMismatched,
@@ -766,7 +766,7 @@ impl GlvDeposit {
             return Ok(());
         }
 
-        require_eq!(
+        require_keys_eq!(
             *receiver,
             Self::first_deposit_receiver(),
             CoreError::InvalidReceiverForFirstDeposit

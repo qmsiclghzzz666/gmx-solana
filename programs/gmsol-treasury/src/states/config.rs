@@ -41,7 +41,7 @@ impl Config {
 
     /// Set the treasury vault config address.
     pub(crate) fn set_treasury_vault_config(&mut self, mut address: Pubkey) -> Result<Pubkey> {
-        require_neq!(
+        require_keys_neq!(
             self.treasury_vault_config,
             address,
             CoreError::PreconditionsAreNotMet

@@ -202,7 +202,7 @@ pub(crate) fn approve_instructions<'info>(
     for account in ctx.remaining_accounts {
         require!(account.is_writable, ErrorCode::AccountNotMutable);
         let loader = AccountLoader::<InstructionHeader>::try_from(account)?;
-        require_eq!(
+        require_keys_eq!(
             *loader.load()?.executor(),
             executor,
             CoreError::InvalidArgument
@@ -321,8 +321,8 @@ pub(crate) fn unchecked_cancel_instructions<'info>(
 
         {
             let header = loader.load()?;
-            require_eq!(*header.executor(), executor, CoreError::InvalidArgument);
-            require_eq!(
+            require_keys_eq!(*header.executor(), executor, CoreError::InvalidArgument);
+            require_keys_eq!(
                 *header.rent_receiver(),
                 rent_receiver,
                 CoreError::InvalidArgument

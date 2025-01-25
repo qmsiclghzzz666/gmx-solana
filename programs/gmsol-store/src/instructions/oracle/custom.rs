@@ -135,7 +135,7 @@ impl<'info> UpdatePriceFeedWithChainlink<'info> {
             error!(CoreError::InvalidPriceReport)
         })?;
 
-        require_eq!(
+        require_keys_eq!(
             Pubkey::new_from_array(report.feed_id.0),
             self.price_feed.load()?.feed_id,
             CoreError::InvalidPriceReport

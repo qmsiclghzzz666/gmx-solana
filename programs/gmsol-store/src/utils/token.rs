@@ -54,9 +54,9 @@ pub fn validate_token_account<'info>(
         ErrorCode::AccountNotInitialized
     );
 
-    require_eq!(
-        info.owner,
-        token_program_id,
+    require_keys_eq!(
+        *info.owner,
+        *token_program_id,
         ErrorCode::AccountOwnedByWrongProgram,
     );
 
@@ -80,10 +80,10 @@ pub fn validate_associated_token_account<'info>(
     let info = account.as_ref();
 
     let mint = accessor::mint(info)?;
-    require_eq!(mint, *expected_mint, ErrorCode::ConstraintTokenMint);
+    require_keys_eq!(mint, *expected_mint, ErrorCode::ConstraintTokenMint);
 
     let owner = accessor::authority(info)?;
-    require_eq!(owner, *expected_owner, ErrorCode::ConstraintTokenOwner);
+    require_keys_eq!(owner, *expected_owner, ErrorCode::ConstraintTokenOwner);
 
     require!(
         is_associated_token_account_with_program_id(
@@ -248,8 +248,8 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
             // The escrow will be closed after unwrap.
             require!(!keep_escrow, CoreError::InvalidArgument);
 
-            require_eq!(ata.key, owner.key, CoreError::InvalidArgument);
-            require_eq!(
+            require_keys_eq!(*ata.key, *owner.key, CoreError::InvalidArgument);
+            require_keys_eq!(
                 anchor_spl::token::accessor::mint(escrow)?,
                 anchor_spl::token::spl_token::native_mint::ID
             );

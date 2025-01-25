@@ -116,7 +116,7 @@ impl PriceFeed {
         require_eq!(token_config.expected_provider()?, provider);
         let feed_id = token_config.get_feed(&provider)?;
 
-        require_eq!(self.feed_id, feed_id, CoreError::InvalidPriceFeedAccount);
+        require_keys_eq!(self.feed_id, feed_id, CoreError::InvalidPriceFeedAccount);
         require!(self.price.is_market_open(), CoreError::MarketNotOpen);
 
         let timestamp = self.price.ts;

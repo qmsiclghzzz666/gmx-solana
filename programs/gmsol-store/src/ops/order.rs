@@ -317,12 +317,12 @@ impl<'a, 'info> CreateIncreaseOrderOperation<'a, 'info> {
 
         {
             let market = self.common.market.load()?;
-            require_eq!(
+            require_keys_eq!(
                 market.meta().long_token_mint,
                 self.long_token.mint,
                 CoreError::TokenMintMismatched
             );
-            require_eq!(
+            require_keys_eq!(
                 market.meta().short_token_mint,
                 self.short_token.mint,
                 CoreError::TokenMintMismatched
@@ -396,12 +396,12 @@ impl<'a, 'info> CreateDecreaseOrderOperation<'a, 'info> {
 
         {
             let market = self.common.market.load()?;
-            require_eq!(
+            require_keys_eq!(
                 market.meta().long_token_mint,
                 self.long_token.mint,
                 CoreError::TokenMintMismatched
             );
-            require_eq!(
+            require_keys_eq!(
                 market.meta().short_token_mint,
                 self.short_token.mint,
                 CoreError::TokenMintMismatched

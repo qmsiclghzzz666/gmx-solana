@@ -252,7 +252,7 @@ impl SwapParams {
             return Ok(None);
         };
         let market = AccountLoader::<Market>::try_from(info)?;
-        require_eq!(market.load()?.store, *store, CoreError::StoreMismatched);
+        require_keys_eq!(market.load()?.store, *store, CoreError::StoreMismatched);
         Ok(Some(market))
     }
 
@@ -293,7 +293,7 @@ impl SwapParams {
             return Ok(None);
         };
         let market = AccountLoader::<Market>::try_from(info)?;
-        require_eq!(market.load()?.store, *store, CoreError::StoreMismatched);
+        require_keys_eq!(market.load()?.store, *store, CoreError::StoreMismatched);
         Ok(Some(market))
     }
 
@@ -355,7 +355,7 @@ fn validate_path<'info>(
         validated_market_tokens.push(meta.market_token_mint);
     }
 
-    require_eq!(current, *token_out, CoreError::InvalidSwapPath);
+    require_keys_eq!(current, *token_out, CoreError::InvalidSwapPath);
 
     Ok(validated_market_tokens)
 }

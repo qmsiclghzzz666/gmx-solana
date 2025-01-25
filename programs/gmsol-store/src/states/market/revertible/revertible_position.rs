@@ -29,7 +29,7 @@ impl<'a, 'info> RevertiblePosition<'a, 'info> {
         let storage = loader.load_mut()?;
         let meta = market.market_meta();
 
-        require_eq!(
+        require_keys_eq!(
             storage.market_token,
             meta.market_token_mint,
             CoreError::MarketTokenMintMismatched

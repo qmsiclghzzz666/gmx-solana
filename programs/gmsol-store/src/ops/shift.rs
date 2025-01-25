@@ -116,13 +116,13 @@ where
 
         from_market.validate_shiftable(&to_market)?;
 
-        require_eq!(
+        require_keys_eq!(
             from_market.meta().market_token_mint,
             self.from_market_token_account.mint,
             CoreError::MarketTokenMintMismatched,
         );
 
-        require_eq!(
+        require_keys_eq!(
             to_market.meta().market_token_mint,
             self.to_market_token_account.mint,
             CoreError::MarketTokenMintMismatched,

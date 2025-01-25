@@ -675,17 +675,17 @@ impl<'info> ConfirmGtBuyback<'info> {
         let treasury_vault_config_key = self.treasury_vault_config.key();
         for (idx, token) in self.treasury_vault_config.load()?.tokens().enumerate() {
             let mint = &mints[idx];
-            require_eq!(mint.key(), token, CoreError::TokenMintMismatched);
+            require_keys_eq!(mint.key(), token, CoreError::TokenMintMismatched);
             let vault = &vaults[idx];
-            require_eq!(mint.owner, vault.owner, CoreError::InvalidArgument);
+            require_keys_eq!(*mint.owner, *vault.owner, CoreError::InvalidArgument);
 
             let token_program_id = mint.owner;
 
             let mint = InterfaceAccount::<Mint>::try_from(mint)?;
             let vault = InterfaceAccount::<TokenAccount>::try_from(vault)?;
 
-            require_eq!(vault.mint, mint.key(), CoreError::TokenMintMismatched);
-            require_eq!(
+            require_keys_eq!(vault.mint, mint.key(), CoreError::TokenMintMismatched);
+            require_keys_eq!(
                 vault.owner,
                 treasury_vault_config_key,
                 CoreError::InvalidArgument

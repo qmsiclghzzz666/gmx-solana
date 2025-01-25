@@ -370,7 +370,7 @@ impl OraclePrice {
                 (oracle_slot, oracle_ts, price)
             }
             PriceProviderKind::Chainlink => {
-                require_eq!(feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
+                require_keys_eq!(feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
                 let program =
                     chainlink.ok_or_else(|| error!(CoreError::ChainlinkProgramIsRequired))?;
                 let (oracle_slot, oracle_ts, price) = Chainlink::check_and_get_chainlink_price(

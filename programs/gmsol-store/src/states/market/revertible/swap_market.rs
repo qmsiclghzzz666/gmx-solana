@@ -369,7 +369,7 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
                 }
             }
         }
-        require_eq!(token_in, expected_token_out, CoreError::InvalidSwapPath);
+        require_keys_eq!(token_in, expected_token_out, CoreError::InvalidSwapPath);
         Ok(token_in_amount)
     }
 }

@@ -412,7 +412,7 @@ impl TradeData {
         let clock = Clock::get()?;
         self.set_flags(position.try_is_long()?, is_collateral_long, is_increase);
         self.trade_id = 0;
-        require_eq!(self.store, position.store, CoreError::PermissionDenied);
+        require_keys_eq!(self.store, position.store, CoreError::PermissionDenied);
         self.market_token = position.market_token;
         self.user = position.owner;
         self.position = pubkey;

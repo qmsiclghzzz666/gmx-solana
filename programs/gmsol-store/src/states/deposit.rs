@@ -89,7 +89,7 @@ impl Deposit {
             return Ok(());
         }
 
-        require_eq!(
+        require_keys_eq!(
             *receiver,
             Self::first_deposit_receiver(),
             CoreError::InvalidReceiverForFirstDeposit

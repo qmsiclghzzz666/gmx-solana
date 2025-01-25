@@ -51,8 +51,8 @@ pub(crate) fn prepare_user(ctx: Context<PrepareUser>) -> Result<()> {
     {
         let user = ctx.accounts.user.load()?;
         require!(user.is_initialized(), CoreError::InvalidUserAccount);
-        require_eq!(user.store, store, CoreError::InvalidUserAccount);
-        require_eq!(user.owner, *owner, CoreError::InvalidUserAccount);
+        require_keys_eq!(user.store, store, CoreError::InvalidUserAccount);
+        require_keys_eq!(user.owner, *owner, CoreError::InvalidUserAccount);
         require_eq!(user.bump, ctx.bumps.user, CoreError::InvalidUserAccount);
     }
     Ok(())
