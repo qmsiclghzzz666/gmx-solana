@@ -20,6 +20,8 @@ use gmsol_utils::to_seed;
 
 use crate::utils::EVENT_AUTHORITY_SEED;
 
+pub use gmsol_timelock::states::find_executor_wallet_pda;
+
 /// Default store.
 pub fn find_default_store() -> (Pubkey, u8) {
     find_store_address("", &gmsol_store::ID)
@@ -348,12 +350,4 @@ pub fn find_executor_pda(
         ],
         timelock_program_id,
     ))
-}
-
-/// Find executor wallet PDA.
-pub fn find_executor_wallet_pda(executor: &Pubkey, timelock_program_id: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[Executor::WALLET_SEED, executor.as_ref()],
-        timelock_program_id,
-    )
 }

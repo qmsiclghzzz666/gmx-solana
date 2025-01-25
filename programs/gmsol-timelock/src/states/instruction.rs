@@ -10,6 +10,8 @@ use gmsol_store::{
 };
 use gmsol_utils::InitSpace;
 
+use super::find_executor_wallet_pda;
+
 const MAX_FLAGS: usize = 8;
 
 /// Instruction Header.
@@ -273,16 +275,23 @@ pub trait InstructionAccess {
     fn accounts(&self) -> impl Iterator<Item = &InstructionAccount>;
 
     /// Convert to instruction.
-    fn to_instruction(&self) -> Instruction {
+    fn to_instruction(&self, mark_executor_wallet_as_signer: bool) -> Instruction {
         let mut accounts = self
             .accounts()
             .map(From::from)
             .collect::<Vec<AccountMeta>>();
-        let executor = self.header().executor;
-        accounts
-            .iter_mut()
-            .filter(|a| a.pubkey == executor)
-            .for_each(|a| a.is_signer = true);
+
+        // When performing a CPI, the PDA doesn't need to be explicitly marked as a signer,
+        // so we've made it optional to reduce computational overhead.
+        if mark_executor_wallet_as_signer {
+            let executor = self.header().executor;
+            let executor_wallet = find_executor_wallet_pda(&executor, &crate::ID).0;
+            accounts
+                .iter_mut()
+                .filter(|a| a.pubkey == executor_wallet)
+                .for_each(|a| a.is_signer = true);
+        }
+
         Instruction {
             program_id: self.header().program_id,
             accounts,

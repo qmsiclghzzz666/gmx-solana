@@ -422,7 +422,7 @@ pub(crate) fn unchecked_execute_instruction(ctx: Context<ExecuteInstruction>) ->
     let signer = ExecutorWalletSigner::new(ctx.accounts.executor.key(), ctx.bumps.wallet);
 
     invoke_signed(
-        &instruction.to_instruction(),
+        &instruction.to_instruction(false),
         remaining_accounts,
         &[&signer.as_seeds()],
     )?;
