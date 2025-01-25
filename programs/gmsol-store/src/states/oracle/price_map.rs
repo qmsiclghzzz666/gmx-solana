@@ -48,7 +48,7 @@ impl SmallPrices {
             CoreError::InvalidArgument
         );
         require_neq!(price.min.value, 0, CoreError::InvalidArgument);
-        require_gt!(price.max.value, price.min.value, CoreError::InvalidArgument);
+        require_gte!(price.max.value, price.min.value, CoreError::InvalidArgument);
 
         let flags = if is_synthetic {
             Self::SYNTHETIC_FLAGS
