@@ -1536,12 +1536,7 @@ pub mod gmsol_store {
         instructions::unchecked_toggle_gt_minting(ctx, enable)
     }
 
-    /// Claim fees from the given market. The claimed amount remains in the market balance,
-    /// and requires a subsequent transfer.
-    ///
-    /// This instruction allows the fee receiver to claim accumulated fees from a market.
-    /// The claimed amount is not immediately transferred - it remains in the market's balance
-    /// and must be transferred in a separate instruction.
+    /// Claim fees from the given market.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](ClaimFeesFromMarket)
