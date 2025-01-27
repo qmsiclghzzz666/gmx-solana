@@ -60,17 +60,19 @@ pub(crate) fn initialize_config(ctx: Context<InitializeConfig>) -> Result<()> {
 
 impl<'info> InitializeConfig<'info> {
     fn accept_receiver(&self, receiver_bump: u8) -> Result<()> {
-        let signer = ReceiverSigner::new(self.config.key(), receiver_bump);
-        accept_receiver(
-            CpiContext::new(
-                self.store_program.to_account_info(),
-                AcceptReceiver {
-                    next_receiver: self.receiver.to_account_info(),
-                    store: self.store.to_account_info(),
-                },
-            )
-            .with_signer(&[&signer.as_seeds()]),
-        )?;
+        if self.store.load()?.receiver() != self.receiver.key() {
+            let signer = ReceiverSigner::new(self.config.key(), receiver_bump);
+            accept_receiver(
+                CpiContext::new(
+                    self.store_program.to_account_info(),
+                    AcceptReceiver {
+                        next_receiver: self.receiver.to_account_info(),
+                        store: self.store.to_account_info(),
+                    },
+                )
+                .with_signer(&[&signer.as_seeds()]),
+            )?;
+        }
         Ok(())
     }
 }
