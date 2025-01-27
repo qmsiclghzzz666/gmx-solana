@@ -77,11 +77,11 @@ export ADDRESS=$(solana address)
 
 export STORE=$(cargo gmsol -ul admin create-store)
 
-export CONFIG=$(cargo gmsol -ul treasury init-config)
-
 export RECEIVER=$(cargo gmsol -ul treasury receiver)
 
 cargo gmsol -ul admin transfer-receiver $RECEIVER --confirm
+
+export CONFIG=$(cargo gmsol -ul treasury init-config)
 
 cargo gmsol -ul timelock init-executor ADMIN
 export ADMIN_EXECUTOR_WALLET=$(cargo gmsol -ul timelock executor-wallet ADMIN)
@@ -94,6 +94,8 @@ cargo gmsol -ul admin init-roles \
     --treasury-keeper $KEEPER_ADDRESS \
     --timelock-admin $ADDRESS \
     --allow-multiple-transactions
+
+cargo gmsol -ul admin transfer-store-authority --new-authority $ADMIN_EXECUTOR_WALLET --confirm
 
 cargo gmsol -ul timelock init-config --initial-delay 300
 

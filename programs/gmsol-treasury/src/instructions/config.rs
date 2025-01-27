@@ -22,6 +22,7 @@ pub struct InitializeConfig<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     /// The store that controls this config.
+    #[account(mut)]
     pub store: AccountLoader<'info, Store>,
     /// The config account.
     #[account(

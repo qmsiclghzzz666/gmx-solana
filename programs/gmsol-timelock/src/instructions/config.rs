@@ -17,6 +17,7 @@ pub struct InitializeConfig<'info> {
     pub authority: Signer<'info>,
     /// Store.
     /// CHECK: check by CPI.
+    #[account(mut)]
     pub store: UncheckedAccount<'info>,
     /// Config.
     #[account(
