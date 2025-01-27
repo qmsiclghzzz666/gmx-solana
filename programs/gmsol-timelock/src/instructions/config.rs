@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use gmsol_store::{
     program::GmsolStore,
-    states::{Seed, MAX_ROLE_NAME_LEN},
+    states::{Seed, Store, MAX_ROLE_NAME_LEN},
     utils::{fixed_str::fixed_str_to_bytes, CpiAuthenticate, CpiAuthentication, WithStore},
     CoreError,
 };
@@ -21,13 +21,13 @@ pub struct InitializeConfig<'info> {
     /// Store.
     /// CHECK: check by CPI.
     #[account(mut)]
-    pub store: UncheckedAccount<'info>,
+    pub store: AccountLoader<'info, Store>,
     /// Config.
     #[account(
         init,
         payer = authority,
         space = 8 + TimelockConfig::INIT_SPACE,
-        seeds = [TimelockConfig::SEED, store.key.as_ref()],
+        seeds = [TimelockConfig::SEED, store.key().as_ref()],
         bump,
     )]
     pub timelock_config: AccountLoader<'info, TimelockConfig>,
@@ -37,7 +37,7 @@ pub struct InitializeConfig<'info> {
         constraint = executor.load()?.role_name()? == roles::ADMIN @ CoreError::InvalidArgument,
         seeds = [
             Executor::SEED,
-            store.key.as_ref(),
+            store.key().as_ref(),
             &fixed_str_to_bytes::<MAX_ROLE_NAME_LEN>(roles::ADMIN)?,
         ],
         bump = executor.load()?.bump,
@@ -109,18 +109,19 @@ impl<'info> InitializeConfig<'info> {
     fn accept_store_authority(&self, admin_executor_wallet_bump: u8) -> Result<()> {
         use gmsol_store::cpi::{accept_store_authority, accounts::AcceptStoreAuthority};
 
-        let signer = ExecutorWalletSigner::new(self.executor.key(), admin_executor_wallet_bump);
-
-        accept_store_authority(
-            CpiContext::new(
-                self.store_program.to_account_info(),
-                AcceptStoreAuthority {
-                    next_authority: self.wallet.to_account_info(),
-                    store: self.store.to_account_info(),
-                },
-            )
-            .with_signer(&[&signer.as_seeds()]),
-        )?;
+        if !self.store.load()?.is_authority(self.wallet.key) {
+            let signer = ExecutorWalletSigner::new(self.executor.key(), admin_executor_wallet_bump);
+            accept_store_authority(
+                CpiContext::new(
+                    self.store_program.to_account_info(),
+                    AcceptStoreAuthority {
+                        next_authority: self.wallet.to_account_info(),
+                        store: self.store.to_account_info(),
+                    },
+                )
+                .with_signer(&[&signer.as_seeds()]),
+            )?;
+        }
 
         Ok(())
     }
