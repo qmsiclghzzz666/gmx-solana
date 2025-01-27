@@ -2,12 +2,15 @@ use anchor_lang::prelude::*;
 use gmsol_store::{
     program::GmsolStore,
     states::{Seed, MAX_ROLE_NAME_LEN},
-    utils::{fixed_str::fixed_str_to_bytes, CpiAuthentication, WithStore},
+    utils::{fixed_str::fixed_str_to_bytes, CpiAuthenticate, CpiAuthentication, WithStore},
     CoreError,
 };
 use gmsol_utils::InitSpace;
 
-use crate::states::{config::TimelockConfig, Executor, ExecutorWalletSigner};
+use crate::{
+    roles,
+    states::{config::TimelockConfig, Executor, ExecutorWalletSigner},
+};
 
 /// The accounts definition for [`initialize_config`](crate::gmsol_timelock::initialize_config).
 #[derive(Accounts)]
@@ -31,11 +34,11 @@ pub struct InitializeConfig<'info> {
     /// Admin executor.
     #[account(
         has_one = store,
-        constraint = executor.load()?.role_name()? == crate::roles::ADMIN @ CoreError::InvalidArgument,
+        constraint = executor.load()?.role_name()? == roles::ADMIN @ CoreError::InvalidArgument,
         seeds = [
             Executor::SEED,
             store.key.as_ref(),
-            &fixed_str_to_bytes::<MAX_ROLE_NAME_LEN>(crate::roles::ADMIN)?,
+            &fixed_str_to_bytes::<MAX_ROLE_NAME_LEN>(roles::ADMIN)?,
         ],
         bump = executor.load()?.bump,
     )]
@@ -59,6 +62,12 @@ pub(crate) fn unchecked_initialize_config(
     ctx: Context<InitializeConfig>,
     delay: u32,
 ) -> Result<()> {
+    // Ensure at least one address can create and execute timelocked instructions.
+    CpiAuthenticate::only(&ctx, roles::TIMELOCK_KEEPER)?;
+    // Ensure at least one address can approve timelocked instructions requiring ADMIN permission,
+    // such as granting roles to other addresses.
+    CpiAuthenticate::only(&ctx, roles::TIMELOCKED_ADMIN)?;
+
     let admin_executor_wallet_bump = ctx.bumps.wallet;
 
     ctx.accounts

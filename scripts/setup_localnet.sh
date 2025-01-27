@@ -83,9 +83,6 @@ cargo gmsol -ul admin transfer-receiver $RECEIVER --confirm
 
 export CONFIG=$(cargo gmsol -ul treasury init-config)
 
-cargo gmsol -ul timelock init-executor ADMIN
-export ADMIN_EXECUTOR_WALLET=$(cargo gmsol -ul timelock executor-wallet ADMIN)
-
 cargo gmsol -ul admin init-roles \
     --market-keeper $KEEPER_ADDRESS \
     --order-keeper $KEEPER_ADDRESS \
@@ -94,10 +91,6 @@ cargo gmsol -ul admin init-roles \
     --treasury-keeper $KEEPER_ADDRESS \
     --timelock-admin $ADDRESS \
     --allow-multiple-transactions
-
-cargo gmsol -ul admin transfer-store-authority --new-authority $ADMIN_EXECUTOR_WALLET --confirm
-
-cargo gmsol -ul timelock init-config --initial-delay 300
 
 export TREASURY=$(cargo gmsol -ul -w $GMSOL_KEEPER treasury init-treasury 0)
 cargo gmsol -ul -w $GMSOL_KEEPER treasury set-treasury $TREASURY
@@ -122,6 +115,10 @@ cargo gmsol -ul -w $GMSOL_KEEPER market init-gt \
     6000000000000 \
     20000000000000 \
     60000000000000
+
+cargo gmsol -ul admin grant-role $KEEPER_ADDRESS GT_CONTROLLER
+cargo gmsol -ul -w $GMSOL_KEEPER gt set-exchange-time-window $GMSOL_TIME_WINDOW
+cargo gmsol -ul admin revoke-role $KEEPER_ADDRESS GT_CONTROLLER
 
 cargo gmsol -ul -w $GMSOL_KEEPER market set-order-fee-discount-factors \
     0 \
@@ -153,10 +150,6 @@ cargo gmsol -ul -w $GMSOL_KEEPER treasury set-gt-factor 51428600000000000000
 
 cargo gmsol -ul -w $GMSOL_KEEPER treasury set-buyback-factor 2000000000000000000
 
-cargo gmsol -ul admin grant-role $KEEPER_ADDRESS GT_CONTROLLER
-cargo gmsol -ul -w $GMSOL_KEEPER gt set-exchange-time-window $GMSOL_TIME_WINDOW
-cargo gmsol -ul admin revoke-role $KEEPER_ADDRESS GT_CONTROLLER
-
 export TOKEN_MAP=$(cargo gmsol -ul market create-token-map)
 export ORACLE=$(cargo gmsol -ul market init-oracle --seed $GMSOL_ORACLE_SEED --authority $CONFIG)
 cargo gmsol -ul -w $GMSOL_KEEPER market insert-token-configs $GMSOL_TOKENS --token-map $TOKEN_MAP --set-token-map
@@ -169,6 +162,11 @@ cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting DmZeSpGmGwNWSv66CrbXij
 
 export COMMON_ALT=$(cargo gmsol -ul alt extend --init common $ORACLE)
 export MARKET_ALT=$(cargo gmsol -ul alt extend --init market)
+
+cargo gmsol -ul timelock init-executor ADMIN
+export ADMIN_EXECUTOR_WALLET=$(cargo gmsol -ul timelock executor-wallet ADMIN)
+cargo gmsol -ul admin transfer-store-authority --new-authority $ADMIN_EXECUTOR_WALLET --confirm
+cargo gmsol -ul timelock init-config --initial-delay 300
 
 echo "STORE: $STORE"
 echo "ADMIN_EXECUTOR_WALLET: $ADMIN_EXECUTOR_WALLET"
