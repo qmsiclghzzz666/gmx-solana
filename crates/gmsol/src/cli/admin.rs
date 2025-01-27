@@ -7,6 +7,7 @@ use gmsol_store::states::RoleKey;
 use gmsol_timelock::roles as timelock_roles;
 use gmsol_treasury::roles as treasury_roles;
 use indexmap::IndexSet;
+use solana_sdk::signature::Keypair;
 
 use crate::{GMSOLClient, TimelockCtx};
 
@@ -19,10 +20,7 @@ pub(super) struct AdminArgs {
 #[derive(clap::Subcommand)]
 enum Command {
     /// Create a new data store.
-    CreateStore {
-        #[arg(long)]
-        admin: Option<Pubkey>,
-    },
+    CreateStore {},
     /// Transfer store authority.
     TransferStoreAuthority {
         #[arg(long)]
@@ -70,14 +68,14 @@ impl AdminArgs {
         let store = client.find_store_address(store_key);
         match &self.command {
             Command::InitRoles(args) => args.run(client, store_key, serialize_only).await?,
-            Command::CreateStore { admin } => {
+            Command::CreateStore {} => {
                 tracing::info!(
                     "Initialize store with key={store_key}, address={store}, admin={}",
-                    admin.unwrap_or(client.payer())
+                    client.payer()
                 );
                 crate::utils::send_or_serialize(
                     client
-                        .initialize_store(store_key, admin.as_ref())
+                        .initialize_store::<Keypair>(store_key, None, None, None)
                         .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
@@ -258,7 +256,7 @@ impl InitializeRoles {
 
         if self.init_store {
             // Insert initialize store instruction.
-            builder.try_push(client.initialize_store(store_key, None))?;
+            builder.try_push(client.initialize_store::<Keypair>(store_key, None, None, None))?;
         }
 
         let treasury_global_config = client.find_treasury_config_address(&store);

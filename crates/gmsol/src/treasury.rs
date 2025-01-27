@@ -194,6 +194,8 @@ where
                 payer: self.payer(),
                 store: *store,
                 config,
+                receiver: self.find_treasury_receiver_address(&config),
+                store_program: *self.store_program_id(),
                 system_program: system_program::ID,
             })
             .with_output(config)
@@ -461,7 +463,7 @@ where
                 store: *store,
                 config,
                 receiver,
-                new_receiver: *new_receiver,
+                next_receiver: *new_receiver,
                 store_program: *self.store_program_id(),
                 system_program: system_program::ID,
             })

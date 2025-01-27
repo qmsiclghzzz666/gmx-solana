@@ -107,6 +107,9 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
         initial_delay: u32,
     ) -> RpcBuilder<C, Pubkey> {
         let config = self.find_timelock_config_address(store);
+        let executor = self
+            .find_executor_address(store, roles::ADMIN)
+            .expect("must success");
         self.timelock_rpc()
             .args(instruction::InitializeConfig {
                 delay: initial_delay,
@@ -115,6 +118,8 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 authority: self.payer(),
                 store: *store,
                 timelock_config: config,
+                executor,
+                wallet: self.find_executor_wallet_address(&executor),
                 store_program: *self.store_program_id(),
                 system_program: system_program::ID,
             })

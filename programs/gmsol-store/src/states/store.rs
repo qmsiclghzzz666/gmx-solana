@@ -27,6 +27,8 @@ pub struct Store {
     role: RoleStore,
     /// Store authority.
     pub authority: Pubkey,
+    /// Next authority.
+    pub(crate) next_authority: Pubkey,
     /// The token map to used.
     pub token_map: Pubkey,
     /// Disabled features.
@@ -87,18 +89,24 @@ impl Store {
     /// Wallet Seed.
     pub const WALLET_SEED: &'static [u8] = b"store_wallet";
 
-    /// Init.
-    /// # Warning
-    /// The `roles` is assumed to be initialized with `is_admin == false`.
-    pub fn init(&mut self, authority: Pubkey, key: &str, bump: u8) -> Result<()> {
+    /// Initialize.
+    pub fn init(
+        &mut self,
+        authority: Pubkey,
+        key: &str,
+        bump: u8,
+        receiver: Pubkey,
+        holding: Pubkey,
+    ) -> Result<()> {
         self.key = crate::utils::fixed_str::fixed_str_to_bytes(key)?;
         self.key_seed = to_seed(key);
         self.bump = [bump];
         self.authority = authority;
-        self.treasury.init(authority);
+        self.next_authority = authority;
+        self.treasury.init(receiver);
         self.amount.init();
         self.factor.init();
-        self.address.init(authority);
+        self.address.init(holding);
         Ok(())
     }
 
@@ -145,6 +153,26 @@ impl Store {
     /// Check if the given pubkey is the authority of the store.
     pub fn is_authority(&self, authority: &Pubkey) -> bool {
         self.authority == *authority
+    }
+
+    pub(crate) fn set_next_authority(&mut self, next_authority: &Pubkey) -> Result<()> {
+        require_keys_neq!(
+            self.next_authority,
+            *next_authority,
+            CoreError::PreconditionsAreNotMet
+        );
+        self.next_authority = *next_authority;
+        Ok(())
+    }
+
+    pub(crate) fn update_authority(&mut self) -> Result<Pubkey> {
+        require_keys_neq!(
+            self.authority,
+            self.next_authority,
+            CoreError::PreconditionsAreNotMet
+        );
+        self.authority = self.next_authority;
+        Ok(self.authority)
     }
 
     /// Get token map address.
@@ -246,12 +274,15 @@ impl Store {
         &self.address.holding
     }
 
-    /// Set the receiver address of the treasury.
-    /// # CHECK
-    /// - Must be called by current receiver.
-    pub(crate) fn unchecked_set_receiver(&mut self, address: &Pubkey) -> Result<()> {
-        self.treasury.receiver = *address;
-        Ok(())
+    /// Set the next receiver address of the treasury.
+    pub(crate) fn set_next_receiver(&mut self, next_authority: &Pubkey) -> Result<()> {
+        self.treasury.set_next_receiver(next_authority)
+    }
+
+    /// Update receiver address to the next receiver address.
+    pub(crate) fn update_receiver(&mut self) -> Result<Pubkey> {
+        self.treasury.update_receiver()?;
+        Ok(self.receiver())
     }
 
     /// Validate whether fees can be claimed by this address.
@@ -266,6 +297,11 @@ impl Store {
     /// Get the receiver address.
     pub fn receiver(&self) -> Pubkey {
         self.treasury.receiver
+    }
+
+    /// Get the next receiver address.
+    pub fn next_receiver(&self) -> Pubkey {
+        self.treasury.next_receiver
     }
 
     /// Get GT State.
@@ -375,6 +411,8 @@ impl StoreWalletSigner {
 pub struct Treasury {
     /// Receiver.
     receiver: Pubkey,
+    /// Next receiver.
+    next_receiver: Pubkey,
     #[cfg_attr(feature = "debug", debug(skip))]
     reserved: [u8; 128],
 }
@@ -389,10 +427,31 @@ impl std::fmt::Display for Treasury {
 impl Treasury {
     fn init(&mut self, receiver: Pubkey) {
         self.receiver = receiver;
+        self.next_receiver = receiver;
     }
 
     fn is_receiver(&self, address: &Pubkey) -> bool {
         self.receiver == *address
+    }
+
+    fn set_next_receiver(&mut self, next_receiver: &Pubkey) -> Result<()> {
+        require_keys_neq!(
+            self.next_receiver,
+            *next_receiver,
+            CoreError::PreconditionsAreNotMet
+        );
+        self.next_receiver = *next_receiver;
+        Ok(())
+    }
+
+    fn update_receiver(&mut self) -> Result<()> {
+        require_keys_neq!(
+            self.receiver,
+            self.next_receiver,
+            CoreError::PreconditionsAreNotMet
+        );
+        self.receiver = self.next_receiver;
+        Ok(())
     }
 }
 
@@ -519,7 +578,7 @@ impl Factors {
 pub struct Addresses {
     pub(crate) holding: Pubkey,
     #[cfg_attr(feature = "debug", debug(skip))]
-    reserved: [Pubkey; 31],
+    reserved: [Pubkey; 30],
 }
 
 /// Address keys.

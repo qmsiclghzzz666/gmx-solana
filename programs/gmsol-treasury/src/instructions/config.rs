@@ -1,12 +1,19 @@
 use anchor_lang::prelude::*;
 use gmsol_store::{
+    cpi::{accept_receiver, accounts::AcceptReceiver},
     program::GmsolStore,
     states::{Seed, Store},
     utils::{CpiAuthentication, WithStore},
 };
 use gmsol_utils::InitSpace;
 
-use crate::states::{config::Config, treasury::TreasuryVaultConfig};
+use crate::{
+    constants,
+    states::{
+        config::{Config, ReceiverSigner},
+        treasury::TreasuryVaultConfig,
+    },
+};
 
 /// The accounts definition for [`initialize_config`](crate::gmsol_treasury::initialize_config).
 #[derive(Accounts)]
@@ -25,19 +32,46 @@ pub struct InitializeConfig<'info> {
         bump,
     )]
     pub config: AccountLoader<'info, Config>,
+    /// Receiver.
+    #[account(
+        seeds = [constants::RECEIVER_SEED, config.key().as_ref()],
+        bump,
+    )]
+    pub receiver: SystemAccount<'info>,
+    /// The store program.
+    pub store_program: Program<'info, GmsolStore>,
     /// The system program.
     pub system_program: Program<'info, System>,
 }
 
 pub(crate) fn initialize_config(ctx: Context<InitializeConfig>) -> Result<()> {
+    let receiver_bump = ctx.bumps.receiver;
+
+    ctx.accounts.accept_receiver(receiver_bump)?;
+
     let mut config = ctx.accounts.config.load_init()?;
     let store = ctx.accounts.store.key();
-    config.init(ctx.bumps.config, &store);
-    msg!(
-        "[Treasury] initialized the treasury vault config for {}",
-        store
-    );
+    config.init(ctx.bumps.config, receiver_bump, &store);
+
+    msg!("[Treasury] initialized the treasury config for {}", store);
     Ok(())
+}
+
+impl<'info> InitializeConfig<'info> {
+    fn accept_receiver(&self, receiver_bump: u8) -> Result<()> {
+        let signer = ReceiverSigner::new(self.config.key(), receiver_bump);
+        accept_receiver(
+            CpiContext::new(
+                self.store_program.to_account_info(),
+                AcceptReceiver {
+                    next_receiver: self.receiver.to_account_info(),
+                    store: self.store.to_account_info(),
+                },
+            )
+            .with_signer(&[&signer.as_seeds()]),
+        )?;
+        Ok(())
+    }
 }
 
 /// The accounts definition for [`set_treasury_vault_config`](crate::gmsol_treasury::set_treasury_vault_config).

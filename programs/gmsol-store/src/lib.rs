@@ -268,59 +268,85 @@ pub mod gmsol_store {
     /// # Arguments
     /// - `key`: The name of the store, used as a seed to derive the store account's address.
     ///   The length must not exceed [`MAX_LEN`](states::Store::MAX_LEN).
-    /// - `authority`: The authority (admin) address to set for the new Store. If not provided,
-    ///   the [`payer`](Initialize::payer) will be used as the authority.
     ///
     /// # Errors
     /// - The `key` must be empty unless the `multi-store` feature is enabled
     /// - The [`payer`](Initialize::payer) must be a signer
+    /// - The [`authority`](Initialize::authority) must be as signer if it is provided.
+    /// - The [`receiver`](Initialize::receiver) must be as signer if it is provided.
+    /// - The [`holding`](Initialize::holding) must be as signer if it is provided.
     /// - The [`store`](Initialize::store) must not be initialized
     /// - The [`store`](Initialize::store) address must match the PDA derived from
     ///   the seed of [`Store`](states::Store) and the SHA-256 hash of `key`
-    pub fn initialize(
-        ctx: Context<Initialize>,
-        key: String,
-        authority: Option<Pubkey>,
-    ) -> Result<()> {
-        instructions::initialize(ctx, key, authority)
+    pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
+        instructions::initialize(ctx, key)
     }
 
-    /// Transfer the authority (admin) of the given store to a new address.
+    /// Request to transfer the authority (admin) of the given store to a new address.
+    /// # Note
+    /// This instruction only sets `next_authority`. Use [`accept_store_authority`] to
+    /// complete the transfer.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](TransferStoreAuthority).*
-    ///
-    /// # Arguments
-    /// - `new_authority`: The new authority address that will become the admin of the store.
     ///
     /// # Errors
     /// - The [`authority`](TransferStoreAuthority::authority) must be a signer and the current
     ///   admin of the store.
     /// - The [`store`](TransferStoreAuthority::store) must be an initialized store account
     ///   owned by the store program.
-    /// - The `new_authority` cannot be the same as the current authority.
+    /// - The [`next_authority`](TransferStoreAuthority::next_authority) cannot be the same as
+    ///   current `next_authority`.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
-    pub fn transfer_store_authority(
-        ctx: Context<TransferStoreAuthority>,
-        new_authority: Pubkey,
-    ) -> Result<()> {
-        instructions::unchecked_transfer_store_authority(ctx, new_authority)
+    pub fn transfer_store_authority(ctx: Context<TransferStoreAuthority>) -> Result<()> {
+        instructions::unchecked_transfer_store_authority(ctx)
     }
 
-    /// Set the receiver address for claiming fees.
+    /// Accept the transfer of the authority (admin) of the given store.
     ///
     /// # Accounts
-    /// *[See the documentation for the accounts.](SetReceiver).*
+    /// *[See the documentation for the accounts.](AcceptStoreAuthority).*
     ///
     /// # Errors
-    /// - The [`authority`](SetReceiver::authority) must be a signer and the current receiver
+    /// - The [`next_authority`](AcceptStoreAuthority::next_authority) must be a signer and the current
+    ///   `next_authority` of the store.
+    /// - The [`store`](TransferStoreAuthority::store) must be an initialized store account
+    ///   owned by the store program.
+    pub fn accept_store_authority(ctx: Context<AcceptStoreAuthority>) -> Result<()> {
+        instructions::accept_store_authority(ctx)
+    }
+
+    /// Request to transfer the receiver address to a new one.
+    /// # Note
+    /// This instruction only sets `next_receiver`. Use [`accept_receiver`] to
+    /// complete the transfer.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](TransferReceiver).*
+    ///
+    /// # Errors
+    /// - The [`authority`](TransferReceiver::authority) must be a signer and the current receiver
     ///   of the given store.
-    /// - The [`store`](SetReceiver::store) must be an initialized store account owned by
+    /// - The [`store`](TransferReceiver::store) must be an initialized store account owned by
     ///   the store program.
-    /// - The new [`receiver`](SetReceiver::receiver) account provided cannot be the same as
-    ///   the current receiver.
-    pub fn set_receiver(ctx: Context<SetReceiver>) -> Result<()> {
-        instructions::set_receiver(ctx)
+    /// - The new [`next_receiver`](TransferReceiver::next_receiver) account provided cannot be the same as
+    ///   the current `next_receiver`.
+    pub fn transfer_receiver(ctx: Context<TransferReceiver>) -> Result<()> {
+        instructions::transfer_receiver(ctx)
+    }
+
+    /// Accept the transfer of the receiver address of the given store.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](AcceptReceiver).*
+    ///
+    /// # Errors
+    /// - The [`next_receiver`](AcceptReceiver::next_receiver) must be a signer and the current
+    ///   `next_receiver` of the store.
+    /// - The [`store`](AcceptReceiver::store) must be an initialized store account
+    ///   owned by the store program.
+    pub fn accept_receiver(ctx: Context<AcceptReceiver>) -> Result<()> {
+        instructions::accept_receiver(ctx)
     }
 
     /// Set the token map address for the store.

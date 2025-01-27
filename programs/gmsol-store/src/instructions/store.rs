@@ -12,9 +12,20 @@ use crate::{
 #[instruction(key: String)]
 pub struct Initialize<'info> {
     /// The payer for the rent-exempt fee of the [`Store`] Account.
-    /// If `authority` is not specified, it will be set as the authority of this Store Account.
     #[account(mut)]
     pub payer: Signer<'info>,
+    /// The authority of the the [`Store`] account.
+    ///
+    /// If it is not specified, the `payer` will be set as the authority of this [`Store`] Account.
+    pub authority: Option<Signer<'info>>,
+    /// The receiver address of the the [`Store`] account.
+    ///
+    /// Defaults to the authority address.
+    pub receiver: Option<Signer<'info>>,
+    /// The holding address.
+    ///
+    /// Defaults to the authority address.
+    pub holding: Option<Signer<'info>>,
     /// The account to be used for creating the [`Store`] Account.
     /// Its address is a PDA derived from a constant [`SEED`](Store::SEED)
     /// and a hashed key as the seeds.
@@ -30,19 +41,29 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub(crate) fn initialize(
-    ctx: Context<Initialize>,
-    key: String,
-    authority: Option<Pubkey>,
-) -> Result<()> {
+pub(crate) fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
     ctx.accounts.validate_key(&key)?;
 
     let mut store = ctx.accounts.store.load_init()?;
-    store.init(
-        authority.unwrap_or(ctx.accounts.payer.key()),
-        &key,
-        ctx.bumps.store,
-    )?;
+    let authority = ctx
+        .accounts
+        .authority
+        .as_ref()
+        .map(|a| a.key())
+        .unwrap_or(ctx.accounts.payer.key());
+    let receiver = ctx
+        .accounts
+        .receiver
+        .as_ref()
+        .map(|a| a.key())
+        .unwrap_or(authority);
+    let holding = ctx
+        .accounts
+        .holding
+        .as_ref()
+        .map(|a| a.key())
+        .unwrap_or(authority);
+    store.init(authority, &key, ctx.bumps.store, receiver, holding)?;
     Ok(())
 }
 
@@ -65,6 +86,9 @@ pub struct TransferStoreAuthority<'info> {
     /// The store account whose authority is to be transferred.
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
+    /// Next authority address.
+    /// CHECK: only the address is used.
+    pub next_authority: UncheckedAccount<'info>,
 }
 
 /// Transfer the authority of the store to a new one.
@@ -73,13 +97,15 @@ pub struct TransferStoreAuthority<'info> {
 /// - Only ADMIN can execute this instruction.
 pub(crate) fn unchecked_transfer_store_authority(
     ctx: Context<TransferStoreAuthority>,
-    new_authority: Pubkey,
 ) -> Result<()> {
-    require!(
-        ctx.accounts.authority.key() != new_authority,
-        CoreError::InvalidArgument
+    ctx.accounts
+        .store
+        .load_mut()?
+        .set_next_authority(ctx.accounts.next_authority.key)?;
+    msg!(
+        "[Store] the next_authority is now {}",
+        ctx.accounts.next_authority.key
     );
-    ctx.accounts.store.load_mut()?.authority = new_authority;
     Ok(())
 }
 
@@ -93,34 +119,67 @@ impl<'info> internal::Authentication<'info> for TransferStoreAuthority<'info> {
     }
 }
 
-/// The accounts definition for [`set_receiver`](crate::gmsol_store::set_receiver).
+/// The accounts definition for
+/// [`accept_store_authority`](crate::gmsol_store::accept_store_authority).
 #[derive(Accounts)]
-pub struct SetReceiver<'info> {
+pub struct AcceptStoreAuthority<'info> {
+    /// The next authority.
+    pub next_authority: Signer<'info>,
+    /// The store account whose authority is being transferred.
+    #[account(mut, has_one = next_authority)]
+    pub store: AccountLoader<'info, Store>,
+}
+
+pub(crate) fn accept_store_authority(ctx: Context<AcceptStoreAuthority>) -> Result<()> {
+    let authority = ctx.accounts.store.load_mut()?.update_authority()?;
+    msg!("[Store] the authority is now {}", authority);
+    Ok(())
+}
+
+/// The accounts definition for [`transfer_receiver`](crate::gmsol_store::transfer_receiver).
+#[derive(Accounts)]
+pub struct TransferReceiver<'info> {
     /// The caller of this instruction.
     #[account(
         constraint = authority.key() == store.load()?.receiver() @ CoreError::PermissionDenied,
     )]
     pub authority: Signer<'info>,
-    /// The store account whose authority is to be transferred.
+    /// The store account whose receiver is to be transferred.
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
-    /// New receiver.
+    /// The new receiver.
     /// CHECK: only the address is used.
-    #[account(
-        constraint = receiver.key() != authority.key() @ CoreError::PreconditionsAreNotMet,
-    )]
-    pub receiver: UncheckedAccount<'info>,
+    pub next_receiver: UncheckedAccount<'info>,
 }
 
-pub(crate) fn set_receiver(ctx: Context<SetReceiver>) -> Result<()> {
+pub(crate) fn transfer_receiver(ctx: Context<TransferReceiver>) -> Result<()> {
     ctx.accounts
         .store
         .load_mut()?
-        .unchecked_set_receiver(ctx.accounts.receiver.key)?;
+        .set_next_receiver(ctx.accounts.next_receiver.key)?;
     msg!(
-        "[Treasury] the receiver is now {}",
-        ctx.accounts.receiver.key
+        "[Treasury] the next_receiver is now {}",
+        ctx.accounts.next_receiver.key
     );
+    Ok(())
+}
+
+/// The accounts definition for [`accept_receiver`](crate::gmsol_store::accept_receiver).
+#[derive(Accounts)]
+pub struct AcceptReceiver<'info> {
+    /// The next receiver.
+    #[account(
+        constraint = next_receiver.key() == store.load()?.next_receiver() @ CoreError::PermissionDenied,
+    )]
+    pub next_receiver: Signer<'info>,
+    /// The store account whose receiver is being transferred.
+    #[account(mut)]
+    pub store: AccountLoader<'info, Store>,
+}
+
+pub(crate) fn accept_receiver(ctx: Context<AcceptReceiver>) -> Result<()> {
+    let receiver = ctx.accounts.store.load_mut()?.update_receiver()?;
+    msg!("[Treasury] the receiver is now {}", receiver);
     Ok(())
 }
 

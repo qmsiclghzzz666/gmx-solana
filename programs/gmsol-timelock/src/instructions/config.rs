@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 use gmsol_store::{
     program::GmsolStore,
-    states::Seed,
-    utils::{CpiAuthentication, WithStore},
+    states::{Seed, MAX_ROLE_NAME_LEN},
+    utils::{fixed_str::fixed_str_to_bytes, CpiAuthentication, WithStore},
     CoreError,
 };
 use gmsol_utils::InitSpace;
 
-use crate::states::config::TimelockConfig;
+use crate::states::{config::TimelockConfig, Executor, ExecutorWalletSigner};
 
 /// The accounts definition for [`initialize_config`](crate::gmsol_timelock::initialize_config).
 #[derive(Accounts)]
@@ -27,6 +27,24 @@ pub struct InitializeConfig<'info> {
         bump,
     )]
     pub timelock_config: AccountLoader<'info, TimelockConfig>,
+    /// Admin executor.
+    #[account(
+        has_one = store,
+        constraint = executor.load()?.role_name()? == crate::roles::ADMIN @ CoreError::InvalidArgument,
+        seeds = [
+            Executor::SEED,
+            store.key.as_ref(),
+            &fixed_str_to_bytes::<MAX_ROLE_NAME_LEN>(crate::roles::ADMIN)?,
+        ],
+        bump = executor.load()?.bump,
+    )]
+    pub executor: AccountLoader<'info, Executor>,
+    /// Admin executor wallet.
+    #[account(
+        seeds = [Executor::WALLET_SEED, executor.key().as_ref()],
+        bump,
+    )]
+    pub wallet: SystemAccount<'info>,
     /// Store program.
     pub store_program: Program<'info, GmsolStore>,
     /// System program.
@@ -40,6 +58,11 @@ pub(crate) fn unchecked_initialize_config(
     ctx: Context<InitializeConfig>,
     delay: u32,
 ) -> Result<()> {
+    let admin_executor_wallet_bump = ctx.bumps.wallet;
+
+    ctx.accounts
+        .accept_store_authority(admin_executor_wallet_bump)?;
+
     ctx.accounts.timelock_config.load_init()?.init(
         ctx.bumps.timelock_config,
         delay,
@@ -69,6 +92,27 @@ impl<'info> CpiAuthentication<'info> for InitializeConfig<'info> {
 
     fn on_error(&self) -> Result<()> {
         err!(CoreError::PermissionDenied)
+    }
+}
+
+impl<'info> InitializeConfig<'info> {
+    fn accept_store_authority(&self, admin_executor_wallet_bump: u8) -> Result<()> {
+        use gmsol_store::cpi::{accept_store_authority, accounts::AcceptStoreAuthority};
+
+        let signer = ExecutorWalletSigner::new(self.executor.key(), admin_executor_wallet_bump);
+
+        accept_store_authority(
+            CpiContext::new(
+                self.store_program.to_account_info(),
+                AcceptStoreAuthority {
+                    next_authority: self.wallet.to_account_info(),
+                    store: self.store.to_account_info(),
+                },
+            )
+            .with_signer(&[&signer.as_seeds()]),
+        )?;
+
+        Ok(())
     }
 }
 

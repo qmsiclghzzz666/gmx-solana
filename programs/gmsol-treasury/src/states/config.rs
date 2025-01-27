@@ -10,8 +10,9 @@ use crate::constants;
 pub struct Config {
     version: u8,
     pub(crate) bump: u8,
+    pub(crate) receiver_bump: u8,
     #[cfg_attr(feature = "debug", debug(skip))]
-    padding_0: [u8; 14],
+    padding_0: [u8; 13],
     pub(crate) store: Pubkey,
     treasury_vault_config: Pubkey,
     gt_factor: u128,
@@ -29,8 +30,9 @@ impl InitSpace for Config {
 }
 
 impl Config {
-    pub(crate) fn init(&mut self, bump: u8, store: &Pubkey) {
+    pub(crate) fn init(&mut self, bump: u8, receiver_bump: u8, store: &Pubkey) {
         self.bump = bump;
+        self.receiver_bump = receiver_bump;
         self.store = *store;
     }
 

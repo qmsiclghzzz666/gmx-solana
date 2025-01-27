@@ -569,7 +569,7 @@ impl Deployment {
         let mut builder = client.transaction();
 
         builder
-            .push(client.initialize_store(&self.store_key, None))?
+            .push(client.initialize_store::<Keypair>(&self.store_key, None, None, None))?
             .push_many(
                 [
                     RoleKey::GT_CONTROLLER,
