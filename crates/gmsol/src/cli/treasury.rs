@@ -35,6 +35,11 @@ enum Command {
     InitConfig,
     /// Initialize Treasury.
     InitTreasury { index: u8 },
+    /// Transfer Receiver.
+    TransferReceiver {
+        #[arg(long)]
+        new_receiver: Pubkey,
+    },
     /// Set treasury.
     SetTreasury { treasury_vault_config: Pubkey },
     /// Set GT factor.
@@ -152,6 +157,9 @@ impl Args {
                     .swap_output(());
                 println!("{address}");
                 rpc
+            }
+            Command::TransferReceiver { new_receiver } => {
+                client.transfer_receiver(store, new_receiver)
             }
             Command::SetTreasury {
                 treasury_vault_config,

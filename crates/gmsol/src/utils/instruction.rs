@@ -51,11 +51,28 @@ pub fn to_inspector_url(message: &VersionedMessage, cluster: Option<&Cluster>) -
 
     let message = BASE64_STANDARD.encode(message.serialize());
 
-    let cluster = cluster.cloned().unwrap_or(Cluster::Mainnet);
-    let encoded = form_urlencoded::Serializer::new(String::new())
-        .append_pair("message", &message)
-        .append_pair("cluster", &cluster.to_string())
-        .finish();
+    let mut serializer = form_urlencoded::Serializer::new(String::new());
+    serializer.append_pair("message", &message);
 
-    format!("https://explorer.solana.com/tx/inspector?{encoded}")
+    let cluster = cluster.cloned().unwrap_or(Cluster::Mainnet);
+    match cluster {
+        Cluster::Localnet => {
+            serializer
+                .append_pair("cluster", "custom")
+                .append_pair("custom_cluster", "http://localhost:8899");
+        }
+        Cluster::Custom(url, _) => {
+            serializer
+                .append_pair("cluster", "custom")
+                .append_pair("custom_cluster", &url);
+        }
+        _ => {
+            serializer.append_pair("cluster", &cluster.to_string());
+        }
+    }
+
+    format!(
+        "https://explorer.solana.com/tx/inspector?{}",
+        serializer.finish()
+    )
 }

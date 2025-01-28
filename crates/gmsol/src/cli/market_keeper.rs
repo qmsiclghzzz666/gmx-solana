@@ -684,11 +684,12 @@ impl Args {
                 market_token,
                 toggle,
             } => {
-                crate::utils::send_or_serialize(
-                    client
-                        .toggle_market(store, market_token, toggle.is_enable())
-                        .into_anchor_request_without_compute_budget(),
+                crate::utils::send_or_serialize_rpc(
+                    store,
+                    client.toggle_market(store, market_token, toggle.is_enable()),
+                    timelock,
                     serialize_only,
+                    true,
                     |signature| {
                         tracing::info!(
                             "market set to be {} at tx {signature}",
