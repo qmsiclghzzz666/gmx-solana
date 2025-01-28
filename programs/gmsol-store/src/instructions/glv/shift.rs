@@ -230,8 +230,9 @@ impl<'info> internal::Close<'info, GlvShift> for CloseGlvShift<'info> {
         self.funder.to_account_info()
     }
 
-    fn skip_completion_check_for_keeper(&self) -> bool {
-        true
+    fn skip_completion_check_for_keeper(&self) -> Result<bool> {
+        // Allow the funder to close the GLV shift even if it has not reached a final state.
+        Ok(*self.glv_shift.load()?.funder() == self.authority.key())
     }
 
     fn store_wallet_bump(&self, bumps: &Self::Bumps) -> u8 {

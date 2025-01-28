@@ -98,8 +98,8 @@ where
     fn store_wallet_bump(&self, bumps: &Self::Bumps) -> u8;
 
     /// Whether to skip the completion check when the authority is keeper.
-    fn skip_completion_check_for_keeper(&self) -> bool {
-        false
+    fn skip_completion_check_for_keeper(&self) -> Result<bool> {
+        Ok(false)
     }
 
     /// Validate.
@@ -158,7 +158,7 @@ where
             self.only_role(self.expected_keeper_role())?;
             {
                 let action = self.action().load()?;
-                if self.skip_completion_check_for_keeper()
+                if self.skip_completion_check_for_keeper()?
                     || action.header().action_state()?.is_completed_or_cancelled()
                 {
                     Ok(false)
