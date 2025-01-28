@@ -25,6 +25,14 @@ enum Command {
         #[arg(long)]
         spill: Option<Pubkey>,
     },
+    /// Close a program buffer account.
+    CloseBuffer {
+        address: Pubkey,
+        #[arg(long)]
+        authority: Option<Pubkey>,
+        #[arg(long)]
+        spill: Option<Pubkey>,
+    },
 }
 
 impl Args {
@@ -84,6 +92,33 @@ impl Args {
                         buffer,
                         &authority.unwrap_or(client.payer()),
                         &spill.unwrap_or(client.payer()),
+                    ));
+
+                crate::utils::send_or_serialize_rpc(
+                    store,
+                    rpc,
+                    None,
+                    serialize_only,
+                    true,
+                    |signature| {
+                        println!("{signature}");
+                        Ok(())
+                    },
+                )
+                .await
+            }
+            Command::CloseBuffer {
+                address,
+                authority,
+                spill,
+            } => {
+                let rpc = client
+                    .store_rpc()
+                    .program(system_program::ID)
+                    .pre_instruction(solana_sdk::bpf_loader_upgradeable::close(
+                        address,
+                        &spill.unwrap_or(client.payer()),
+                        &authority.unwrap_or(client.payer()),
                     ));
 
                 crate::utils::send_or_serialize_rpc(
