@@ -167,6 +167,9 @@ struct UpdateGlvArgs {
     /// Maximum price impact factor after shift.
     #[arg(long)]
     shift_max_price_impact_factor: Option<u128>,
+    /// Minimum shift value.
+    #[arg(long)]
+    shift_min_value: Option<u128>,
 }
 
 impl<'a> From<&'a UpdateGlvArgs> for UpdateGlvParams {
@@ -175,6 +178,7 @@ impl<'a> From<&'a UpdateGlvArgs> for UpdateGlvParams {
             min_tokens_for_first_deposit: args.min_tokens_for_first_deposit,
             shift_min_interval_secs: args.shift_min_interval_secs,
             shift_max_price_impact_factor: args.shift_max_price_impact_factor,
+            shift_min_value: args.shift_min_value,
         }
     }
 }

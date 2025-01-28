@@ -51,6 +51,7 @@ pub struct Glv {
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 4],
     shift_max_price_impact_factor: u128,
+    shift_min_value: u128,
     #[cfg_attr(feature = "debug", debug(skip))]
     reserved: [u8; 256],
     /// Market config map with market token addresses as keys.
@@ -143,6 +144,7 @@ impl Glv {
 
         self.shift_min_interval_secs = constants::DEFAULT_GLV_MIN_SHIFT_INTERVAL_SECS;
         self.shift_max_price_impact_factor = constants::DEFAULT_GLV_MAX_SHIFT_PRICE_IMPACT_FACTOR;
+        self.shift_min_value = constants::DEFAULT_GLV_MIN_SHIFT_VALUE;
 
         require_gte!(
             Self::MAX_ALLOWED_NUMBER_OF_MARKETS,
@@ -255,6 +257,15 @@ impl Glv {
                 CoreError::PreconditionsAreNotMet
             );
             self.shift_max_price_impact_factor = factor;
+        }
+
+        if let Some(value) = params.shift_min_value {
+            require_neq!(
+                self.shift_min_value,
+                value,
+                CoreError::PreconditionsAreNotMet
+            );
+            self.shift_min_value = value;
         }
 
         Ok(())
@@ -502,6 +513,15 @@ impl Glv {
         }
     }
 
+    pub(crate) fn validate_shift_value(&self, from_market_token_value: u128) -> Result<()> {
+        require_gte!(
+            from_market_token_value,
+            self.shift_min_value,
+            CoreError::GlvShiftValueNotLargeEnough
+        );
+        Ok(())
+    }
+
     pub(crate) fn update_shift_last_executed_ts(&mut self) -> Result<()> {
         let clock = Clock::get()?;
         self.shift_last_executed_at = clock.unix_timestamp;
@@ -525,6 +545,11 @@ impl Glv {
     pub fn shift_max_price_impact_factor(&self) -> u128 {
         self.shift_max_price_impact_factor
     }
+
+    /// Get min shift vaule.
+    pub fn shift_min_value(&self) -> u128 {
+        self.shift_min_value
+    }
 }
 
 /// GLV Update Params.
@@ -537,6 +562,8 @@ pub struct UpdateGlvParams {
     pub shift_min_interval_secs: Option<u32>,
     /// Maximum price impact factor after shift.
     pub shift_max_price_impact_factor: Option<u128>,
+    /// Minimum shift value.
+    pub shift_min_value: Option<u128>,
 }
 
 impl UpdateGlvParams {
@@ -544,7 +571,8 @@ impl UpdateGlvParams {
         require!(
             self.min_tokens_for_first_deposit.is_some()
                 || self.shift_min_interval_secs.is_some()
-                || self.shift_max_price_impact_factor.is_some(),
+                || self.shift_max_price_impact_factor.is_some()
+                || self.shift_min_value.is_some(),
             CoreError::InvalidArgument
         );
         Ok(())

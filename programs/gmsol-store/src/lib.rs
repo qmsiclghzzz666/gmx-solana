@@ -3785,6 +3785,9 @@ pub enum CoreError {
     /// Shift max price impact exceeded.
     #[msg("GLV: shift max price impact exceeded")]
     GlvShiftMaxPriceImpactExceeded,
+    /// Shift value too small.
+    #[msg("GLV: shift value is not large enough")]
+    GlvShiftValueNotLargeEnough,
     // ===========================================
     //                Other Errors
     // ===========================================

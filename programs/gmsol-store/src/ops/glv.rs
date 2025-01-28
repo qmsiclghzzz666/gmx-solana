@@ -1172,7 +1172,7 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
             )?;
         }
 
-        // Validate price impact.
+        // Validate max price impact and min shift value.
         {
             let mut prices = self.oracle.market_prices(from_market.market())?;
 
@@ -1183,6 +1183,10 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
                 shift.params.from_market_token_amount().into(),
                 true,
             )?;
+
+            self.glv
+                .load()?
+                .validate_shift_value(from_market_token_value)?;
 
             let (to_market_token_value, _, _) = get_glv_value_for_market(
                 self.oracle,
