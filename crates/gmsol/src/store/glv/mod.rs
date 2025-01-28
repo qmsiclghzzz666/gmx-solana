@@ -291,6 +291,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
             .accounts(accounts::RemoveGlvMarket {
                 authority: self.payer(),
                 store: *store,
+                store_wallet: self.find_store_wallet_address(store),
                 glv,
                 market_token: *market_token,
                 vault,

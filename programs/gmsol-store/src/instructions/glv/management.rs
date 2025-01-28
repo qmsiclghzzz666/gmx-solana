@@ -364,6 +364,9 @@ pub struct RemoveGlvMarket<'info> {
     pub authority: Signer<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
+    /// The store wallet.
+    #[account(mut, seeds = [Store::WALLET_SEED, store.key().as_ref()], bump)]
+    pub store_wallet: SystemAccount<'info>,
     /// GLV to modify.
     #[account(
         mut,
@@ -413,7 +416,7 @@ pub(crate) fn unchecked_remove_glv_market(ctx: Context<RemoveGlvMarket>) -> Resu
                 ctx.accounts.token_program.to_account_info(),
                 CloseAccount {
                     account: ctx.accounts.vault.to_account_info(),
-                    destination: ctx.accounts.authority.to_account_info(),
+                    destination: ctx.accounts.store_wallet.to_account_info(),
                     authority: ctx.accounts.glv.to_account_info(),
                 },
             )
