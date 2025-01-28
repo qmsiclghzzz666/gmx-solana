@@ -22,8 +22,11 @@ pub trait StoreOps<C> {
         holding: Option<S>,
     ) -> RpcBuilder<C>;
 
-    /// Transfer Store authority.
+    /// Transfer store authority.
     fn transfer_store_authority(&self, store: &Pubkey, new_authority: &Pubkey) -> RpcBuilder<C>;
+
+    /// Accept store authority.
+    fn accept_store_authority(&self, store: &Pubkey) -> RpcBuilder<C>;
 
     /// Transfer receiver.
     fn transfer_receiver(&self, store: &Pubkey, new_receiver: &Pubkey) -> RpcBuilder<C>;
@@ -79,6 +82,15 @@ where
                 authority: self.payer(),
                 store: *store,
                 next_authority: *next_authority,
+            })
+    }
+
+    fn accept_store_authority(&self, store: &Pubkey) -> RpcBuilder<C> {
+        self.store_rpc()
+            .args(instruction::AcceptStoreAuthority {})
+            .accounts(accounts::AcceptStoreAuthority {
+                next_authority: self.payer(),
+                store: *store,
             })
     }
 

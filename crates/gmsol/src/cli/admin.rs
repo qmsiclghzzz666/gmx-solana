@@ -28,6 +28,8 @@ enum Command {
         #[arg(long)]
         confirm: bool,
     },
+    /// Accept store authority.
+    AcceptStoreAuthority,
     /// Transfer receiver.
     TransferReceiver {
         new_receiver: Pubkey,
@@ -119,6 +121,20 @@ impl AdminArgs {
                         tracing::info!("The simulation was successful, but this operation is very dangerous. If you are sure you want to proceed, please reauthorize the command with `--confirm` flag");
                     }
                 }
+            }
+            Command::AcceptStoreAuthority => {
+                crate::utils::send_or_serialize_rpc(
+                    &store,
+                    client.accept_store_authority(&store),
+                    timelock,
+                    serialize_only,
+                    skip_preflight,
+                    |signature| {
+                        tracing::info!("accepted store authority at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
             }
             Command::TransferReceiver {
                 new_receiver,
