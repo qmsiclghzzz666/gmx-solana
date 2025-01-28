@@ -84,6 +84,8 @@ devnet = [
     "switchboard-on-demand-client?/devnet",
 ]
 
+squads = ["squads-multisig"]
+
 [dependencies]
 gmsol-utils = { workspace = true }
 gmsol-store = { workspace = true, features = [
@@ -190,6 +192,9 @@ pin-project-lite = { workspace = true, optional = true }
 
 # Dependencies for switchboard support
 switchboard-on-demand-client = { workspace = true, optional = true }
+
+# Dependencies for squads-multisig
+squads-multisig = { workspace = true, optional = true }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

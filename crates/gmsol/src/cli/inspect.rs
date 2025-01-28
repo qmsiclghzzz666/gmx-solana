@@ -228,7 +228,17 @@ enum Command {
         debug: bool,
     },
     /// Timelocked instruction.
-    Tld { addresses: Vec<Pubkey> },
+    Tld {
+        addresses: Vec<Pubkey>,
+        #[clap(long)]
+        raw: bool,
+    },
+    #[cfg(feature = "squads")]
+    Squads {
+        vault_transaction_address: Pubkey,
+        #[clap(long)]
+        raw: bool,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone, Default)]
@@ -1130,7 +1140,7 @@ impl InspectArgs {
                     }
                 }
             }
-            Command::Tld { addresses } => {
+            Command::Tld { addresses, raw } => {
                 use anchor_client::solana_sdk::message::{Message, VersionedMessage};
 
                 let config = client.find_timelock_config_address(store);
@@ -1174,9 +1184,33 @@ impl InspectArgs {
                 let message = Message::new(&instructions, Some(&client.payer()));
                 println!(
                     "{}",
-                    gmsol::utils::instruction::to_inspector_url(
+                    gmsol::utils::instruction::inspect_transaction(
                         &VersionedMessage::Legacy(message),
-                        Some(client.cluster())
+                        Some(client.cluster()),
+                        *raw,
+                    )
+                );
+            }
+            #[cfg(feature = "squads")]
+            Command::Squads {
+                vault_transaction_address,
+                raw,
+            } => {
+                use gmsol::squads::SquadsVaultTransaction;
+                use solana_sdk::message::VersionedMessage;
+
+                let vault_transaction = client
+                    .account::<SquadsVaultTransaction>(vault_transaction_address)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?;
+
+                let message = vault_transaction.to_message();
+                println!(
+                    "{}",
+                    gmsol::utils::instruction::inspect_transaction(
+                        &VersionedMessage::V0(message),
+                        Some(client.cluster()),
+                        *raw
                     )
                 );
             }

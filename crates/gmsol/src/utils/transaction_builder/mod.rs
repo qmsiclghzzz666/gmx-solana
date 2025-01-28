@@ -15,7 +15,7 @@ use anchor_client::{
 use futures_util::TryStreamExt;
 use tokio::time::sleep;
 
-use crate::utils::instruction::to_inspector_url;
+use crate::utils::instruction::inspect_transaction;
 
 use super::RpcBuilder;
 
@@ -336,7 +336,7 @@ async fn send_all_txs(
                 let cluster = client.url().parse().ok().and_then(|cluster| {
                     (!matches!(cluster, Cluster::Custom(_, _))).then_some(cluster)
                 });
-                let inspector_url = to_inspector_url(&tx.message, cluster.as_ref());
+                let inspector_url = inspect_transaction(&tx.message, cluster.as_ref(), false);
                 let hash = tx.message.recent_blockhash();
                 tracing::trace!(%err, %hash, ?config, "transaction failed: {inspector_url}");
                 error = Some(ClientError::from(err).into());

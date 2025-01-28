@@ -43,11 +43,15 @@ pub mod constants {
 /// Switchboard integration.
 pub mod switchboard;
 
-/// Chainlink intergartion.
+/// Chainlink integartion.
 pub mod chainlink;
 
-/// Pyth integration.
+/// Pyth intergration.
 pub mod pyth;
+
+#[cfg(feature = "squads")]
+/// Squads integation.
+pub mod squads;
 
 /// Test Utils.
 #[cfg(test)]

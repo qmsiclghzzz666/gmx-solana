@@ -44,35 +44,43 @@ pub fn serialize_instruction(
     Ok(message)
 }
 
-/// Generate inspector url for the given message.
-pub fn to_inspector_url(message: &VersionedMessage, cluster: Option<&Cluster>) -> String {
+/// Generate inspector url or encoded transaction message for the given message.
+pub fn inspect_transaction(
+    message: &VersionedMessage,
+    cluster: Option<&Cluster>,
+    raw: bool,
+) -> String {
     use base64::{prelude::BASE64_STANDARD, Engine};
     use url::form_urlencoded;
 
     let message = BASE64_STANDARD.encode(message.serialize());
 
-    let mut serializer = form_urlencoded::Serializer::new(String::new());
-    serializer.append_pair("message", &message);
+    if raw {
+        message
+    } else {
+        let mut serializer = form_urlencoded::Serializer::new(String::new());
+        serializer.append_pair("message", &message);
 
-    let cluster = cluster.cloned().unwrap_or(Cluster::Mainnet);
-    match cluster {
-        Cluster::Localnet => {
-            serializer
-                .append_pair("cluster", "custom")
-                .append_pair("custom_cluster", "http://localhost:8899");
+        let cluster = cluster.cloned().unwrap_or(Cluster::Mainnet);
+        match cluster {
+            Cluster::Localnet => {
+                serializer
+                    .append_pair("cluster", "custom")
+                    .append_pair("customUrl", "http://localhost:8899");
+            }
+            Cluster::Custom(url, _) => {
+                serializer
+                    .append_pair("cluster", "custom")
+                    .append_pair("customUrl", &url);
+            }
+            _ => {
+                serializer.append_pair("cluster", &cluster.to_string());
+            }
         }
-        Cluster::Custom(url, _) => {
-            serializer
-                .append_pair("cluster", "custom")
-                .append_pair("custom_cluster", &url);
-        }
-        _ => {
-            serializer.append_pair("cluster", &cluster.to_string());
-        }
+
+        format!(
+            "https://explorer.solana.com/tx/inspector?{}",
+            serializer.finish()
+        )
     }
-
-    format!(
-        "https://explorer.solana.com/tx/inspector?{}",
-        serializer.finish()
-    )
 }
