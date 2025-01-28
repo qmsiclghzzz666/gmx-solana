@@ -59,7 +59,7 @@ pub struct CreateGlvShift<'info> {
         init,
         payer = authority,
         space = 8 + GlvShift::INIT_SPACE,
-        seeds = [GlvShift::SEED, store.key().as_ref(), glv.key().as_ref(), &nonce],
+        seeds = [GlvShift::SEED, store.key().as_ref(), authority.key().as_ref(), &nonce],
         bump,
     )]
     pub glv_shift: AccountLoader<'info, GlvShift>,
