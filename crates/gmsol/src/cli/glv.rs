@@ -1,4 +1,4 @@
-use crate::{utils::ToggleValue, GMSOLClient, TimelockCtx};
+use crate::{utils::ToggleValue, GMSOLClient, InstructionBufferCtx};
 use gmsol::{
     store::glv::GlvOps,
     types::{
@@ -207,7 +207,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        timelock: Option<TimelockCtx<'_>>,
+        timelock: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {

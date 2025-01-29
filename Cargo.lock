@@ -1776,6 +1776,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dialoguer"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "658bce805d770f407bc62102fca7c2c64ceef2fbcb2b8bd19d2765ce093980de"
+dependencies = [
+ "console",
+ "shell-words",
+ "tempfile",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2266,6 +2279,7 @@ dependencies = [
  "byteorder",
  "chainlink-datastreams",
  "clap 4.5.20",
+ "dialoguer 0.11.0",
  "either",
  "event-listener 5.3.1",
  "eventsource-stream",
@@ -5676,7 +5690,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c191019f4d4f84281a6d0dd9a43181146b33019627fc394e42e08ade8976b431"
 dependencies = [
  "console",
- "dialoguer",
+ "dialoguer 0.10.4",
  "hidapi",
  "log",
  "num-derive 0.4.2",

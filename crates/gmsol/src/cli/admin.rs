@@ -9,7 +9,7 @@ use gmsol_treasury::roles as treasury_roles;
 use indexmap::IndexSet;
 use solana_sdk::signature::Keypair;
 
-use crate::{GMSOLClient, TimelockCtx};
+use crate::{GMSOLClient, InstructionBufferCtx};
 
 #[derive(clap::Args)]
 pub(super) struct AdminArgs {
@@ -63,7 +63,7 @@ impl AdminArgs {
         &self,
         client: &GMSOLClient,
         store_key: &str,
-        timelock: Option<TimelockCtx<'_>>,
+        timelock: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {

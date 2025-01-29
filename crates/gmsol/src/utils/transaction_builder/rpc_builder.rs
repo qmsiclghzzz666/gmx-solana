@@ -414,7 +414,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         Ok(message)
     }
 
-    fn message_with_blockhash_and_options(
+    /// Get compiled message with the given hash and options.
+    pub fn message_with_blockhash_and_options(
         &self,
         latest_hash: Hash,
         without_compute_budget: bool,

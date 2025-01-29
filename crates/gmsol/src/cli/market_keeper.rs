@@ -35,7 +35,7 @@ use indexmap::IndexMap;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::de::DeserializeOwned;
 
-use crate::{ser::MarketConfigMap, utils::ToggleValue, GMSOLClient, TimelockCtx};
+use crate::{ser::MarketConfigMap, utils::ToggleValue, GMSOLClient, InstructionBufferCtx};
 
 #[derive(clap::Args)]
 pub(super) struct Args {
@@ -345,7 +345,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        timelock: Option<TimelockCtx<'_>>,
+        timelock: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
     ) -> gmsol::Result<()> {
         match &self.command {

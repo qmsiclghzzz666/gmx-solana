@@ -43,6 +43,7 @@ cli = [
     "decode",
     "mock",
     "solana-remote-wallet",
+    "dialoguer",
 ]
 
 clap = ["dep:clap", "gmsol-store/clap"]
@@ -169,6 +170,7 @@ async-tungstenite = { workspace = true, optional = true, features = [
     "futures-03-sink",
 ] }
 solana-remote-wallet = { workspace = true, optional = true }
+dialoguer = { workspace = true, optional = true }
 
 # Chainlink.
 sha2 = { workspace = true, optional = true }

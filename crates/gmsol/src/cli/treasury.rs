@@ -20,7 +20,7 @@ use gmsol_treasury::states::treasury::TokenFlag;
 
 use crate::{
     utils::{SelectGtExchangeVault, Side},
-    GMSOLClient, TimelockCtx,
+    GMSOLClient, InstructionBufferCtx,
 };
 
 #[derive(clap::Args)]
@@ -141,7 +141,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        timelock: Option<TimelockCtx<'_>>,
+        timelock: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {

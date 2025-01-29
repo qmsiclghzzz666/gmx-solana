@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 
 use crate::{
     utils::{send_or_serialize_rpc, table_format},
-    GMSOLClient, TimelockCtx,
+    GMSOLClient, InstructionBufferCtx,
 };
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol::{
@@ -76,7 +76,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        timelock: Option<TimelockCtx<'_>>,
+        timelock: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {

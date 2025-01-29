@@ -13,6 +13,7 @@ use gmsol::utils::{instruction::InstructionSerialization, LocalSignerRef};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
+use utils::InstructionBuffer;
 
 mod admin;
 mod alt;
@@ -62,9 +63,15 @@ struct Cli {
     /// Timelock Program ID.
     #[arg(long, env)]
     timelock_program: Option<Pubkey>,
-    /// Whether to create a timelocked buffer for this instruction.
+    /// Whether to create a draft instruction buffer.
     #[arg(long)]
+    draft: bool,
+    /// Whether to create a timelocked buffer for this instruction.
+    #[arg(long, group = "ix-buffer")]
     timelock: Option<String>,
+    #[cfg(feature = "squads")]
+    #[cfg_attr(feature = "squads", arg(long, group = "ix-buffer"))]
+    squads: Option<String>,
     /// Print the serialized instructions,
     /// instead of sending the transaction.
     #[arg(long, group = "tx-opts")]
@@ -130,7 +137,7 @@ async fn main() -> eyre::Result<()> {
 }
 
 type GMSOLClient = gmsol::Client<LocalSignerRef>;
-type TimelockCtx<'a> = (&'a str, &'a GMSOLClient);
+type InstructionBufferCtx<'a> = (InstructionBuffer<'a>, &'a GMSOLClient, bool);
 
 impl Cli {
     fn wallet(
@@ -171,10 +178,20 @@ impl Cli {
 
                 let payer = NullSigner::new(&executor_wallet);
 
-                Ok((gmsol::utils::local_signer(payer), Some(wallet)))
-            } else {
-                Ok((wallet, None))
+                return Ok((gmsol::utils::local_signer(payer), Some(wallet)));
             }
+
+            #[cfg(feature = "squads")]
+            if let Some(squads) = self.squads.as_ref() {
+                let (multisig, vault_index) = parse_squads(squads)?;
+                let vault_pda = gmsol::squads::get_vault_pda(&multisig, vault_index, None).0;
+
+                let payer = NullSigner::new(&vault_pda);
+
+                return Ok((gmsol::utils::local_signer(payer), Some(wallet)));
+            }
+
+            Ok((wallet, None))
         }
     }
 
@@ -208,29 +225,45 @@ impl Cli {
     ) -> eyre::Result<(GMSOLClient, Option<GMSOLClient>)> {
         let cluster = self.cluster()?;
         tracing::debug!("using cluster: {cluster}");
-        let (wallet, timelock_wallet) = self.wallet(wallet_manager)?;
+        let (wallet, instruction_buffer_wallet) = self.wallet(wallet_manager)?;
         let payer = wallet.pubkey();
         tracing::debug!("using wallet: {}", payer);
         let commitment = self.commitment;
         tracing::debug!("using commitment config: {}", commitment.commitment);
         let client = gmsol::Client::new_with_options(cluster.clone(), wallet, self.options())?;
-        let timelock_client = timelock_wallet
+        let instruction_buffer_client = instruction_buffer_wallet
             .map(|wallet| gmsol::Client::new_with_options(cluster, wallet, self.options()))
             .transpose()?;
-        Ok((client, timelock_client))
+        Ok((client, instruction_buffer_client))
     }
 
-    fn timelock(&self) -> Option<&str> {
-        self.timelock.as_deref()
+    fn instruction_buffer(&self) -> eyre::Result<Option<InstructionBuffer<'_>>> {
+        if let Some(role) = self.timelock.as_ref() {
+            return Ok(Some(InstructionBuffer::Timelock { role }));
+        }
+
+        #[cfg(feature = "squads")]
+        if let Some(squads) = self.squads.as_ref() {
+            let (multisig, vault_index) = parse_squads(squads)?;
+            return Ok(Some(InstructionBuffer::Squads {
+                multisig,
+                vault_index,
+            }));
+        }
+
+        Ok(None)
     }
 
     async fn run(&self) -> eyre::Result<()> {
         let mut wallet_manager = None;
-        let (client, timelock_client) = self.gmsol_client(&mut wallet_manager)?;
-        let timelock = timelock_client.as_ref().and_then(|client| {
-            let role = self.timelock()?;
-            Some((role, client))
-        });
+        let (client, instruction_buffer_client) = self.gmsol_client(&mut wallet_manager)?;
+        let instruction_buffer_ctx = instruction_buffer_client
+            .as_ref()
+            .and_then(|client| {
+                let buffer = self.instruction_buffer().transpose()?;
+                Some(buffer.map(|buffer| (buffer, client, self.draft)))
+            })
+            .transpose()?;
         let (store, store_key) = self.store(&client).await?;
         match &self.command {
             Command::Whoami => {
@@ -240,7 +273,7 @@ impl Cli {
                 args.run(
                     &client,
                     &store_key,
-                    timelock,
+                    instruction_buffer_ctx,
                     self.serialize_only,
                     self.skip_preflight,
                 )
@@ -250,7 +283,7 @@ impl Cli {
                 args.run(
                     &client,
                     &store,
-                    timelock,
+                    instruction_buffer_ctx,
                     self.serialize_only,
                     self.skip_preflight,
                 )
@@ -274,14 +307,14 @@ impl Cli {
             }
             Command::Order(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Market(args) => {
-                args.run(&client, &store, timelock, self.serialize_only)
+                args.run(&client, &store, instruction_buffer_ctx, self.serialize_only)
                     .await?
             }
             Command::Glv(args) => {
                 args.run(
                     &client,
                     &store,
-                    timelock,
+                    instruction_buffer_ctx,
                     self.serialize_only,
                     self.skip_preflight,
                 )
@@ -291,7 +324,7 @@ impl Cli {
                 args.run(
                     &client,
                     &store,
-                    timelock,
+                    instruction_buffer_ctx,
                     self.serialize_only,
                     self.skip_preflight,
                 )
@@ -305,4 +338,14 @@ impl Cli {
         client.shutdown().await?;
         Ok(())
     }
+}
+
+#[cfg(feature = "squads")]
+fn parse_squads(data: &str) -> eyre::Result<(Pubkey, u8)> {
+    let (multisig, vault_index) = match data.split_once(':') {
+        Some((multisig, vault_index)) => (multisig, vault_index.parse()?),
+        None => (data, 0),
+    };
+
+    Ok((multisig.parse()?, vault_index))
 }

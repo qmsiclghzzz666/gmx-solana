@@ -12,7 +12,10 @@ use anchor_client::{
 use eyre::OptionExt;
 use gmsol::{
     timelock::TimelockOps,
-    utils::{instruction::InstructionSerialization, RpcBuilder, TransactionBuilder},
+    utils::{
+        instruction::{inspect_transaction, InstructionSerialization},
+        RpcBuilder, TransactionBuilder,
+    },
 };
 use prettytable::format::{FormatBuilder, TableFormat};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
@@ -91,10 +94,21 @@ where
     Ok(())
 }
 
+pub(crate) enum InstructionBuffer<'a> {
+    Timelock {
+        role: &'a str,
+    },
+    #[cfg(feature = "squads")]
+    Squads {
+        multisig: Pubkey,
+        vault_index: u8,
+    },
+}
+
 pub(crate) async fn send_or_serialize_rpc<C, S>(
     store: &Pubkey,
-    req: RpcBuilder<'_, C>,
-    timelock: Option<(&str, &GMSOLClient)>,
+    rpc: RpcBuilder<'_, C>,
+    instruction_buffer_ctx: Option<(InstructionBuffer<'_>, &GMSOLClient, bool)>,
     serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
     callback: impl FnOnce(Signature) -> gmsol::Result<()>,
@@ -104,29 +118,69 @@ where
     S: Signer,
 {
     if let Some(format) = serialize_only {
-        for (idx, ix) in req
+        for (idx, ix) in rpc
             .instructions_with_options(true, None)
             .into_iter()
             .enumerate()
         {
             println!(
                 "ix[{idx}]: {}",
-                gmsol::utils::serialize_instruction(&ix, format, Some(&req.payer_address()))?
+                gmsol::utils::serialize_instruction(&ix, format, Some(&rpc.payer_address()))?
             );
         }
-    } else if let Some((role, client)) = timelock {
+    } else if let Some((instruction_buffer, client, draft)) = instruction_buffer_ctx {
         let mut txn = client.transaction();
-        for (idx, ix) in req
-            .instructions_with_options(true, None)
-            .into_iter()
-            .enumerate()
-        {
-            let buffer = Keypair::new();
-            let (rpc, buffer) = client
-                .create_timelocked_instruction(store, role, buffer, ix)?
-                .swap_output(());
-            txn.push(rpc)?;
-            println!("ix[{idx}]: {buffer}");
+
+        match instruction_buffer {
+            InstructionBuffer::Timelock { role } => {
+                for (idx, ix) in rpc
+                    .instructions_with_options(true, None)
+                    .into_iter()
+                    .enumerate()
+                {
+                    let buffer = Keypair::new();
+                    let (rpc, buffer) = client
+                        .create_timelocked_instruction(store, role, buffer, ix)?
+                        .swap_output(());
+                    txn.push(rpc)?;
+                    println!("ix[{idx}]: {buffer}");
+                }
+            }
+            #[cfg(feature = "squads")]
+            InstructionBuffer::Squads {
+                multisig,
+                vault_index,
+            } => {
+                use gmsol::squads::SquadsOps;
+
+                let message =
+                    rpc.message_with_blockhash_and_options(Default::default(), true, None)?;
+
+                let (rpc, transaction) = client
+                    .squads_create_vault_transaction(&multisig, vault_index, &message, None, draft)
+                    .await?
+                    .swap_output(());
+
+                tracing::info!(
+                    %transaction,
+                    %draft,
+                    "Creating a vault transaction: {}",
+                    inspect_transaction(&message, Some(client.cluster()), false),
+                );
+
+                let confirmation = dialoguer::Confirm::new()
+                    .with_prompt("Continue?")
+                    .default(false)
+                    .interact()
+                    .map_err(gmsol::Error::unknown)?;
+
+                if !confirmation {
+                    tracing::info!("Cancelled");
+                    return Ok(());
+                }
+
+                txn.push(rpc)?;
+            }
         }
 
         match txn.send_all(skip_preflight).await {
@@ -138,7 +192,7 @@ where
             }
         }
     } else {
-        let signature = req
+        let signature = rpc
             .send_with_options(
                 false,
                 None,
