@@ -12,10 +12,7 @@ use anchor_client::{
 use eyre::OptionExt;
 use gmsol::{
     timelock::TimelockOps,
-    utils::{
-        instruction::{inspect_transaction, InstructionSerialization},
-        RpcBuilder, TransactionBuilder,
-    },
+    utils::{instruction::InstructionSerialization, RpcBuilder, TransactionBuilder},
 };
 use prettytable::format::{FormatBuilder, TableFormat};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
@@ -133,6 +130,12 @@ where
 
         match instruction_buffer {
             InstructionBuffer::Timelock { role } => {
+                if draft {
+                    tracing::warn!(
+                        "draft timelocked instruction buffer is not supported currently"
+                    );
+                }
+
                 for (idx, ix) in rpc
                     .instructions_with_options(true, None)
                     .into_iter()
@@ -151,7 +154,7 @@ where
                 multisig,
                 vault_index,
             } => {
-                use gmsol::squads::SquadsOps;
+                use gmsol::{squads::SquadsOps, utils::instruction::inspect_transaction};
 
                 let message =
                     rpc.message_with_blockhash_and_options(Default::default(), true, None)?;

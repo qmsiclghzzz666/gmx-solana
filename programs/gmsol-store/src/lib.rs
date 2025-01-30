@@ -35,7 +35,7 @@
 //! #### Instructions for Store Accounts
 //! - [`initialize`](gmsol_store::initialize): Create a new [`Store`](states::Store) account.
 //! - [`transfer_store_authority`]: Transfer the authority of the given store to a new authority.
-//! - [`set_receiver`](gmsol_store::set_receiver): Set the claimable fee receiver address.
+//! - [`transfer_receiver`](gmsol_store::transfer_receiver): Set the claimable fee receiver address.
 //! - [`set_token_map`]: Set the token map account to use.
 //!
 //! #### Instructions for Config Management
