@@ -170,9 +170,12 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
         use crate::{num::UnsignedAbs, utils};
         use num_traits::{CheckedAdd, CheckedMul, CheckedSub, FromPrimitive, Signed};
 
+        let params = self.market.funding_fee_params()?;
+        let funding_increase_factor_per_second = params.increase_factor_per_second();
+
         let diff_value = long_open_interest.clone().diff(short_open_interest.clone());
 
-        if diff_value.is_zero() {
+        if diff_value.is_zero() && funding_increase_factor_per_second.is_zero() {
             return Ok((Zero::zero(), true, Zero::zero()));
         }
 
@@ -184,8 +187,6 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
             return Err(crate::Error::UnableToGetFundingFactorEmptyOpenInterest);
         }
 
-        let params = self.market.funding_fee_params()?;
-
         let diff_value_after_exponent =
             utils::apply_exponent_factor(diff_value, params.exponent().clone()).ok_or(
                 crate::Error::Computation("applying exponent factor to diff value"),
@@ -195,7 +196,7 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
                 crate::Error::Computation("calculating diff value to open interest factor"),
             )?;
 
-        if params.increase_factor_per_second().is_zero() {
+        if funding_increase_factor_per_second.is_zero() {
             let mut funding_factor_per_second =
                 utils::apply_factor(&diff_value_to_open_interest_factor, params.factor()).ok_or(
                     crate::Error::Computation("calculating fallback funding factor per second"),
@@ -227,7 +228,7 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
             FundingRateChangeType::Increase => {
                 let increase_value = utils::apply_factor(
                     &diff_value_to_open_interest_factor,
-                    params.increase_factor_per_second(),
+                    funding_increase_factor_per_second,
                 )
                 .and_then(|v| v.checked_mul(&duration_value))
                 .ok_or(crate::Error::Computation(
