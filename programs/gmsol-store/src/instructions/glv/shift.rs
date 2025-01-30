@@ -195,8 +195,6 @@ pub struct CloseGlvShift<'info> {
         constraint = glv_shift.load()?.header().store == store.key() @ CoreError::StoreMismatched,
         // The rent receiver of a GLV shift must be the funder.
         constraint = glv_shift.load()?.header().rent_receiver() == funder.key @ CoreError::RentReceiverMismatched,
-        seeds = [GlvShift::SEED, store.key().as_ref(), glv.key().as_ref(), &glv_shift.load()?.header().nonce],
-        bump = glv_shift.load()?.header().bump,
     )]
     pub glv_shift: AccountLoader<'info, GlvShift>,
     /// From Market token.
@@ -316,8 +314,6 @@ pub struct ExecuteGlvShift<'info> {
         constraint = glv_shift.load()?.header().store == store.key() @ CoreError::StoreMismatched,
         constraint = glv_shift.load()?.tokens().from_market_token_account() == from_market_token_glv_vault.key() @ CoreError::MarketTokenAccountMismatched,
         constraint = glv_shift.load()?.tokens().to_market_token_account() == to_market_token_glv_vault.key() @ CoreError::MarketTokenAccountMismatched,
-        seeds = [GlvShift::SEED, store.key().as_ref(), glv.key().as_ref(), &glv_shift.load()?.header().nonce],
-        bump = glv_shift.load()?.header().bump,
     )]
     pub glv_shift: AccountLoader<'info, GlvShift>,
     /// From Market token.

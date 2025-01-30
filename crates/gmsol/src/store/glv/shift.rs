@@ -93,7 +93,9 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvShiftBuilder<'a, C> {
         let authority = self.client.payer();
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let glv = self.client.find_glv_address(&self.glv_token);
-        let glv_shift = self.client.find_shift_address(&self.store, &glv, &nonce);
+        let glv_shift = self
+            .client
+            .find_shift_address(&self.store, &authority, &nonce);
 
         let token_program_id = anchor_spl::token::ID;
 
