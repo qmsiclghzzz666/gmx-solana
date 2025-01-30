@@ -1,7 +1,7 @@
 use anchor_client::{anchor_lang::system_program, solana_sdk::pubkey::Pubkey};
 use gmsol::utils::instruction::InstructionSerialization;
 
-use crate::GMSOLClient;
+use crate::{GMSOLClient, InstructionBufferCtx};
 
 #[derive(clap::Args)]
 pub(super) struct Args {
@@ -40,6 +40,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
+        instruction_buffer: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
     ) -> gmsol::Result<()> {
         match &self.command {
@@ -65,11 +66,17 @@ impl Args {
                     })
                     .args(instruction::Initialize { user: *store });
 
-                let req = rpc.into_anchor_request_without_compute_budget();
-                crate::utils::send_or_serialize(req, serialize_only, |signature| {
-                    println!("{signature}");
-                    Ok(())
-                })
+                crate::utils::send_or_serialize_rpc(
+                    store,
+                    rpc,
+                    instruction_buffer,
+                    serialize_only,
+                    true,
+                    |signature| {
+                        println!("{signature}");
+                        Ok(())
+                    },
+                )
                 .await
             }
             Command::HexToBase58 { hex } => {
@@ -97,7 +104,7 @@ impl Args {
                 crate::utils::send_or_serialize_rpc(
                     store,
                     rpc,
-                    None,
+                    instruction_buffer,
                     serialize_only,
                     true,
                     |signature| {
@@ -124,7 +131,7 @@ impl Args {
                 crate::utils::send_or_serialize_rpc(
                     store,
                     rpc,
-                    None,
+                    instruction_buffer,
                     serialize_only,
                     true,
                     |signature| {

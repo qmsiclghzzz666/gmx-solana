@@ -333,7 +333,10 @@ impl Cli {
             Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Feature(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Alt(args) => args.run(&client, &store, self.serialize_only).await?,
-            Command::Other(args) => args.run(&client, &store, self.serialize_only).await?,
+            Command::Other(args) => {
+                args.run(&client, &store, instruction_buffer_ctx, self.serialize_only)
+                    .await?
+            }
         }
         client.shutdown().await?;
         Ok(())
