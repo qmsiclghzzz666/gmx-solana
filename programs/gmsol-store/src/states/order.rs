@@ -574,7 +574,7 @@ impl Order {
         let value_to_mint_for = next_paid_fee_value.saturating_sub(minted_fee_value);
 
         let (minted, delta_minted_value, minting_cost) =
-            store.gt_mut().get_mint_amount(value_to_mint_for, 0)?;
+            store.gt_mut().get_mint_amount(value_to_mint_for)?;
 
         let next_minted_value = minted_fee_value
             .checked_add(delta_minted_value)

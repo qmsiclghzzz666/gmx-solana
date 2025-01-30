@@ -330,30 +330,8 @@ impl GtState {
     }
 
     #[inline(never)]
-    pub(crate) fn get_mint_amount(
-        &self,
-        size_in_value: u128,
-        discount: u128,
-    ) -> Result<(u64, u128, u128)> {
-        use gmsol_model::utils::apply_factor;
-
-        // Calculate the minting cost to apply.
-        let minting_cost = if discount == 0 {
-            self.minting_cost
-        } else {
-            require_gt!(
-                constants::MARKET_USD_UNIT,
-                discount,
-                CoreError::InvalidGTDiscount
-            );
-            let discounted_factor = constants::MARKET_USD_UNIT - discount;
-
-            apply_factor::<_, { constants::MARKET_DECIMALS }>(
-                &self.minting_cost,
-                &discounted_factor,
-            )
-            .ok_or_else(|| error!(CoreError::InvalidGTDiscount))?
-        };
+    pub(crate) fn get_mint_amount(&self, size_in_value: u128) -> Result<(u64, u128, u128)> {
+        let minting_cost = self.minting_cost;
 
         require!(minting_cost != 0, CoreError::InvalidGTConfig);
 
