@@ -100,4 +100,7 @@ pub enum Error {
     /// Invalid token balance.
     #[error("invalid token balance: {0}, expected={1}, balance={2}")]
     InvalidTokenBalance(&'static str, String, String),
+    /// Unable to get funding factor when the open interest is empty.
+    #[error("unable to get funding factor when the open interest is empty")]
+    UnableToGetFundingFactorEmptyOpenInterest,
 }

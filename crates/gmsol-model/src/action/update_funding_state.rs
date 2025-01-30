@@ -180,11 +180,9 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
             .checked_add(short_open_interest)
             .ok_or(crate::Error::Computation("calculating total open interest"))?;
 
-        // `total_open_interest` must be non-zero here, since if `total_open_interest` were zero, the `diff_value` must be zero too.
-        debug_assert!(
-            !total_open_interest.is_zero(),
-            "this should not be possible"
-        );
+        if total_open_interest.is_zero() {
+            return Err(crate::Error::UnableToGetFundingFactorEmptyOpenInterest);
+        }
 
         let params = self.market.funding_fee_params()?;
 
