@@ -1,12 +1,9 @@
 use std::{collections::HashMap, fs, ops::Deref, path::PathBuf, rc::Rc};
 
-use anchor_client::{
-    solana_client::rpc_config::RpcSendTransactionConfig,
-    solana_sdk::{
-        pubkey::Pubkey,
-        signature::{Keypair, Signature},
-        signer::Signer,
-    },
+use anchor_client::solana_sdk::{
+    pubkey::Pubkey,
+    signature::{Keypair, Signature},
+    signer::Signer,
 };
 use eyre::OptionExt;
 use gmsol::{timelock::TimelockOps, utils::instruction::InstructionSerialization};
@@ -78,6 +75,18 @@ pub(crate) enum InstructionBuffer<'a> {
     },
 }
 
+pub(crate) fn instruction_buffer_not_supported(
+    ctx: Option<InstructionBufferCtx<'_>>,
+) -> gmsol::Result<()> {
+    if ctx.is_some() {
+        Err(gmsol::Error::invalid_argument(
+            "instruction buffer is not supported",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 pub(crate) async fn send_or_serialize_transaction<C, S>(
     store: &Pubkey,
     rpc: TransactionBuilder<'_, C>,
@@ -90,105 +99,29 @@ where
     C: Clone + Deref<Target = S>,
     S: Signer,
 {
-    if let Some(format) = serialize_only {
-        for (idx, ix) in rpc
-            .instructions_with_options(true, None)
-            .into_iter()
-            .enumerate()
-        {
-            println!(
-                "ix[{idx}]: {}",
-                gmsol::utils::serialize_instruction(&ix, format, Some(&rpc.get_payer()))?
-            );
-        }
-    } else if let Some((instruction_buffer, client, draft)) = instruction_buffer_ctx {
-        let mut bundle = client.bundle();
-
-        match instruction_buffer {
-            InstructionBuffer::Timelock { role } => {
-                if draft {
-                    tracing::warn!(
-                        "draft timelocked instruction buffer is not supported currently"
-                    );
-                }
-
-                for (idx, ix) in rpc
-                    .instructions_with_options(true, None)
-                    .into_iter()
-                    .enumerate()
-                {
-                    let buffer = Keypair::new();
-                    let (rpc, buffer) = client
-                        .create_timelocked_instruction(store, role, buffer, ix)?
-                        .swap_output(());
-                    bundle.push(rpc)?;
-                    println!("ix[{idx}]: {buffer}");
-                }
+    let bundle = rpc.into_bundle_with_options(true, None, None)?;
+    send_or_serialize_bundle(
+        store,
+        bundle,
+        instruction_buffer_ctx,
+        serialize_only,
+        skip_preflight,
+        |mut signatures, err| match err {
+            Some(err) => Err(err),
+            None => {
+                debug_assert_eq!(signatures.len(), 1, "force one transaction");
+                let signature = signatures.pop().expect("must exist");
+                (callback)(signature)
             }
-            #[cfg(feature = "squads")]
-            InstructionBuffer::Squads {
-                multisig,
-                vault_index,
-            } => {
-                use gmsol::squads::SquadsOps;
-                use gmsol_solana_utils::utils::inspect_transaction;
-
-                let message =
-                    rpc.message_with_blockhash_and_options(Default::default(), true, None)?;
-
-                let (rpc, transaction) = client
-                    .squads_create_vault_transaction(&multisig, vault_index, &message, None, draft)
-                    .await?
-                    .swap_output(());
-
-                tracing::info!(
-                    %transaction,
-                    %draft,
-                    "Creating a vault transaction: {}",
-                    inspect_transaction(&message, Some(client.cluster()), false),
-                );
-
-                let confirmation = dialoguer::Confirm::new()
-                    .with_prompt("Continue?")
-                    .default(false)
-                    .interact()
-                    .map_err(gmsol::Error::unknown)?;
-
-                if !confirmation {
-                    tracing::info!("Cancelled");
-                    return Ok(());
-                }
-
-                bundle.push(rpc)?;
-            }
-        }
-
-        match bundle.send_all(skip_preflight).await {
-            Ok(signatures) => {
-                tracing::info!("{signatures:#?}");
-            }
-            Err((signatures, error)) => {
-                tracing::error!(%error, "{signatures:#?}");
-            }
-        }
-    } else {
-        let signature = rpc
-            .send_with_options(
-                false,
-                None,
-                RpcSendTransactionConfig {
-                    skip_preflight,
-                    ..Default::default()
-                },
-            )
-            .await?;
-        (callback)(signature)?;
-    }
-    Ok(())
+        },
+    )
+    .await
 }
 
 pub(crate) async fn send_or_serialize_bundle<C, S>(
+    store: &Pubkey,
     builder: BundleBuilder<'_, C>,
+    instruction_buffer_ctx: Option<InstructionBufferCtx<'_>>,
     serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
     callback: impl FnOnce(Vec<Signature>, Option<gmsol::Error>) -> gmsol::Result<()>,
@@ -212,6 +145,90 @@ where
                 );
             }
             println!();
+        }
+    } else if let Some((instruction_buffer, client, draft)) = instruction_buffer_ctx {
+        let mut bundle = client.bundle();
+
+        let txns = builder.into_builders();
+        let len = txns.len();
+        for (txn_idx, txn) in txns.into_iter().enumerate() {
+            match instruction_buffer {
+                InstructionBuffer::Timelock { role } => {
+                    if draft {
+                        tracing::warn!(
+                            "draft timelocked instruction buffer is not supported currently"
+                        );
+                    }
+
+                    for (idx, ix) in txn
+                        .instructions_with_options(true, None)
+                        .into_iter()
+                        .enumerate()
+                    {
+                        let buffer = Keypair::new();
+                        let (rpc, buffer) = client
+                            .create_timelocked_instruction(store, role, buffer, ix)?
+                            .swap_output(());
+                        bundle.push(rpc)?;
+                        println!("ix[{idx}]: {buffer}");
+                    }
+                }
+                #[cfg(feature = "squads")]
+                InstructionBuffer::Squads {
+                    multisig,
+                    vault_index,
+                } => {
+                    use gmsol::squads::SquadsOps;
+                    use gmsol_solana_utils::utils::inspect_transaction;
+
+                    let message =
+                        txn.message_with_blockhash_and_options(Default::default(), true, None)?;
+
+                    let (rpc, transaction) = client
+                        .squads_create_vault_transaction(
+                            &multisig,
+                            vault_index,
+                            &message,
+                            None,
+                            draft,
+                        )
+                        .await?
+                        .swap_output(());
+
+                    let txn_count = txn_idx + 1;
+                    tracing::info!(
+                        %transaction,
+                        %draft,
+                        "Creating a vault transaction {txn_idx}: {}",
+
+                        inspect_transaction(&message, Some(client.cluster()), false),
+                    );
+
+                    let confirmation = dialoguer::Confirm::new()
+                        .with_prompt(format!(
+                            "[{txn_count}/{len}] Confirm to create vault transaction {txn_idx} ?"
+                        ))
+                        .default(false)
+                        .interact()
+                        .map_err(gmsol::Error::unknown)?;
+
+                    if !confirmation {
+                        tracing::info!("Cancelled");
+                        return Ok(());
+                    }
+
+                    bundle.push(rpc)?;
+                }
+            }
+        }
+
+        match bundle.send_all(skip_preflight).await {
+            Ok(signatures) => {
+                tracing::info!("successful transactions: {signatures:#?}");
+            }
+            Err((signatures, error)) => {
+                tracing::error!(%error, "successful transactions: {signatures:#?}");
+            }
         }
     } else {
         match builder.send_all(skip_preflight).await {

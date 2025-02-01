@@ -289,22 +289,22 @@ impl Cli {
                 .await?
             }
             Command::Timelock(args) => {
-                if self.timelock.is_some() {
-                    eyre::bail!(
-                        "`--timelock` option is not supported by the `timelock` subcommands"
-                    );
-                }
+                crate::utils::instruction_buffer_not_supported(instruction_buffer_ctx)?;
                 args.run(&client, &store, self.serialize_only, self.skip_preflight)
                     .await?
             }
             Command::Inspect(args) => args.run(&client, &store).await?,
             Command::Exchange(args) => {
+                crate::utils::instruction_buffer_not_supported(instruction_buffer_ctx)?;
                 if self.serialize_only.is_some() {
                     eyre::bail!("serialize-only mode not supported");
                 }
                 args.run(&client, &store).await?
             }
-            Command::Order(args) => args.run(&client, &store, self.serialize_only).await?,
+            Command::Order(args) => {
+                crate::utils::instruction_buffer_not_supported(instruction_buffer_ctx)?;
+                args.run(&client, &store, self.serialize_only).await?
+            }
             Command::Market(args) => {
                 args.run(&client, &store, instruction_buffer_ctx, self.serialize_only)
                     .await?
@@ -329,9 +329,18 @@ impl Cli {
                 )
                 .await?
             }
-            Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,
-            Command::Feature(args) => args.run(&client, &store, self.serialize_only).await?,
-            Command::Alt(args) => args.run(&client, &store, self.serialize_only).await?,
+            Command::Controller(args) => {
+                crate::utils::instruction_buffer_not_supported(instruction_buffer_ctx)?;
+                args.run(&client, &store, self.serialize_only).await?
+            }
+            Command::Feature(args) => {
+                crate::utils::instruction_buffer_not_supported(instruction_buffer_ctx)?;
+                args.run(&client, &store, self.serialize_only).await?
+            }
+            Command::Alt(args) => {
+                crate::utils::instruction_buffer_not_supported(instruction_buffer_ctx)?;
+                args.run(&client, &store, self.serialize_only).await?
+            }
             Command::Other(args) => {
                 args.run(&client, &store, instruction_buffer_ctx, self.serialize_only)
                     .await?

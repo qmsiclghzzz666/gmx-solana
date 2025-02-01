@@ -346,7 +346,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        timelock: Option<InstructionBufferCtx<'_>>,
+        ctx: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
     ) -> gmsol::Result<()> {
         match &self.command {
@@ -374,7 +374,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -396,7 +396,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -411,7 +411,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     client.set_token_map(store, token_map),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -450,6 +450,7 @@ impl Args {
                     client,
                     store,
                     &token_map,
+                    ctx,
                     serialize_only,
                     *skip_preflight,
                     *set_token_map,
@@ -521,7 +522,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     req,
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -536,7 +537,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     client.toggle_token_config(store, &token_map, token, toggle.is_enable()),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -551,7 +552,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     client.set_expected_provider(store, &token_map, token, *provider),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -566,7 +567,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -595,7 +596,7 @@ impl Args {
                         None,
                     )
                     .await?;
-                crate::utils::send_or_serialize_transaction(store, request, timelock, serialize_only, false,|signature| {
+                crate::utils::send_or_serialize_transaction(store, request, ctx, serialize_only, false,|signature| {
                     tracing::info!(
                         "created a new market with {market_token} as its token address at tx {signature}"
                     );
@@ -613,6 +614,7 @@ impl Args {
                 create_markets(
                     client,
                     store,
+                    ctx,
                     serialize_only,
                     *skip_preflight,
                     *enable,
@@ -645,6 +647,7 @@ impl Args {
                     .update(
                         client,
                         store,
+                        ctx,
                         serialize_only,
                         false,
                         None,
@@ -661,7 +664,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     client.update_market_config_flag_by_key(store, market_token, *key, *value)?,
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -685,6 +688,7 @@ impl Args {
                     .update(
                         client,
                         store,
+                        ctx,
                         serialize_only,
                         *skip_preflight,
                         *max_transaction_size,
@@ -700,7 +704,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     client.toggle_market(store, market_token, toggle.is_enable()),
-                    timelock,
+                    ctx,
                     serialize_only,
                     true,
                     |signature| {
@@ -732,7 +736,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -748,7 +752,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     client.close_marekt_config_buffer(buffer, receiver.as_ref()),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -787,6 +791,7 @@ impl Args {
                         store,
                         buffer.as_ref(),
                         expire_after,
+                        ctx,
                         serialize_only,
                         *skip_preflight,
                         *max_transaction_size,
@@ -802,7 +807,7 @@ impl Args {
                     store,
                     client
                         .set_market_config_buffer_authority(buffer, new_authority),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -830,7 +835,7 @@ impl Args {
                     client
                         .fund_market(store, market_token, &source_account, *amount, Some(&token))
                         .await?,
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -847,7 +852,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     client.toggle_gt_minting(store, market_token, toggle.is_enable()),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -887,7 +892,7 @@ impl Args {
                         *grow_step,
                         ranks.clone(),
                     ),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -904,7 +909,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     client.gt_set_order_fee_discount_factors(store, factors.clone()),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -921,7 +926,7 @@ impl Args {
                 crate::utils::send_or_serialize_transaction(
                     store,
                     client.gt_set_referral_reward_factors(store, factors.clone()),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -939,7 +944,7 @@ impl Args {
                         FactorKey::OrderFeeDiscountForReferredUser,
                         *factor,
                     ),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -1041,6 +1046,7 @@ async fn insert_token_configs(
     client: &GMSOLClient,
     store: &Pubkey,
     token_map: &Pubkey,
+    ctx: Option<InstructionBufferCtx<'_>>,
     serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
     set_token_map: bool,
@@ -1085,7 +1091,9 @@ async fn insert_token_configs(
     }
 
     crate::utils::send_or_serialize_bundle(
+        store,
         builder,
+        ctx,
         serialize_only,
         skip_preflight,
         |signatures, error| {
@@ -1113,9 +1121,11 @@ pub struct Market {
     short_token: Pubkey,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn create_markets(
     client: &GMSOLClient,
     store: &Pubkey,
+    ctx: Option<InstructionBufferCtx<'_>>,
     serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
     enable: bool,
@@ -1149,7 +1159,9 @@ async fn create_markets(
     }
 
     crate::utils::send_or_serialize_bundle(
+        store,
         builder,
+        ctx,
         serialize_only,
         skip_preflight,
         |signatures, error| {
@@ -1181,6 +1193,7 @@ impl MarketConfigMap {
         store: &Pubkey,
         buffer: Option<&Pubkey>,
         expire_after: &humantime::Duration,
+        ctx: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
         max_transaction_size: Option<usize>,
@@ -1216,7 +1229,9 @@ impl MarketConfigMap {
         }
 
         crate::utils::send_or_serialize_bundle(
+            store,
             builder,
+            ctx,
             serialize_only,
             skip_preflight,
             |signatures, error| {
@@ -1251,6 +1266,7 @@ impl MarketConfigs {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
+        ctx: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
         max_transaction_size: Option<usize>,
@@ -1315,7 +1331,9 @@ impl MarketConfigs {
         }
 
         crate::utils::send_or_serialize_bundle(
+            store,
             builder,
+            ctx,
             serialize_only,
             skip_preflight,
             |signatures, error| {

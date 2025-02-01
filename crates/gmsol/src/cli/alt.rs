@@ -81,7 +81,9 @@ impl Args {
 
                 if !txns.is_empty() {
                     crate::utils::send_or_serialize_bundle(
+                        store,
                         txns,
+                        None,
                         serialize_only,
                         true,
                         |signatures, err| {

@@ -149,7 +149,9 @@ impl Args {
                     txns.push(rpc)?;
                 }
                 return crate::utils::send_or_serialize_bundle(
+                    store,
                     txns,
+                    None,
                     serialize_only,
                     skip_preflight,
                     |signatures, error| {

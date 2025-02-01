@@ -141,7 +141,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        timelock: Option<InstructionBufferCtx<'_>>,
+        ctx: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {
@@ -292,7 +292,9 @@ impl Args {
                 };
 
                 return crate::utils::send_or_serialize_bundle(
+                    store,
                     txns,
+                    ctx,
                     serialize_only,
                     skip_preflight,
                     |signatures, error| {
@@ -415,7 +417,7 @@ impl Args {
         crate::utils::send_or_serialize_transaction(
             store,
             req,
-            timelock,
+            ctx,
             serialize_only,
             skip_preflight,
             |signature| {

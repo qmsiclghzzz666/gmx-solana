@@ -64,13 +64,16 @@ impl AdminArgs {
         &self,
         client: &GMSOLClient,
         store_key: &str,
-        timelock: Option<InstructionBufferCtx<'_>>,
+        ctx: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
         match &self.command {
-            Command::InitRoles(args) => args.run(client, store_key, serialize_only).await?,
+            Command::InitRoles(args) => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
+                args.run(client, store_key, serialize_only).await?
+            }
             Command::CreateStore {} => {
                 tracing::info!(
                     "Initialize store with key={store_key}, address={store}, admin={}",
@@ -79,7 +82,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize_transaction(
                     &store,
                     client.initialize_store::<Keypair>(store_key, None, None, None),
-                    timelock,
+                    ctx,
                     serialize_only,
                     false,
                     |signature| {
@@ -99,7 +102,7 @@ impl AdminArgs {
                     crate::utils::send_or_serialize_transaction(
                         &store,
                         rpc,
-                        timelock,
+                        ctx,
                         serialize_only,
                         skip_preflight,
                         |signature| {
@@ -128,7 +131,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize_transaction(
                     &store,
                     client.accept_store_authority(&store),
-                    timelock,
+                    ctx,
                     serialize_only,
                     skip_preflight,
                     |signature| {
@@ -147,7 +150,7 @@ impl AdminArgs {
                     crate::utils::send_or_serialize_transaction(
                         &store,
                         rpc,
-                        timelock,
+                        ctx,
                         serialize_only,
                         skip_preflight,
                         |signature| {
@@ -176,7 +179,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize_transaction(
                     &store,
                     client.enable_role(&store, role),
-                    timelock,
+                    ctx,
                     serialize_only,
                     skip_preflight,
                     |signature| {
@@ -190,7 +193,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize_transaction(
                     &store,
                     client.disable_role(&store, role),
-                    timelock,
+                    ctx,
                     serialize_only,
                     skip_preflight,
                     |signature| {
@@ -204,7 +207,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize_transaction(
                     &store,
                     client.grant_role(&store, authority, role),
-                    timelock,
+                    ctx,
                     serialize_only,
                     skip_preflight,
                     |signature| {
@@ -218,7 +221,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize_transaction(
                     &store,
                     client.revoke_role(&store, authority, role),
-                    timelock,
+                    ctx,
                     serialize_only,
                     skip_preflight,
                     |signature| {
@@ -344,7 +347,9 @@ impl InitializeRoles {
         }
 
         crate::utils::send_or_serialize_bundle(
+            &store,
             builder,
+            None,
             serialize_only,
             self.skip_preflight,
             |signatures, error| {

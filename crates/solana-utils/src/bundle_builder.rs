@@ -45,6 +45,8 @@ pub struct SendBundleOptions {
     pub continue_on_error: bool,
     /// RPC config.
     pub config: RpcSendTransactionConfig,
+    /// Whether to trace transaction error.
+    pub disable_error_tracing: bool,
 }
 
 /// Buidler for transaction bundle.
@@ -242,6 +244,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
             update_recent_block_hash_before_send,
             continue_on_error,
             mut config,
+            disable_error_tracing,
         } = opts;
         config.preflight_commitment = config
             .preflight_commitment
@@ -274,6 +277,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
             config,
             update_recent_block_hash_before_send,
             continue_on_error,
+            !disable_error_tracing,
         )
         .await
     }
@@ -312,6 +316,7 @@ async fn send_all_txs(
     config: RpcSendTransactionConfig,
     update_recent_block_hash_before_send: bool,
     continue_on_error: bool,
+    enable_tracing: bool,
 ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
     let txs = txs.into_iter();
     let (min, max) = txs.size_hint();
@@ -342,12 +347,15 @@ async fn send_all_txs(
                 signatures.push(signature);
             }
             Err(err) => {
-                let cluster = client.url().parse().ok().and_then(|cluster| {
-                    (!matches!(cluster, Cluster::Custom(_, _))).then_some(cluster)
-                });
-                let inspector_url = inspect_transaction(&tx.message, cluster.as_ref(), false);
-                let hash = tx.message.recent_blockhash();
-                tracing::trace!(%err, %hash, ?config, "transaction failed: {inspector_url}");
+                if enable_tracing {
+                    let cluster = client.url().parse().ok().and_then(|cluster| {
+                        (!matches!(cluster, Cluster::Custom(_, _))).then_some(cluster)
+                    });
+                    let inspector_url = inspect_transaction(&tx.message, cluster.as_ref(), false);
+                    let hash = tx.message.recent_blockhash();
+                    tracing::error!(%err, %hash, ?config, "transaction {idx} failed: {inspector_url}");
+                }
+
                 error = Some(Box::new(err).into());
                 if !continue_on_error {
                     break;
