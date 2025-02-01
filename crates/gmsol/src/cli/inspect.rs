@@ -1197,7 +1197,9 @@ impl InspectArgs {
                 vault_transaction_address,
                 raw,
             } => {
-                use gmsol::squads::SquadsVaultTransaction;
+                use gmsol::squads::{
+                    get_proposal_pda, get_vault_pda, SquadsProposal, SquadsVaultTransaction,
+                };
                 use solana_sdk::message::VersionedMessage;
 
                 let vault_transaction = client
@@ -1205,9 +1207,31 @@ impl InspectArgs {
                     .await?
                     .ok_or(gmsol::Error::NotFound)?;
 
+                let multisig = &vault_transaction.multisig;
+                let proposal_pubkey = get_proposal_pda(multisig, vault_transaction.index, None).0;
+
+                let proposal = client
+                    .account::<SquadsProposal>(&proposal_pubkey)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?;
+
                 let message = vault_transaction.to_message();
+
+                println!("Transaction Index: {}", vault_transaction.index);
+                println!("Status: {:?}", proposal.status);
                 println!(
-                    "{}",
+                    "Results: approved {} - rejected {}",
+                    proposal.approved.len(),
+                    proposal.rejected.len()
+                );
+                println!("Multisig: {multisig}");
+                println!(
+                    "Vault: {}",
+                    get_vault_pda(multisig, vault_transaction.vault_index, None).0
+                );
+                println!("Proposal: {proposal_pubkey}");
+                println!(
+                    "Inspector: {}",
                     inspect_transaction(
                         &VersionedMessage::V0(message),
                         Some(client.cluster()),

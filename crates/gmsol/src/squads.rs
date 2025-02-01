@@ -17,15 +17,22 @@ use squads_multisig::{
         get_multisig, ProposalCreateAccounts, ProposalCreateArgs, ProposalCreateData,
         VaultTransactionCreateAccounts, VaultTransactionCreateArgs, VaultTransactionCreateData,
     },
-    pda::{get_proposal_pda, get_transaction_pda},
     squads_multisig_program::{self, VaultTransaction},
-    state::TransactionMessage,
+    state::{Proposal, TransactionMessage},
 };
 
-pub use squads_multisig::pda::get_vault_pda;
+pub use squads_multisig::pda::{get_proposal_pda, get_transaction_pda, get_vault_pda};
 
 /// Squads Vault Transaction.
 pub struct SquadsVaultTransaction(VaultTransaction);
+
+impl Deref for SquadsVaultTransaction {
+    type Target = VaultTransaction;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl anchor_lang::Discriminator for SquadsVaultTransaction {
     const DISCRIMINATOR: [u8; 8] =
@@ -76,6 +83,32 @@ impl SquadsVaultTransaction {
             instructions,
             address_table_lookups,
         }
+    }
+}
+
+/// Squads Proposal.
+pub struct SquadsProposal(Proposal);
+
+impl Deref for SquadsProposal {
+    type Target = Proposal;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl anchor_lang::Discriminator for SquadsProposal {
+    const DISCRIMINATOR: [u8; 8] =
+        <Proposal as squads_multisig::anchor_lang::Discriminator>::DISCRIMINATOR;
+}
+
+impl anchor_lang::AccountDeserialize for SquadsProposal {
+    fn try_deserialize_unchecked(buf: &mut &[u8]) -> anchor_lang::Result<Self> {
+        let inner = <Proposal as squads_multisig::anchor_lang::AccountDeserialize>::try_deserialize_unchecked(buf).map_err(|_err| {
+            anchor_lang::error::ErrorCode::AccountDidNotDeserialize
+        })?;
+
+        Ok(Self(inner))
     }
 }
 
