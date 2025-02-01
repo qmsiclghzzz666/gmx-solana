@@ -151,6 +151,7 @@ where
 
         let txns = builder.into_builders();
         let len = txns.len();
+        let steps = len + 1;
         for (txn_idx, txn) in txns.into_iter().enumerate() {
             match instruction_buffer {
                 InstructionBuffer::Timelock { role } => {
@@ -199,14 +200,14 @@ where
                     tracing::info!(
                         %transaction,
                         %draft,
-                        "Creating a vault transaction {txn_idx}: {}",
+                        "Adding a vault transaction {txn_idx}: {}",
 
                         inspect_transaction(&message, Some(client.cluster()), false),
                     );
 
                     let confirmation = dialoguer::Confirm::new()
                         .with_prompt(format!(
-                            "[{txn_count}/{len}] Confirm to create vault transaction {txn_idx} ?"
+                            "[{txn_count}/{steps}] Confirm to add vault transaction {txn_idx} ?"
                         ))
                         .default(false)
                         .interact()
@@ -220,6 +221,19 @@ where
                     bundle.push(rpc)?;
                 }
             }
+        }
+
+        let confirmation = dialoguer::Confirm::new()
+            .with_prompt(format!(
+                "[{steps}/{steps}] Confirm creation of {len} vault transactions?"
+            ))
+            .default(false)
+            .interact()
+            .map_err(gmsol::Error::unknown)?;
+
+        if !confirmation {
+            tracing::info!("Cancelled");
+            return Ok(());
         }
 
         match bundle.send_all(skip_preflight).await {
