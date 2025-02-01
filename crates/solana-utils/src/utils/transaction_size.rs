@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anchor_client::solana_sdk::{instruction::Instruction, pubkey::Pubkey};
+use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 
 /// Estimated the size of the result transaction.
 ///

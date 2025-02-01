@@ -84,6 +84,9 @@ pub enum Error {
     /// Switchboard Error.
     #[error("switchboard: {0}")]
     Switchboard(String),
+    /// Solana utils error.
+    #[error(transparent)]
+    SolanaUtils(gmsol_solana_utils::Error),
 }
 
 impl Error {
@@ -128,6 +131,18 @@ impl From<anchor_client::ClientError> for Error {
             },
             ClientError::SolanaClientPubsubError(err) => Self::from(err),
             err => Self::Client(err),
+        }
+    }
+}
+
+impl From<gmsol_solana_utils::Error> for Error {
+    fn from(value: gmsol_solana_utils::Error) -> Self {
+        match value {
+            gmsol_solana_utils::Error::Client(err) => match handle_solana_client_error(&err) {
+                Some(err) => err,
+                None => Self::SolanaUtils(err.into()),
+            },
+            err => Self::SolanaUtils(err),
         }
     }
 }
@@ -244,4 +259,10 @@ fn handle_solana_client_error(
     }
 
     None
+}
+
+impl<T> From<(T, gmsol_solana_utils::Error)> for Error {
+    fn from((_, err): (T, gmsol_solana_utils::Error)) -> Self {
+        Self::SolanaUtils(err)
+    }
 }

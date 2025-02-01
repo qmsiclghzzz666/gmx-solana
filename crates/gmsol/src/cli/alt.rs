@@ -53,7 +53,7 @@ impl Args {
                 address,
                 custom_addresses,
             } => {
-                let mut txns = client.transaction();
+                let mut txns = client.bundle();
 
                 let mut new_addresses = match kind {
                     AltKind::Custom => {
@@ -79,7 +79,7 @@ impl Args {
                     txns.append(extend_txns, false)?;
                 }
 
-                if !txns.is_emtpy() {
+                if !txns.is_empty() {
                     crate::utils::send_or_serialize_transactions(
                         txns,
                         serialize_only,

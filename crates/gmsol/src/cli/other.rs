@@ -56,15 +56,15 @@ impl Args {
                     Pubkey::find_program_address(&[DEFAULT_ACCESS_CONTROLLER_ACCOUNT_SEEDS], &ID).0;
 
                 let rpc = client
-                    .store_rpc()
+                    .store_transaction()
                     .program(ID)
-                    .accounts(accounts::Initialize {
+                    .anchor_accounts(accounts::Initialize {
                         payer: client.payer(),
                         verifier_account: chainlink_verifier,
                         access_controller,
                         system_program: system_program::ID,
                     })
-                    .args(instruction::Initialize { user: *store });
+                    .anchor_args(instruction::Initialize { user: *store });
 
                 crate::utils::send_or_serialize_rpc(
                     store,
@@ -92,7 +92,7 @@ impl Args {
                 spill,
             } => {
                 let rpc = client
-                    .store_rpc()
+                    .store_transaction()
                     .program(system_program::ID)
                     .pre_instruction(solana_sdk::bpf_loader_upgradeable::upgrade(
                         program_id,
@@ -120,7 +120,7 @@ impl Args {
                 spill,
             } => {
                 let rpc = client
-                    .store_rpc()
+                    .store_transaction()
                     .program(system_program::ID)
                     .pre_instruction(solana_sdk::bpf_loader_upgradeable::close(
                         address,

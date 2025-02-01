@@ -9,11 +9,10 @@ use anchor_client::{
         signer::Signer,
     },
 };
+use gmsol_solana_utils::{bundle_builder::BundleBuilder, transaction_builder::TransactionBuilder};
 use solana_account_decoder::UiAccountEncoding;
 
-use crate::utils::{
-    rpc::accounts::get_account_with_context, RpcBuilder, TransactionBuilder, WithSlot,
-};
+use crate::utils::{rpc::accounts::get_account_with_context, WithSlot};
 
 /// Address Lookup Table operations.
 pub trait AddressLookupTableOps<C> {
@@ -43,21 +42,21 @@ pub trait AddressLookupTableOps<C> {
         }
     }
 
-    /// Create a [`RpcBuilder`] to create address lookup table.
-    fn create_alt(&self) -> impl Future<Output = crate::Result<(RpcBuilder<C>, Pubkey)>>;
+    /// Create a [`TransactionBuilder`] to create address lookup table.
+    fn create_alt(&self) -> impl Future<Output = crate::Result<(TransactionBuilder<C>, Pubkey)>>;
 
-    /// Create a [`TransactionBuilder`] to extend the given address lookup table with new addresses.
+    /// Create a [`BundleBuilder`] to extend the given address lookup table with new addresses.
     fn extend_alt(
         &self,
         alt: &Pubkey,
         new_addresses: Vec<Pubkey>,
         chunk_size: Option<usize>,
-    ) -> crate::Result<TransactionBuilder<C>>;
-    /// Create a [`RpcBuilder`] to deactivate the given address lookup table
-    fn deactivate_alt(&self, alt: &Pubkey) -> RpcBuilder<C>;
+    ) -> crate::Result<BundleBuilder<C>>;
+    /// Create a [`TransactionBuilder`] to deactivate the given address lookup table
+    fn deactivate_alt(&self, alt: &Pubkey) -> TransactionBuilder<C>;
 
-    /// Create a [`RpcBuilder`] to close the given address lookup table
-    fn close_alt(&self, alt: &Pubkey) -> RpcBuilder<C>;
+    /// Create a [`TransactionBuilder`] to close the given address lookup table
+    fn close_alt(&self, alt: &Pubkey) -> TransactionBuilder<C>;
 }
 
 impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate::Client<C> {
@@ -66,7 +65,7 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
         address: &Pubkey,
         config: RpcAccountInfoConfig,
     ) -> crate::Result<WithSlot<Option<AddressLookupTableAccount>>> {
-        let client = self.store_program().solana_rpc();
+        let client = self.store_program().rpc();
         let account: WithSlot<_> = get_account_with_context(&client, address, config)
             .await?
             .into();
@@ -85,13 +84,13 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
             .transpose()
     }
 
-    async fn create_alt(&self) -> crate::Result<(RpcBuilder<C>, Pubkey)> {
+    async fn create_alt(&self) -> crate::Result<(TransactionBuilder<C>, Pubkey)> {
         let slot = self.get_slot(None).await?;
         let payer = self.payer();
         let (ix, address) =
             address_lookup_table::instruction::create_lookup_table(payer, payer, slot);
         let rpc = self
-            .store_rpc()
+            .store_transaction()
             .program(address_lookup_table::program::ID)
             .pre_instruction(ix);
 
@@ -103,8 +102,8 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
         alt: &Pubkey,
         new_addresses: Vec<Pubkey>,
         chunk_size: Option<usize>,
-    ) -> crate::Result<TransactionBuilder<C>> {
-        let mut tx = self.transaction();
+    ) -> crate::Result<BundleBuilder<C>> {
+        let mut tx = self.bundle();
         let payer = self.payer();
 
         let chunk_size = chunk_size.unwrap_or(10);
@@ -116,7 +115,7 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
                 new_addresses.to_owned(),
             );
             let rpc = self
-                .store_rpc()
+                .store_transaction()
                 .program(address_lookup_table::program::ID)
                 .pre_instruction(ix);
             tx.try_push(rpc)?;
@@ -124,18 +123,18 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
         Ok(tx)
     }
 
-    fn deactivate_alt(&self, alt: &Pubkey) -> RpcBuilder<C> {
+    fn deactivate_alt(&self, alt: &Pubkey) -> TransactionBuilder<C> {
         let payer = self.payer();
         let ix = address_lookup_table::instruction::deactivate_lookup_table(*alt, payer);
-        self.store_rpc()
+        self.store_transaction()
             .program(address_lookup_table::program::ID)
             .pre_instruction(ix)
     }
 
-    fn close_alt(&self, alt: &Pubkey) -> RpcBuilder<C> {
+    fn close_alt(&self, alt: &Pubkey) -> TransactionBuilder<C> {
         let payer = self.payer();
         let ix = address_lookup_table::instruction::close_lookup_table(*alt, payer, payer);
-        self.store_rpc()
+        self.store_transaction()
             .program(address_lookup_table::program::ID)
             .pre_instruction(ix)
     }

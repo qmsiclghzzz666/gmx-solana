@@ -5,6 +5,10 @@ use anchor_client::{
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
+use gmsol_solana_utils::{
+    bundle_builder::BundleBuilder, compute_budget::ComputeBudget,
+    transaction_builder::TransactionBuilder,
+};
 use gmsol_store::{
     accounts, instruction,
     ops::deposit::CreateDepositParams,
@@ -17,12 +21,8 @@ use gmsol_store::{
 use crate::{
     exchange::ExchangeOps,
     store::{token::TokenAccountOps, utils::FeedsParser},
-    utils::{
-        builder::{
-            FeedAddressMap, FeedIds, MakeTransactionBuilder, PullOraclePriceConsumer,
-            SetExecutionFee,
-        },
-        ComputeBudget, RpcBuilder, TransactionBuilder,
+    utils::builder::{
+        FeedAddressMap, FeedIds, MakeBundleBuilder, PullOraclePriceConsumer, SetExecutionFee,
     },
 };
 
@@ -54,7 +54,7 @@ pub struct CreateDepositBuilder<'a, C> {
     should_unwrap_native_token: bool,
 }
 
-impl<'a, C> CreateDepositBuilder<'a, C> {
+impl<C> CreateDepositBuilder<'_, C> {
     /// Set execution fee. Defaults to min execution fee.
     pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
         self.execution_fee = fee;
@@ -206,8 +206,8 @@ where
         self
     }
 
-    /// Build a [`RpcBuilder`] and return deposit address.
-    pub async fn build_with_address(&self) -> crate::Result<(RpcBuilder<'a, C>, Pubkey)> {
+    /// Build a [`TransactionBuilder`] and return deposit address.
+    pub async fn build_with_address(&self) -> crate::Result<(TransactionBuilder<'a, C>, Pubkey)> {
         let token_program_id = anchor_spl::token::ID;
         let Self {
             client,
@@ -260,7 +260,7 @@ where
         }
 
         let create = client
-            .store_rpc()
+            .store_transaction()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CreateDeposit {
                     owner,
@@ -284,7 +284,7 @@ where
                 &gmsol_store::id(),
                 client.store_program_id(),
             ))
-            .args(instruction::CreateDeposit {
+            .anchor_args(instruction::CreateDeposit {
                 nonce,
                 params: CreateDepositParams {
                     execution_lamports: *execution_fee,
@@ -348,9 +348,9 @@ pub struct CloseDepositHint {
     should_unwrap_native_token: bool,
 }
 
-impl<'a> CloseDepositHint {
+impl CloseDepositHint {
     /// Create from deposit.
-    pub fn new(deposit: &'a Deposit) -> Self {
+    pub fn new(deposit: &Deposit) -> Self {
         Self {
             owner: *deposit.header().owner(),
             receiver: deposit.header().receiver(),
@@ -407,8 +407,8 @@ where
         }
     }
 
-    /// Build a [`RpcBuilder`] for `cancel_deposit` instruction.
-    pub async fn build(&self) -> crate::Result<RpcBuilder<'a, C>> {
+    /// Build a [`TransactionBuilder`] for `cancel_deposit` instruction.
+    pub async fn build(&self) -> crate::Result<TransactionBuilder<'a, C>> {
         let executor = self.client.payer();
         let hint = self.get_or_fetch_deposit_info().await?;
         let Self {
@@ -430,7 +430,7 @@ where
             .as_ref()
             .map(|mint| get_ata_or_owner(&owner, mint, should_unwrap_native_token));
         Ok(client
-            .store_rpc()
+            .store_transaction()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CloseDeposit {
                     executor,
@@ -457,7 +457,7 @@ where
                 &gmsol_store::id(),
                 client.store_program_id(),
             ))
-            .args(instruction::CloseDeposit {
+            .anchor_args(instruction::CloseDeposit {
                 reason: self.reason.clone(),
             }))
     }
@@ -617,7 +617,7 @@ mod pyth {
         async fn build_rpc_with_price_updates(
             &mut self,
             price_updates: Prices,
-        ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
+        ) -> crate::Result<Vec<TransactionBuilder<'a, C, ()>>> {
             let txs = self
                 .parse_with_pyth_price_updates(price_updates)
                 .build()
@@ -627,10 +627,10 @@ mod pyth {
     }
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
+impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
     for ExecuteDepositBuilder<'a, C>
 {
-    async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
+    async fn build(&mut self) -> crate::Result<BundleBuilder<'a, C>> {
         let token_map = self.get_token_map().await?;
         let hint = self.prepare_hint().await?;
         let Self {
@@ -658,7 +658,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
 
         // Execution.
         let execute = client
-            .store_rpc()
+            .store_transaction()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::ExecuteDeposit {
                     authority,
@@ -690,7 +690,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
                 &gmsol_store::ID,
                 self.client.store_program_id(),
             ))
-            .args(instruction::ExecuteDeposit {
+            .anchor_args(instruction::ExecuteDeposit {
                 execution_fee: *execution_fee,
                 throw_on_execution_error: !*cancel_on_execution_error,
             })
@@ -720,7 +720,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
             execute
         };
 
-        let mut tx = self.client.transaction();
+        let mut tx = self.client.bundle();
 
         tx.try_push(rpc)?;
 
@@ -728,8 +728,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
     }
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer
-    for ExecuteDepositBuilder<'a, C>
+impl<C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer
+    for ExecuteDepositBuilder<'_, C>
 {
     async fn feed_ids(&mut self) -> crate::Result<FeedIds> {
         let hint = self.prepare_hint().await?;
@@ -747,7 +747,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer
     }
 }
 
-impl<'a, C> SetExecutionFee for ExecuteDepositBuilder<'a, C> {
+impl<C> SetExecutionFee for ExecuteDepositBuilder<'_, C> {
     fn set_execution_fee(&mut self, lamports: u64) -> &mut Self {
         self.execution_fee = lamports;
         self

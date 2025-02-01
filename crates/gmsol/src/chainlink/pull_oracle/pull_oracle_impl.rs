@@ -67,7 +67,7 @@ impl ChainlinkPullOracleFactory {
         feed_ids: HashMap<Pubkey, FeedId>,
     ) -> crate::Result<()> {
         let provider = PriceProviderKind::ChainlinkDataStreams;
-        let mut txs = gmsol.transaction();
+        let mut txs = gmsol.bundle();
         let authority = gmsol.payer();
         for (token, feed_id) in feed_ids {
             let address = gmsol.find_price_feed_address(
@@ -101,7 +101,7 @@ impl ChainlinkPullOracleFactory {
             self.feeds.write().unwrap().insert(feed_id, address);
         }
 
-        if !txs.is_emtpy() {
+        if !txs.is_empty() {
             match txs.send_all(false).await {
                 Ok(signatures) => {
                     tracing::info!("initialized feeds with txs: {signatures:#?}");
@@ -134,7 +134,7 @@ pub struct ChainlinkPullOracle<'a, C> {
     skip_feeds_preparation: bool,
 }
 
-impl<'a, C> Clone for ChainlinkPullOracle<'a, C> {
+impl<C> Clone for ChainlinkPullOracle<'_, C> {
     fn clone(&self) -> Self {
         Self {
             ctx: self.ctx.clone(),
@@ -160,7 +160,7 @@ impl<'a, C> ChainlinkPullOracle<'a, C> {
     }
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> PullOracle for ChainlinkPullOracle<'a, C> {
+impl<C: Deref<Target = impl Signer> + Clone> PullOracle for ChainlinkPullOracle<'_, C> {
     type PriceUpdates = HashMap<FeedId, ApiReportData>;
 
     async fn fetch_price_updates(

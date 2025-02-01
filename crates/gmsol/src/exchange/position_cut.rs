@@ -5,6 +5,7 @@ use anchor_client::{
     solana_sdk::{address_lookup_table::AddressLookupTableAccount, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
+use gmsol_solana_utils::{bundle_builder::BundleBuilder, compute_budget::ComputeBudget};
 use gmsol_store::{
     accounts, instruction,
     ops::order::PositionCutKind,
@@ -19,10 +20,9 @@ use crate::{
     store::{token::TokenAccountOps, utils::FeedsParser},
     utils::{
         builder::{
-            FeedAddressMap, FeedIds, MakeTransactionBuilder, PullOraclePriceConsumer,
-            SetExecutionFee,
+            FeedAddressMap, FeedIds, MakeBundleBuilder, PullOraclePriceConsumer, SetExecutionFee,
         },
-        fix_optional_account_metas, ComputeBudget, TransactionBuilder, ZeroCopy,
+        fix_optional_account_metas, ZeroCopy,
     },
 };
 
@@ -247,7 +247,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
     async fn build_rpc_with_price_updates(
         &mut self,
         price_updates: Prices,
-    ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
+    ) -> crate::Result<Vec<gmsol_solana_utils::transaction_builder::TransactionBuilder<'a, C, ()>>>
+    {
         let tx = self
             .parse_with_pyth_price_updates(price_updates)
             .build()
@@ -256,10 +257,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
     }
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
+impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
     for PositionCutBuilder<'a, C>
 {
-    async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
+    async fn build(&mut self) -> crate::Result<BundleBuilder<'a, C>> {
         let token_program_id = anchor_spl::token::ID;
 
         let payer = self.client.payer();
@@ -322,19 +323,19 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
             ));
         let prepare_event_buffer = self
             .client
-            .store_rpc()
-            .accounts(accounts::PrepareTradeEventBuffer {
+            .store_transaction()
+            .anchor_accounts(accounts::PrepareTradeEventBuffer {
                 authority: payer,
                 store,
                 event,
                 system_program: system_program::ID,
             })
-            .args(instruction::PrepareTradeEventBuffer {
+            .anchor_args(instruction::PrepareTradeEventBuffer {
                 index: self.event_buffer_index,
             });
         let mut exec_builder = self
             .client
-            .store_rpc()
+            .store_transaction()
             .accounts(fix_optional_account_metas(
                 accounts::PositionCut {
                     authority: payer,
@@ -372,14 +373,14 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
 
         match self.kind {
             PositionCutKind::Liquidate => {
-                exec_builder = exec_builder.args(instruction::Liquidate {
+                exec_builder = exec_builder.anchor_args(instruction::Liquidate {
                     nonce,
                     recent_timestamp: self.recent_timestamp,
                     execution_fee: self.execution_fee,
                 });
             }
             PositionCutKind::AutoDeleverage(size_delta_in_usd) => {
-                exec_builder = exec_builder.args(instruction::AutoDeleverage {
+                exec_builder = exec_builder.anchor_args(instruction::AutoDeleverage {
                     nonce,
                     recent_timestamp: self.recent_timestamp,
                     size_delta_in_usd,
@@ -439,7 +440,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
         )
         .build(self.client);
 
-        let mut builder = TransactionBuilder::new(self.client.store_program().solana_rpc());
+        let mut builder = BundleBuilder::from_rpc_client(self.client.store_program().rpc());
         builder
             .try_push(pre_builder.merge(prepare_event_buffer))?
             .try_push(prepare.merge(exec_builder))?
@@ -448,9 +449,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
     }
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer
-    for PositionCutBuilder<'a, C>
-{
+impl<C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer for PositionCutBuilder<'_, C> {
     async fn feed_ids(&mut self) -> crate::Result<FeedIds> {
         let hint = self.prepare_hint().await?;
         Ok(FeedIds::new(hint.store_address, hint.tokens_with_feed))
@@ -467,7 +466,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer
     }
 }
 
-impl<'a, C> SetExecutionFee for PositionCutBuilder<'a, C> {
+impl<C> SetExecutionFee for PositionCutBuilder<'_, C> {
     fn set_execution_fee(&mut self, lamports: u64) -> &mut Self {
         self.execution_fee = lamports;
         self

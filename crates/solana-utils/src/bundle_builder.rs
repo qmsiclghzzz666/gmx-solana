@@ -1,38 +1,40 @@
-use std::{collections::HashSet, ops::Deref, time::Duration};
+use std::{collections::HashSet, ops::Deref};
 
-use anchor_client::{
-    solana_client::{
-        client_error::ClientError as SolanaClientError, nonblocking::rpc_client::RpcClient,
-        rpc_client::SerializableTransaction, rpc_config::RpcSendTransactionConfig,
-        rpc_request::RpcError,
-    },
-    solana_sdk::{
-        commitment_config::CommitmentConfig, packet::PACKET_DATA_SIZE, signature::Signature,
-        signer::Signer, transaction::VersionedTransaction,
-    },
-    ClientError, Cluster,
-};
 use futures_util::TryStreamExt;
-use tokio::time::sleep;
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig};
+use solana_sdk::{
+    commitment_config::CommitmentConfig, packet::PACKET_DATA_SIZE, signature::Signature,
+    signer::Signer, transaction::VersionedTransaction,
+};
 
-use crate::utils::instruction::inspect_transaction;
+use crate::{
+    client::SendAndConfirm,
+    cluster::Cluster,
+    transaction_builder::TransactionBuilder,
+    utils::{inspect_transaction, transaction_size},
+};
 
-use super::RpcBuilder;
+const TRANSACTION_SIZE_LIMIT: usize = PACKET_DATA_SIZE;
+const DEFAULT_MAX_INSTRUCTIONS_FOR_ONE_TX: usize = 14;
 
-use self::transaction_size::transaction_size;
-
-/// Compute Budget.
-pub mod compute_budget;
-
-/// RPC Builder.
-pub mod rpc_builder;
-
-/// Transaction size.
-pub mod transaction_size;
-
-/// Send Transaction Options.
+/// Create Bundle Options.
 #[derive(Debug, Clone, Default)]
-pub struct SendTransactionOptions {
+pub struct CreateBundleOptions {
+    /// Cluster.
+    pub cluster: Cluster,
+    /// Commitment config.
+    pub commitment: CommitmentConfig,
+    /// Whether to force one transaction.
+    pub force_one_transaction: bool,
+    /// Max packet size.
+    pub max_packet_size: Option<usize>,
+    /// Max number of instructions for one transaction.
+    pub max_instructions_for_one_tx: Option<usize>,
+}
+
+/// Send Bundle Options.
+#[derive(Debug, Clone, Default)]
+pub struct SendBundleOptions {
     /// Whether to send without compute budget.
     pub without_compute_budget: bool,
     /// Compute unit price.
@@ -45,36 +47,55 @@ pub struct SendTransactionOptions {
     pub config: RpcSendTransactionConfig,
 }
 
-/// Build transactions from [`RpcBuilder`].
-pub struct TransactionBuilder<'a, C> {
+/// Buidler for transaction bundle.
+pub struct BundleBuilder<'a, C> {
     client: RpcClient,
-    builders: Vec<RpcBuilder<'a, C>>,
+    builders: Vec<TransactionBuilder<'a, C>>,
     force_one_transaction: bool,
     max_packet_size: Option<usize>,
     max_instructions_for_one_tx: usize,
 }
 
-const TRANSACTION_SIZE_LIMIT: usize = PACKET_DATA_SIZE;
-const MAX_INSTRUCTIONS_FOR_ONE_TX: usize = 14;
-
-impl<'a, C> TransactionBuilder<'a, C> {
-    /// Create a new [`TransactionBuilder`].
-    pub fn new(client: RpcClient) -> Self {
-        Self::new_with_options(client, false, None)
+impl<C> BundleBuilder<'_, C> {
+    /// Create a new [`BundleBuilder`] for the given cluster.
+    pub fn new(cluster: Cluster) -> Self {
+        Self::new_with_options(CreateBundleOptions {
+            cluster,
+            ..Default::default()
+        })
     }
 
-    /// Create a new [`TransactionBuilder`] with the given options.
-    pub fn new_with_options(
+    /// Create a new [`BundleBuilder`] with the given options.
+    pub fn new_with_options(options: CreateBundleOptions) -> Self {
+        let rpc = options.cluster.rpc(options.commitment);
+
+        Self::from_rpc_client_with_options(
+            rpc,
+            options.force_one_transaction,
+            options.max_packet_size,
+            options.max_instructions_for_one_tx,
+        )
+    }
+
+    /// Create a new [`BundleBuilder`] from [`RpcClient`].
+    pub fn from_rpc_client(client: RpcClient) -> Self {
+        Self::from_rpc_client_with_options(client, false, None, None)
+    }
+
+    /// Create a new [`BundleBuilder`] from [`RpcClient`] with the given options.
+    pub fn from_rpc_client_with_options(
         client: RpcClient,
         force_one_transaction: bool,
         max_packet_size: Option<usize>,
+        max_instructions_for_one_tx: Option<usize>,
     ) -> Self {
         Self {
             client,
             builders: Default::default(),
             force_one_transaction,
             max_packet_size,
-            max_instructions_for_one_tx: MAX_INSTRUCTIONS_FOR_ONE_TX,
+            max_instructions_for_one_tx: max_instructions_for_one_tx
+                .unwrap_or(DEFAULT_MAX_INSTRUCTIONS_FOR_ONE_TX),
         }
     }
 
@@ -91,40 +112,41 @@ impl<'a, C> TransactionBuilder<'a, C> {
         &self.client
     }
 
-    /// Is emtpy.
-    pub fn is_emtpy(&self) -> bool {
+    /// Is empty.
+    pub fn is_empty(&self) -> bool {
         self.builders.is_empty()
     }
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
-    /// Push a [`RpcBuilder`] with options.
+impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
+    /// Push a [`TransactionBuilder`] with options.
+    #[allow(clippy::result_large_err)]
     pub fn try_push_with_opts(
         &mut self,
-        mut rpc: RpcBuilder<'a, C>,
+        mut txn: TransactionBuilder<'a, C>,
         new_transaction: bool,
-    ) -> Result<&mut Self, (RpcBuilder<'a, C>, crate::Error)> {
+    ) -> Result<&mut Self, (TransactionBuilder<'a, C>, crate::Error)> {
         let packet_size = self.packet_size();
-        let mut ix = rpc.instructions_with_options(true, None);
-        let incoming_lookup_table = rpc.get_complete_lookup_table();
+        let mut ix = txn.instructions_with_options(true, None);
+        let incoming_lookup_table = txn.get_complete_lookup_table();
         if transaction_size(
             &ix,
             true,
             Some(&incoming_lookup_table),
-            rpc.get_alts().len(),
+            txn.get_luts().len(),
         ) > packet_size
         {
             return Err((
-                rpc,
-                crate::Error::invalid_argument("the size of this instruction is too big"),
+                txn,
+                crate::Error::AddTransaction("the size of this instruction is too big"),
             ));
         }
         if self.builders.is_empty() || new_transaction {
             tracing::debug!("adding to a new tx");
             if !self.builders.is_empty() && self.force_one_transaction {
-                return Err((rpc, crate::Error::invalid_argument("cannot create more than one transaction because `force_one_transaction` is set")));
+                return Err((txn, crate::Error::AddTransaction("cannot create more than one transaction because `force_one_transaction` is set")));
             }
-            self.builders.push(rpc);
+            self.builders.push(txn);
         } else {
             let last = self.builders.last_mut().unwrap();
 
@@ -133,8 +155,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
 
             let mut lookup_table = last.get_complete_lookup_table();
             lookup_table.extend(incoming_lookup_table);
-            let mut lookup_table_addresses = last.get_alts().keys().collect::<HashSet<_>>();
-            lookup_table_addresses.extend(rpc.get_alts().keys());
+            let mut lookup_table_addresses = last.get_luts().keys().collect::<HashSet<_>>();
+            lookup_table_addresses.extend(txn.get_luts().keys());
 
             let size_after_merge = transaction_size(
                 &ixs_after_merge,
@@ -146,49 +168,51 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
                 && ixs_after_merge.len() <= self.max_instructions_for_one_tx
             {
                 tracing::debug!(size_after_merge, "adding to the last tx");
-                last.try_merge(&mut rpc).map_err(|err| (rpc, err))?;
+                last.try_merge(&mut txn).map_err(|err| (txn, err))?;
             } else {
                 tracing::debug!(
                     size_after_merge,
                     "exceed packet data size limit, adding to a new tx"
                 );
                 if self.force_one_transaction {
-                    return Err((rpc, crate::Error::invalid_argument("cannot create more than one transaction because `force_one_transaction` is set")));
+                    return Err((txn, crate::Error::AddTransaction("cannot create more than one transaction because `force_one_transaction` is set")));
                 }
-                self.builders.push(rpc);
+                self.builders.push(txn);
             }
         }
         Ok(self)
     }
 
-    /// Try to push a [`RpcBuilder`] to the builder.
+    /// Try to push a [`TransactionBuilder`] to the builder.
+    #[allow(clippy::result_large_err)]
     #[inline]
     pub fn try_push(
         &mut self,
-        rpc: RpcBuilder<'a, C>,
-    ) -> Result<&mut Self, (RpcBuilder<'a, C>, crate::Error)> {
-        self.try_push_with_opts(rpc, false)
+        txn: TransactionBuilder<'a, C>,
+    ) -> Result<&mut Self, (TransactionBuilder<'a, C>, crate::Error)> {
+        self.try_push_with_opts(txn, false)
     }
 
-    /// Push a [`RpcBuilder`].
-    pub fn push(&mut self, rpc: RpcBuilder<'a, C>) -> crate::Result<&mut Self> {
-        self.try_push(rpc).map_err(|(_, err)| err)
+    /// Push a [`TransactionBuilder`].
+    pub fn push(&mut self, txn: TransactionBuilder<'a, C>) -> crate::Result<&mut Self> {
+        self.try_push(txn).map_err(|(_, err)| err)
     }
 
-    /// Push [`RpcBuilder`]s.
+    /// Push [`TransactionBuilder`]s.
     pub fn push_many(
         &mut self,
-        rpcs: impl IntoIterator<Item = RpcBuilder<'a, C>>,
+        txns: impl IntoIterator<Item = TransactionBuilder<'a, C>>,
         new_transaction: bool,
     ) -> crate::Result<&mut Self> {
-        for (idx, rpc) in rpcs.into_iter().enumerate() {
-            self.try_push_with_opts(rpc, (idx == 0) && new_transaction)?;
+        for (idx, txn) in txns.into_iter().enumerate() {
+            self.try_push_with_opts(txn, (idx == 0) && new_transaction)
+                .map_err(|(_, err)| err)?;
         }
         Ok(self)
     }
 
-    /// Get back all collected [`RpcBuilder`]s.
-    pub fn into_builders(self) -> Vec<RpcBuilder<'a, C>> {
+    /// Get back all collected [`TransactionBuilder`]s.
+    pub fn into_builders(self) -> Vec<TransactionBuilder<'a, C>> {
         self.builders
     }
 
@@ -197,7 +221,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         self,
         skip_preflight: bool,
     ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
-        self.send_all_with_opts(SendTransactionOptions {
+        self.send_all_with_opts(SendBundleOptions {
             config: RpcSendTransactionConfig {
                 skip_preflight,
                 ..Default::default()
@@ -210,9 +234,9 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     /// Send all in order with the given options and returns the signatures of the success transactions.
     pub async fn send_all_with_opts(
         self,
-        opts: SendTransactionOptions,
+        opts: SendBundleOptions,
     ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
-        let SendTransactionOptions {
+        let SendBundleOptions {
             without_compute_budget,
             compute_unit_price_micro_lamports,
             update_recent_block_hash_before_send,
@@ -226,7 +250,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
             .client
             .get_latest_blockhash()
             .await
-            .map_err(|err| (vec![], anchor_client::ClientError::from(err).into()))?;
+            .map_err(|err| (vec![], Box::new(err).into()))?;
         let txs = self
             .builders
             .into_iter()
@@ -261,7 +285,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     ) -> crate::Result<u64> {
         self.builders
             .iter()
-            .map(|rpc| rpc.estimate_execution_fee(&self.client, compute_unit_price_micro_lamports))
+            .map(|txn| txn.estimate_execution_fee(&self.client, compute_unit_price_micro_lamports))
             .collect::<futures_util::stream::FuturesUnordered<_>>()
             .try_fold(0, |acc, fee| futures_util::future::ready(Ok(acc + fee)))
             .await
@@ -273,27 +297,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     pub fn append(&mut self, other: Self, new_transaction: bool) -> crate::Result<()> {
         let builders = other.into_builders();
 
-        for (idx, rpc) in builders.into_iter().enumerate() {
-            self.try_push_with_opts(rpc, new_transaction && idx == 0)?;
+        for (idx, txn) in builders.into_iter().enumerate() {
+            self.try_push_with_opts(txn, new_transaction && idx == 0)
+                .map_err(|(_, err)| err)?;
         }
 
         Ok(())
-    }
-}
-
-impl<'a, C> IntoIterator for TransactionBuilder<'a, C> {
-    type Item = RpcBuilder<'a, C>;
-
-    type IntoIter = <Vec<RpcBuilder<'a, C>> as IntoIterator>::IntoIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.builders.into_iter()
-    }
-}
-
-impl<T> From<(T, crate::Error)> for crate::Error {
-    fn from(value: (T, crate::Error)) -> Self {
-        value.1
     }
 }
 
@@ -315,7 +324,7 @@ async fn send_all_txs(
                     tx.message.set_recent_blockhash(latest_blockhash);
                 }
                 Err(err) => {
-                    error = Some(ClientError::from(err).into());
+                    error = Some(Box::new(err).into());
                     break;
                 }
             }
@@ -339,7 +348,7 @@ async fn send_all_txs(
                 let inspector_url = inspect_transaction(&tx.message, cluster.as_ref(), false);
                 let hash = tx.message.recent_blockhash();
                 tracing::trace!(%err, %hash, ?config, "transaction failed: {inspector_url}");
-                error = Some(ClientError::from(err).into());
+                error = Some(Box::new(err).into());
                 if !continue_on_error {
                     break;
                 }
@@ -352,67 +361,12 @@ async fn send_all_txs(
     }
 }
 
-trait SendAndConfirm {
-    async fn send_and_confirm_transaction_with_config(
-        &self,
-        transaction: &impl SerializableTransaction,
-        config: RpcSendTransactionConfig,
-    ) -> Result<Signature, SolanaClientError>;
-}
+impl<'a, C> IntoIterator for BundleBuilder<'a, C> {
+    type Item = TransactionBuilder<'a, C>;
 
-impl SendAndConfirm for RpcClient {
-    async fn send_and_confirm_transaction_with_config(
-        &self,
-        transaction: &impl SerializableTransaction,
-        config: RpcSendTransactionConfig,
-    ) -> Result<Signature, SolanaClientError> {
-        const SEND_RETRIES: usize = 1;
-        const GET_STATUS_RETRIES: usize = usize::MAX;
+    type IntoIter = <Vec<TransactionBuilder<'a, C>> as IntoIterator>::IntoIter;
 
-        'sending: for _ in 0..SEND_RETRIES {
-            let signature = self
-                .send_transaction_with_config(transaction, config)
-                .await?;
-
-            let recent_blockhash = if transaction.uses_durable_nonce() {
-                let (recent_blockhash, ..) = self
-                    .get_latest_blockhash_with_commitment(CommitmentConfig::processed())
-                    .await?;
-                recent_blockhash
-            } else {
-                *transaction.get_recent_blockhash()
-            };
-
-            for status_retry in 0..GET_STATUS_RETRIES {
-                match self.get_signature_status(&signature).await? {
-                    Some(Ok(_)) => return Ok(signature),
-                    Some(Err(e)) => return Err(e.into()),
-                    None => {
-                        if !self
-                            .is_blockhash_valid(&recent_blockhash, CommitmentConfig::processed())
-                            .await?
-                        {
-                            // Block hash is not found by some reason
-                            break 'sending;
-                        } else if cfg!(not(test))
-                            // Ignore sleep at last step.
-                            && status_retry < GET_STATUS_RETRIES
-                        {
-                            // Retry twice a second
-                            sleep(Duration::from_millis(500)).await;
-                            continue;
-                        }
-                    }
-                }
-            }
-        }
-
-        Err(RpcError::ForUser(
-            "unable to confirm transaction. \
-             This can happen in situations such as transaction expiration \
-             and insufficient fee-payer funds"
-                .to_string(),
-        )
-        .into())
+    fn into_iter(self) -> Self::IntoIter {
+        self.builders.into_iter()
     }
 }

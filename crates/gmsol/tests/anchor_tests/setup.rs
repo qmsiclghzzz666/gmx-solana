@@ -39,9 +39,10 @@ use gmsol::{
         glv::GlvMarketFlag, FactorKey, MarketConfigKey, PriceProviderKind, RoleKey,
         UpdateTokenConfigParams,
     },
-    utils::{shared_signer, SendTransactionOptions, SignerRef, TransactionBuilder},
+    utils::{shared_signer, SignerRef},
     Client, ClientOptions,
 };
+use gmsol_solana_utils::bundle_builder::{BundleBuilder, SendBundleOptions};
 use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use tokio::{
     sync::{Mutex, OnceCell, OwnedMutexGuard},
@@ -386,15 +387,15 @@ impl Deployment {
 
         let signature = self
             .client
-            .store_rpc()
+            .store_transaction()
             .program(ID)
-            .accounts(accounts::Initialize {
+            .anchor_accounts(accounts::Initialize {
                 payer: self.client.payer(),
                 verifier_account: chainlink_verifier,
                 access_controller,
                 system_program: system_program::ID,
             })
-            .args(instruction::Initialize { user: self.store })
+            .anchor_args(instruction::Initialize { user: self.store })
             .send()
             .await?;
 
@@ -452,11 +453,11 @@ impl Deployment {
         use anchor_spl::token::{Mint, ID};
         use spl_token::instruction;
 
-        let client = self.client.store_program().solana_rpc();
+        let client = self.client.store_program().rpc();
         let rent = client
             .get_minimum_balance_for_rent_exemption(Mint::LEN)
             .await?;
-        let mut builder = TransactionBuilder::new(client);
+        let mut builder = BundleBuilder::from_rpc_client(client);
 
         let tokens = configs
             .into_iter()
@@ -470,7 +471,7 @@ impl Deployment {
             tracing::info!(%name, "creating mint account {pubkey}");
             let rpc = self
                 .client
-                .store_rpc()
+                .store_transaction()
                 .signer(token)
                 .pre_instruction(system_instruction::create_account(
                     &payer,
@@ -516,8 +517,8 @@ impl Deployment {
         use anchor_spl::token::ID;
         use spl_associated_token_account::instruction;
 
-        let client = self.client.store_program().solana_rpc();
-        let mut builder = TransactionBuilder::new(client);
+        let client = self.client.store_program().rpc();
+        let mut builder = BundleBuilder::from_rpc_client(client);
 
         let payer = self.client.payer();
 
@@ -525,7 +526,7 @@ impl Deployment {
             for user in self.users.keypairs().await {
                 let pubkey = user.pubkey();
                 tracing::info!(token=%name, mint=%token.address, "creating token account for {pubkey}");
-                let rpc = self.client.store_rpc().pre_instruction(
+                let rpc = self.client.store_transaction().pre_instruction(
                     instruction::create_associated_token_account(
                         &payer,
                         &pubkey,
@@ -538,7 +539,7 @@ impl Deployment {
         }
 
         match builder
-            .send_all_with_opts(SendTransactionOptions {
+            .send_all_with_opts(SendBundleOptions {
                 config: RpcSendTransactionConfig {
                     skip_preflight: true,
                     ..Default::default()
@@ -566,7 +567,7 @@ impl Deployment {
             .ok_or_eyre("the default keeper is not initialized")?;
         let keeper = keeper_keypair.pubkey();
 
-        let mut builder = client.transaction();
+        let mut builder = client.bundle();
 
         builder
             .push(client.initialize_store::<Keypair>(&self.store_key, None, None, None))?
@@ -605,7 +606,7 @@ impl Deployment {
         let client = self.user_client(Self::DEFAULT_KEEPER)?;
         let store = &self.store;
 
-        let mut builder = client.transaction();
+        let mut builder = client.bundle();
 
         let (rpc, address) = client.initialize_token_map(store, &self.token_map);
 
@@ -691,7 +692,7 @@ impl Deployment {
         });
 
         let client = self.user_client(Self::DEFAULT_KEEPER)?;
-        let mut builder = client.transaction();
+        let mut builder = client.bundle();
         let store = &self.store;
         let token_map = self.token_map.pubkey();
         for (name, [index, long, short]) in market_triples {
@@ -825,7 +826,7 @@ impl Deployment {
 
         self.glv_token = glv_token;
 
-        let mut txn = keeper.transaction();
+        let mut txn = keeper.bundle();
 
         for market_token in market_tokens {
             txn.push(keeper.toggle_glv_market_flag(
@@ -853,7 +854,7 @@ impl Deployment {
         let client = self.user_client(Self::DEFAULT_KEEPER)?;
         let store = &self.store;
 
-        let mut tx = client.transaction();
+        let mut tx = client.bundle();
 
         let gt_unit = 10u64.pow(decimals as u32);
 
@@ -926,12 +927,12 @@ impl Deployment {
     async fn fund_users(&self) -> eyre::Result<()> {
         const LAMPORTS: u64 = 2_000_000_000;
 
-        let client = self.client.store_program().solana_rpc();
+        let client = self.client.store_program().rpc();
         let payer = self.client.payer();
         let lamports = client.get_balance(&payer).await?;
         tracing::info!(%payer, "before funding users: {lamports}");
 
-        let mut builder = TransactionBuilder::new(client);
+        let mut builder = BundleBuilder::from_rpc_client(client);
         builder.push_many(
             self.users
                 .pubkeys()
@@ -962,8 +963,7 @@ impl Deployment {
         use spl_token::{instruction, native_mint};
 
         let payer = self.client.payer();
-        let client = self.client.store_program().solana_rpc();
-        let mut builder = TransactionBuilder::new(client);
+        let mut builder = self.client.bundle();
 
         let users = self.users.keypairs().await.into_iter().collect::<Vec<_>>();
         for user in &users {
@@ -978,7 +978,7 @@ impl Deployment {
                 continue;
             };
             builder
-                .try_push(self.client.store_rpc().signer(user).pre_instruction(
+                .try_push(self.client.store_transaction().signer(user).pre_instruction(
                     instruction::close_account(&ID, &address, &payer, &pubkey, &[&pubkey])?,
                 ))
                 .map_err(|(_, err)| err)?;
@@ -996,10 +996,10 @@ impl Deployment {
     }
 
     async fn refund_payer(&self) -> eyre::Result<()> {
-        let client = self.client.store_program().solana_rpc();
+        let client = self.client.store_program().rpc();
         let payer = self.client.payer();
 
-        let mut builder = TransactionBuilder::new(self.client.store_program().solana_rpc());
+        let mut builder = self.client.bundle();
 
         let users = self.users.keypairs().await.into_iter().collect::<Vec<_>>();
         for user in &users {
@@ -1011,7 +1011,7 @@ impl Deployment {
             tracing::info!(user = %pubkey, %lamports, "refund from user");
             let ix = system_instruction::transfer(&user.pubkey(), &payer, lamports);
             builder
-                .try_push(self.client.store_rpc().signer(user).pre_instruction(ix))
+                .try_push(self.client.store_transaction().signer(user).pre_instruction(ix))
                 .map_err(|(_, err)| err)?;
         }
 
@@ -1135,15 +1135,14 @@ impl Deployment {
 
         let signature = if token.address == native_mint::ID {
             self.client
-                .store_rpc()
+                .store_transaction()
                 .pre_instruction(system_instruction::transfer(&payer, &account, amount))
                 .pre_instruction(instruction::sync_native(&ID, &account)?)
-                .into_anchor_request()
                 .send()
                 .await?
         } else {
             self.client
-                .store_rpc()
+                .store_transaction()
                 .pre_instruction(instruction::mint_to_checked(
                     &ID,
                     &token.address,
@@ -1153,7 +1152,6 @@ impl Deployment {
                     amount,
                     token.config.decimals,
                 )?)
-                .into_anchor_request()
                 .send()
                 .await?
         };
@@ -1274,9 +1272,9 @@ impl Deployment {
         self.oracle.pubkey()
     }
 
-    pub(crate) async fn chainlink_pull_oracle<'a>(
+    pub(crate) async fn chainlink_pull_oracle(
         &self,
-        gmsol: &'a gmsol::Client<SignerRef>,
+        gmsol: &gmsol::Client<SignerRef>,
     ) -> eyre::Result<Arc<ChainlinkPullOracleFactory>> {
         let oracle = ChainlinkPullOracleFactory::with_program_id_and_access_controller(
             &self.store,

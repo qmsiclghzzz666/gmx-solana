@@ -88,6 +88,7 @@ devnet = [
 squads = ["squads-multisig"]
 
 [dependencies]
+gmsol-solana-utils = { workspace = true, features = ["anchor"] }
 gmsol-utils = { workspace = true }
 gmsol-store = { workspace = true, features = [
     "no-entrypoint",
@@ -110,7 +111,6 @@ gmsol-timelock = { workspace = true, features = [
 ] }
 gmsol-model = { workspace = true, features = ["strum", "serde"] }
 gmsol-decode = { workspace = true, optional = true, features = [
-    "tracing",
     "gmsol",
     "solana-decoder",
 ] }

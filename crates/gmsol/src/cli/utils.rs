@@ -7,13 +7,10 @@ use anchor_client::{
         signature::{Keypair, Signature},
         signer::Signer,
     },
-    RequestBuilder,
 };
 use eyre::OptionExt;
-use gmsol::{
-    timelock::TimelockOps,
-    utils::{instruction::InstructionSerialization, RpcBuilder, TransactionBuilder},
-};
+use gmsol::{timelock::TimelockOps, utils::instruction::InstructionSerialization};
+use gmsol_solana_utils::{bundle_builder::BundleBuilder, transaction_builder::TransactionBuilder};
 use prettytable::format::{FormatBuilder, TableFormat};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use url::Url;
@@ -68,29 +65,6 @@ pub(crate) fn generate_discriminator(
     )
 }
 
-pub(crate) async fn send_or_serialize<C, S>(
-    req: RequestBuilder<'_, C>,
-    serialize_only: Option<InstructionSerialization>,
-    callback: impl FnOnce(Signature) -> gmsol::Result<()>,
-) -> gmsol::Result<()>
-where
-    C: Clone + Deref<Target = S>,
-    S: Signer,
-{
-    if let Some(format) = serialize_only {
-        for (idx, ix) in req.instructions()?.into_iter().enumerate() {
-            println!(
-                "ix[{idx}]: {}",
-                gmsol::utils::serialize_instruction(&ix, format, None)?
-            );
-        }
-    } else {
-        let signature = req.send().await?;
-        (callback)(signature)?;
-    }
-    Ok(())
-}
-
 pub(crate) enum InstructionBuffer<'a> {
     Timelock {
         role: &'a str,
@@ -104,7 +78,7 @@ pub(crate) enum InstructionBuffer<'a> {
 
 pub(crate) async fn send_or_serialize_rpc<C, S>(
     store: &Pubkey,
-    rpc: RpcBuilder<'_, C>,
+    rpc: TransactionBuilder<'_, C>,
     instruction_buffer_ctx: Option<(InstructionBuffer<'_>, &GMSOLClient, bool)>,
     serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
@@ -122,11 +96,11 @@ where
         {
             println!(
                 "ix[{idx}]: {}",
-                gmsol::utils::serialize_instruction(&ix, format, Some(&rpc.payer_address()))?
+                gmsol::utils::serialize_instruction(&ix, format, Some(&rpc.get_payer()))?
             );
         }
     } else if let Some((instruction_buffer, client, draft)) = instruction_buffer_ctx {
-        let mut txn = client.transaction();
+        let mut bundle = client.bundle();
 
         match instruction_buffer {
             InstructionBuffer::Timelock { role } => {
@@ -145,7 +119,7 @@ where
                     let (rpc, buffer) = client
                         .create_timelocked_instruction(store, role, buffer, ix)?
                         .swap_output(());
-                    txn.push(rpc)?;
+                    bundle.push(rpc)?;
                     println!("ix[{idx}]: {buffer}");
                 }
             }
@@ -154,7 +128,8 @@ where
                 multisig,
                 vault_index,
             } => {
-                use gmsol::{squads::SquadsOps, utils::instruction::inspect_transaction};
+                use gmsol::squads::SquadsOps;
+                use gmsol_solana_utils::utils::inspect_transaction;
 
                 let message =
                     rpc.message_with_blockhash_and_options(Default::default(), true, None)?;
@@ -182,11 +157,11 @@ where
                     return Ok(());
                 }
 
-                txn.push(rpc)?;
+                bundle.push(rpc)?;
             }
         }
 
-        match txn.send_all(skip_preflight).await {
+        match bundle.send_all(skip_preflight).await {
             Ok(signatures) => {
                 tracing::info!("{signatures:#?}");
             }
@@ -211,7 +186,7 @@ where
 }
 
 pub(crate) async fn send_or_serialize_transactions<C, S>(
-    builder: TransactionBuilder<'_, C>,
+    builder: BundleBuilder<'_, C>,
     serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
     callback: impl FnOnce(Vec<Signature>, Option<gmsol::Error>) -> gmsol::Result<()>,
@@ -223,10 +198,9 @@ where
     if let Some(format) = serialize_only {
         for (idx, rpc) in builder.into_builders().into_iter().enumerate() {
             println!("Transaction {idx}:");
-            let payer_address = rpc.payer_address();
+            let payer_address = rpc.get_payer();
             for (idx, ix) in rpc
-                .into_anchor_request_without_compute_budget()
-                .instructions()?
+                .instructions_with_options(true, None)
                 .into_iter()
                 .enumerate()
             {
@@ -240,7 +214,7 @@ where
     } else {
         match builder.send_all(skip_preflight).await {
             Ok(signatures) => (callback)(signatures, None)?,
-            Err((signatures, error)) => (callback)(signatures, Some(error))?,
+            Err((signatures, error)) => (callback)(signatures, Some(error.into()))?,
         }
     }
     Ok(())

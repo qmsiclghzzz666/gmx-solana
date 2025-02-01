@@ -1,8 +1,6 @@
 use std::ops::AddAssign;
 
-use anchor_client::solana_sdk::{
-    compute_budget::ComputeBudgetInstruction, instruction::Instruction,
-};
+use solana_sdk::{compute_budget::ComputeBudgetInstruction, instruction::Instruction};
 
 /// Compute Budget.
 #[derive(Debug, Clone, Copy)]
