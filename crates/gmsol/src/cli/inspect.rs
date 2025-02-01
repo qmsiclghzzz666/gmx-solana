@@ -1230,6 +1230,7 @@ impl InspectArgs {
                     get_vault_pda(multisig, vault_transaction.vault_index, None).0
                 );
                 println!("Proposal: {proposal_pubkey}");
+                println!("Creator: {}", vault_transaction.creator);
                 println!(
                     "Inspector: {}",
                     inspect_transaction(
