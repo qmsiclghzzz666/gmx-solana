@@ -82,6 +82,11 @@ enum Command {
         #[arg(long)]
         token_program_id: Option<Pubkey>,
     },
+    /// Prepare GT bank.
+    PrepareGtBank {
+        #[clap(flatten)]
+        gt_exchange_vault: SelectGtExchangeVault,
+    },
     /// Confirm GT buyback.
     ConfirmGtBuyback {
         #[clap(flatten)]
@@ -254,6 +259,18 @@ impl Args {
                 println!("{gt_exchange_vault}");
 
                 rpc
+            }
+            Command::PrepareGtBank { gt_exchange_vault } => {
+                let gt_exchange_vault = gt_exchange_vault.get(store, client).await?;
+                let (txn, gt_bank) = client
+                    .prepare_gt_bank(store, None, &gt_exchange_vault)
+                    .await?
+                    .swap_output(());
+
+                tracing::info!("Preparing GT bank: {gt_bank}");
+                println!("{gt_bank}");
+
+                txn
             }
             Command::ConfirmGtBuyback {
                 gt_exchange_vault,
