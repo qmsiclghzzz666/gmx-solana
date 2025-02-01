@@ -33,6 +33,14 @@ type GMSOLClient = gmsol::Client<LocalSignerRef>;
 
 pub(crate) use self::utils::InstructionBufferCtx;
 
+cfg_if::cfg_if! {
+    if #[cfg(feature = "devnet")] {
+        const DEFAULT_CLUSTER: &str = "devnet";
+    } else {
+        const DEFAULT_CLUSTER: &str = "mainnet";
+    }
+}
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -40,7 +48,7 @@ struct Cli {
     #[arg(long, short, env, default_value = "~/.config/solana/id.json")]
     wallet: String,
     /// Cluster to connect to.
-    #[arg(long = "url", short = 'u', env, default_value = "devnet")]
+    #[arg(long = "url", short = 'u', env, default_value = DEFAULT_CLUSTER)]
     cluster: String,
     /// Commitment level.
     #[arg(long, env, default_value = "confirmed")]

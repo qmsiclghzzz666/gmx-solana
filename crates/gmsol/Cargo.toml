@@ -151,6 +151,7 @@ async-stream = { workspace = true }
 either = { workspace = true }
 url = { workspace = true }
 spl-token = { workspace = true }
+cfg-if = { workspace = true }
 
 # Dependencies for cli
 clap = { workspace = true, optional = true, features = ["derive", "env"] }

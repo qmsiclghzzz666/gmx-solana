@@ -2277,6 +2277,7 @@ dependencies = [
  "bs58 0.5.1",
  "bytemuck",
  "byteorder",
+ "cfg-if",
  "chainlink-datastreams",
  "clap 4.5.20",
  "dialoguer 0.11.0",

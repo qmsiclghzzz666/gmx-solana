@@ -1,6 +1,21 @@
 [alias]
-gmsol = ["run", "--bin", "gmsol", "--features", "cli,devnet,squads", "--"]
+gmsol = ["run", "--bin", "gmsol", "--features", "cli,squads", "--"]
+gmsol-devnet = [
+    "run",
+    "--bin",
+    "gmsol",
+    "--features",
+    "cli,devnet,squads",
+    "--",
+]
 install-gmsol = [
+    "install",
+    "--path",
+    "crates/gmsol",
+    "--features",
+    "cli,squads",
+]
+install-gmsol-devnet = [
     "install",
     "--path",
     "crates/gmsol",

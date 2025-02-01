@@ -978,9 +978,18 @@ impl Deployment {
                 continue;
             };
             builder
-                .try_push(self.client.store_transaction().signer(user).pre_instruction(
-                    instruction::close_account(&ID, &address, &payer, &pubkey, &[&pubkey])?,
-                ))
+                .try_push(
+                    self.client
+                        .store_transaction()
+                        .signer(user)
+                        .pre_instruction(instruction::close_account(
+                            &ID,
+                            &address,
+                            &payer,
+                            &pubkey,
+                            &[&pubkey],
+                        )?),
+                )
                 .map_err(|(_, err)| err)?;
         }
 
@@ -1011,7 +1020,12 @@ impl Deployment {
             tracing::info!(user = %pubkey, %lamports, "refund from user");
             let ix = system_instruction::transfer(&user.pubkey(), &payer, lamports);
             builder
-                .try_push(self.client.store_transaction().signer(user).pre_instruction(ix))
+                .try_push(
+                    self.client
+                        .store_transaction()
+                        .signer(user)
+                        .pre_instruction(ix),
+                )
                 .map_err(|(_, err)| err)?;
         }
 
