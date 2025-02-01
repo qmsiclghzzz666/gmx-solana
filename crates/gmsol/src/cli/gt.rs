@@ -1,7 +1,7 @@
 use std::num::NonZeroU32;
 
 use crate::{
-    utils::{send_or_serialize_rpc, table_format},
+    utils::{send_or_serialize_transaction, table_format},
     GMSOLClient, InstructionBufferCtx,
 };
 use anchor_client::solana_sdk::pubkey::Pubkey;
@@ -120,7 +120,7 @@ impl Args {
                 let (rpc, _vault) = client
                     .prepare_gt_exchange_vault_with_time_window(store, time_window)?
                     .swap_output(());
-                send_or_serialize_rpc(
+                send_or_serialize_transaction(
                     store,
                     rpc,
                     timelock,
@@ -150,7 +150,7 @@ impl Args {
                     rpc = rpc.merge(init);
                 }
 
-                send_or_serialize_rpc(
+                send_or_serialize_transaction(
                     store,
                     rpc,
                     timelock,
@@ -165,7 +165,7 @@ impl Args {
             }
             Command::SetExchangeTimeWindow { seconds } => {
                 let rpc = client.gt_set_exchange_time_window(store, seconds.get());
-                send_or_serialize_rpc(
+                send_or_serialize_transaction(
                     store,
                     rpc,
                     timelock,
@@ -205,7 +205,7 @@ impl Args {
                         } else {
                             request
                         };
-                        send_or_serialize_rpc(
+                        send_or_serialize_transaction(
                             store,
                             rpc,
                             timelock,
@@ -222,7 +222,7 @@ impl Args {
                         let rpc = client
                             .complete_gt_exchange(store, exchange, None, None, None)
                             .await?;
-                        send_or_serialize_rpc(
+                        send_or_serialize_transaction(
                             store,
                             rpc,
                             timelock,

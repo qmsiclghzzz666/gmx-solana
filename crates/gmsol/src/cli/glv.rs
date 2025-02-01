@@ -386,7 +386,7 @@ impl Args {
             }
         };
 
-        crate::utils::send_or_serialize_rpc(
+        crate::utils::send_or_serialize_transaction(
             store,
             rpc,
             timelock,

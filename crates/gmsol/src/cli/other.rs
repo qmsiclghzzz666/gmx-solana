@@ -66,7 +66,7 @@ impl Args {
                     })
                     .anchor_args(instruction::Initialize { user: *store });
 
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
                     instruction_buffer,
@@ -101,7 +101,7 @@ impl Args {
                         &spill.unwrap_or(client.payer()),
                     ));
 
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
                     instruction_buffer,
@@ -128,7 +128,7 @@ impl Args {
                         &authority.unwrap_or(client.payer()),
                     ));
 
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
                     instruction_buffer,

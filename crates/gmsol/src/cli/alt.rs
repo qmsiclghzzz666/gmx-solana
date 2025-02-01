@@ -80,7 +80,7 @@ impl Args {
                 }
 
                 if !txns.is_empty() {
-                    crate::utils::send_or_serialize_transactions(
+                    crate::utils::send_or_serialize_bundle(
                         txns,
                         serialize_only,
                         true,

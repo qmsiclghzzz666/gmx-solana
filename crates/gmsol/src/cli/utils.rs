@@ -17,6 +17,8 @@ use url::Url;
 
 use crate::GMSOLClient;
 
+pub(crate) type InstructionBufferCtx<'a> = (InstructionBuffer<'a>, &'a GMSOLClient, bool);
+
 #[derive(clap::ValueEnum, Clone, Copy, Default)]
 #[clap(rename_all = "kebab-case")]
 pub(crate) enum Output {
@@ -76,10 +78,10 @@ pub(crate) enum InstructionBuffer<'a> {
     },
 }
 
-pub(crate) async fn send_or_serialize_rpc<C, S>(
+pub(crate) async fn send_or_serialize_transaction<C, S>(
     store: &Pubkey,
     rpc: TransactionBuilder<'_, C>,
-    instruction_buffer_ctx: Option<(InstructionBuffer<'_>, &GMSOLClient, bool)>,
+    instruction_buffer_ctx: Option<InstructionBufferCtx<'_>>,
     serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,
     callback: impl FnOnce(Signature) -> gmsol::Result<()>,
@@ -185,7 +187,7 @@ where
     Ok(())
 }
 
-pub(crate) async fn send_or_serialize_transactions<C, S>(
+pub(crate) async fn send_or_serialize_bundle<C, S>(
     builder: BundleBuilder<'_, C>,
     serialize_only: Option<InstructionSerialization>,
     skip_preflight: bool,

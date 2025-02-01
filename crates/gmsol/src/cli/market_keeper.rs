@@ -371,7 +371,7 @@ impl Args {
                 let (rpc, oracle) = client
                     .initialize_oracle(store, &oracle, authority.as_ref())
                     .await?;
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
                     timelock,
@@ -393,7 +393,7 @@ impl Args {
                 }
                 let token_map = Keypair::new();
                 let (rpc, map) = client.initialize_token_map(store, &token_map);
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
                     timelock,
@@ -408,7 +408,7 @@ impl Args {
                 .await?;
             }
             Command::SetTokenMap { token_map } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.set_token_map(store, token_map),
                     timelock,
@@ -518,7 +518,7 @@ impl Args {
                         store, &token_map, name, token, builder, true, !*update,
                     )
                 };
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     req,
                     timelock,
@@ -533,7 +533,7 @@ impl Args {
             }
             Command::ToggleTokenConfig { token, toggle } => {
                 let token_map = self.token_map(client, store).await?;
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.toggle_token_config(store, &token_map, token, toggle.is_enable()),
                     timelock,
@@ -548,7 +548,7 @@ impl Args {
             }
             Command::SetExpectedProvider { token, provider } => {
                 let token_map = self.token_map(client, store).await?;
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.set_expected_provider(store, &token_map, token, *provider),
                     timelock,
@@ -563,7 +563,7 @@ impl Args {
             }
             Command::CreateVault { token } => {
                 let (rpc, vault) = client.initialize_market_vault(store, token);
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
                     timelock,
@@ -595,7 +595,7 @@ impl Args {
                         None,
                     )
                     .await?;
-                crate::utils::send_or_serialize_rpc(store, request, timelock, serialize_only, false,|signature| {
+                crate::utils::send_or_serialize_transaction(store, request, timelock, serialize_only, false,|signature| {
                     tracing::info!(
                         "created a new market with {market_token} as its token address at tx {signature}"
                     );
@@ -658,7 +658,7 @@ impl Args {
                 key,
                 value,
             } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.update_market_config_flag_by_key(store, market_token, *key, *value)?,
                     timelock,
@@ -697,7 +697,7 @@ impl Args {
                 market_token,
                 toggle,
             } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.toggle_market(store, market_token, toggle.is_enable()),
                     timelock,
@@ -729,7 +729,7 @@ impl Args {
                     &buffer_keypair,
                     expire_after.as_secs().try_into().unwrap_or(u32::MAX),
                 );
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     rpc,
                     timelock,
@@ -745,7 +745,7 @@ impl Args {
                 .await?;
             }
             Command::CloseBuffer { buffer, receiver } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.close_marekt_config_buffer(buffer, receiver.as_ref()),
                     timelock,
@@ -798,7 +798,7 @@ impl Args {
                 buffer,
                 new_authority,
             } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client
                         .set_market_config_buffer_authority(buffer, new_authority),
@@ -825,7 +825,7 @@ impl Args {
                     Side::Short => market.meta().short_token_mint,
                 };
                 let source_account = get_associated_token_address(&client.payer(), &token);
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client
                         .fund_market(store, market_token, &source_account, *amount, Some(&token))
@@ -844,7 +844,7 @@ impl Args {
                 market_token,
                 toggle,
             } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.toggle_gt_minting(store, market_token, toggle.is_enable()),
                     timelock,
@@ -877,7 +877,7 @@ impl Args {
                 }
                 let mut ranks = ranks.clone();
                 ranks.sort_unstable();
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.initialize_gt(
                         store,
@@ -901,7 +901,7 @@ impl Args {
                 if factors.is_empty() {
                     return Err(gmsol::Error::invalid_argument("factors must be provided"));
                 }
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.gt_set_order_fee_discount_factors(store, factors.clone()),
                     timelock,
@@ -918,7 +918,7 @@ impl Args {
                 if factors.is_empty() {
                     return Err(gmsol::Error::invalid_argument("factors must be provided"));
                 }
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.gt_set_referral_reward_factors(store, factors.clone()),
                     timelock,
@@ -932,7 +932,7 @@ impl Args {
                 .await?
             }
             Command::SetReferredDiscountFactor { factor } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.insert_factor(
                         store,
@@ -1084,7 +1084,7 @@ async fn insert_token_configs(
         }
     }
 
-    crate::utils::send_or_serialize_transactions(
+    crate::utils::send_or_serialize_bundle(
         builder,
         serialize_only,
         skip_preflight,
@@ -1148,7 +1148,7 @@ async fn create_markets(
         builder.try_push(rpc)?;
     }
 
-    crate::utils::send_or_serialize_transactions(
+    crate::utils::send_or_serialize_bundle(
         builder,
         serialize_only,
         skip_preflight,
@@ -1215,7 +1215,7 @@ impl MarketConfigMap {
             ))?;
         }
 
-        crate::utils::send_or_serialize_transactions(
+        crate::utils::send_or_serialize_bundle(
             builder,
             serialize_only,
             skip_preflight,
@@ -1314,7 +1314,7 @@ impl MarketConfigs {
             builder.try_push(client.close_marekt_config_buffer(buffer, receiver))?;
         }
 
-        crate::utils::send_or_serialize_transactions(
+        crate::utils::send_or_serialize_bundle(
             builder,
             serialize_only,
             skip_preflight,

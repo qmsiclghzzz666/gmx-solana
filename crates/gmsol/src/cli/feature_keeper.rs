@@ -49,7 +49,7 @@ impl Args {
                     return Err(gmsol::Error::invalid_argument("invalid toggle flags"));
                 }
                 let req = client.toggle_feature(store, domain, action, enable);
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     req,
                     None,

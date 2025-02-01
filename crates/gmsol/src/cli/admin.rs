@@ -76,7 +76,7 @@ impl AdminArgs {
                     "Initialize store with key={store_key}, address={store}, admin={}",
                     client.payer()
                 );
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     &store,
                     client.initialize_store::<Keypair>(store_key, None, None, None),
                     timelock,
@@ -96,7 +96,7 @@ impl AdminArgs {
             } => {
                 let rpc = client.transfer_store_authority(&store, new_authority);
                 if *confirm || serialize_only.is_some() {
-                    crate::utils::send_or_serialize_rpc(
+                    crate::utils::send_or_serialize_transaction(
                         &store,
                         rpc,
                         timelock,
@@ -125,7 +125,7 @@ impl AdminArgs {
                 }
             }
             Command::AcceptStoreAuthority => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     &store,
                     client.accept_store_authority(&store),
                     timelock,
@@ -144,7 +144,7 @@ impl AdminArgs {
             } => {
                 let rpc = client.transfer_receiver(&store, new_receiver);
                 if *confirm || serialize_only.is_some() {
-                    crate::utils::send_or_serialize_rpc(
+                    crate::utils::send_or_serialize_transaction(
                         &store,
                         rpc,
                         timelock,
@@ -173,7 +173,7 @@ impl AdminArgs {
                 }
             }
             Command::EnableRole { role } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     &store,
                     client.enable_role(&store, role),
                     timelock,
@@ -187,7 +187,7 @@ impl AdminArgs {
                 .await?;
             }
             Command::DisableRole { role } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     &store,
                     client.disable_role(&store, role),
                     timelock,
@@ -201,7 +201,7 @@ impl AdminArgs {
                 .await?;
             }
             Command::GrantRole { role, authority } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     &store,
                     client.grant_role(&store, authority, role),
                     timelock,
@@ -215,7 +215,7 @@ impl AdminArgs {
                 .await?;
             }
             Command::RevokeRole { role, authority } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     &store,
                     client.revoke_role(&store, authority, role),
                     timelock,
@@ -343,7 +343,7 @@ impl InitializeRoles {
             builder.try_push(client.grant_role(&store, keeper, RoleKey::ORDER_KEEPER))?;
         }
 
-        crate::utils::send_or_serialize_transactions(
+        crate::utils::send_or_serialize_bundle(
             builder,
             serialize_only,
             self.skip_preflight,

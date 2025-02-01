@@ -29,6 +29,10 @@ mod timelock;
 mod treasury;
 mod utils;
 
+type GMSOLClient = gmsol::Client<LocalSignerRef>;
+
+pub(crate) use self::utils::InstructionBufferCtx;
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -133,9 +137,6 @@ async fn main() -> eyre::Result<()> {
     Cli::parse().run().await?;
     Ok(())
 }
-
-type GMSOLClient = gmsol::Client<LocalSignerRef>;
-type InstructionBufferCtx<'a> = (InstructionBuffer<'a>, &'a GMSOLClient, bool);
 
 impl Cli {
     fn wallet(

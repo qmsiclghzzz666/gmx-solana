@@ -148,7 +148,7 @@ impl Args {
                         .await?;
                     txns.push(rpc)?;
                 }
-                return crate::utils::send_or_serialize_transactions(
+                return crate::utils::send_or_serialize_bundle(
                     txns,
                     serialize_only,
                     skip_preflight,
@@ -186,7 +186,7 @@ impl Args {
                 )
             }
         };
-        crate::utils::send_or_serialize_rpc(
+        crate::utils::send_or_serialize_transaction(
             store,
             req,
             None,

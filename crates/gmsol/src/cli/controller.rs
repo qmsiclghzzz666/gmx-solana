@@ -42,7 +42,7 @@ impl ControllerArgs {
     ) -> gmsol::Result<()> {
         match &self.command {
             Command::InsertAmount { amount, key } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.insert_global_amount_by_key(store, *key, amount),
                     None,
@@ -56,7 +56,7 @@ impl ControllerArgs {
                 .await?;
             }
             Command::InsertFactor { factor, key } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.insert_global_factor_by_key(store, *key, factor),
                     None,
@@ -70,7 +70,7 @@ impl ControllerArgs {
                 .await?;
             }
             Command::InsertAddress { address, key } => {
-                crate::utils::send_or_serialize_rpc(
+                crate::utils::send_or_serialize_transaction(
                     store,
                     client.insert_global_address_by_key(store, *key, address),
                     None,
