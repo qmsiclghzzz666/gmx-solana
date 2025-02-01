@@ -161,6 +161,8 @@ where
                         );
                     }
 
+                    tracing::info!("Creating instruction buffers for transaction {txn_idx}");
+
                     for (idx, ix) in txn
                         .instructions_with_options(true, None)
                         .into_iter()
