@@ -210,9 +210,10 @@ impl Args {
         timelock: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
+        priority_lamports: u64,
     ) -> gmsol::Result<()> {
         let selected = &self.glv_token;
-        let rpc = match &self.command {
+        let mut rpc = match &self.command {
             Command::Init { market_tokens } => {
                 let Some(index) = selected.index else {
                     return Err(gmsol::Error::invalid_argument(
@@ -385,6 +386,9 @@ impl Args {
                 rpc
             }
         };
+
+        rpc.compute_budget_mut()
+            .set_min_priority_lamports(Some(priority_lamports));
 
         crate::utils::send_or_serialize_transaction(
             store,

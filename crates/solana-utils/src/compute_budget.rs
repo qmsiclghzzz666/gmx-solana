@@ -13,7 +13,7 @@ pub struct ComputeBudget {
 impl Default for ComputeBudget {
     fn default() -> Self {
         Self {
-            min_priority_lamports: Some(10000),
+            min_priority_lamports: Some(Self::MIN_PRIORITY_LAMPORTS),
             limit_units: 200_000,
             price_micro_lamports: 50_000,
         }
@@ -22,6 +22,9 @@ impl Default for ComputeBudget {
 
 impl ComputeBudget {
     const MICRO_LAMPORTS: u64 = 10u64.pow(6);
+
+    /// Minimum priority lamports.
+    pub const MIN_PRIORITY_LAMPORTS: u64 = 10000;
 
     /// Set compute units limit.
     #[inline]
@@ -39,7 +42,14 @@ impl ComputeBudget {
 
     /// Set min priority lamports.
     #[inline]
-    pub fn min_priority_lamports(mut self, lamports: Option<u64>) -> Self {
+    pub fn with_min_priority_lamports(mut self, lamports: Option<u64>) -> Self {
+        self.set_min_priority_lamports(lamports);
+        self
+    }
+
+    /// Set min priority lamports.
+    #[inline]
+    pub fn set_min_priority_lamports(&mut self, lamports: Option<u64>) -> &mut Self {
         self.min_priority_lamports = lamports;
         self
     }
@@ -59,7 +69,7 @@ impl ComputeBudget {
     fn budget_price(&self, compute_unit_price_micro_lamports: Option<u64>) -> u64 {
         let mut price = compute_unit_price_micro_lamports.unwrap_or(self.price_micro_lamports);
         if let Some(min_price) = self.min_priority_lamports.and_then(|min_lamports| {
-            (min_lamports)
+            min_lamports
                 .checked_mul(Self::MICRO_LAMPORTS)?
                 .checked_div(self.limit_units as u64)
         }) {

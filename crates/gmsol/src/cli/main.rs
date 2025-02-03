@@ -7,7 +7,7 @@ use anchor_client::solana_sdk::{
 use clap::Parser;
 use eyre::eyre;
 use gmsol::utils::{instruction::InstructionSerialization, LocalSignerRef};
-use gmsol_solana_utils::cluster::Cluster;
+use gmsol_solana_utils::{cluster::Cluster, compute_budget::ComputeBudget};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
@@ -94,6 +94,9 @@ struct Cli {
     /// Only available in `serialize-only` mode.
     #[arg(long, requires = "serialize_only")]
     payer: Option<Pubkey>,
+    /// Priority fee lamports.
+    #[arg(long, value_name = "LAMPORTS", default_value_t = ComputeBudget::MIN_PRIORITY_LAMPORTS)]
+    priority_lamports: u64,
     /// Commands.
     #[command(subcommand)]
     command: Command,
@@ -324,6 +327,7 @@ impl Cli {
                     instruction_buffer_ctx,
                     self.serialize_only,
                     self.skip_preflight,
+                    self.priority_lamports,
                 )
                 .await?
             }
