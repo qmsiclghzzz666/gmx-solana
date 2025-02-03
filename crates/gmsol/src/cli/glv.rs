@@ -60,6 +60,9 @@ enum Command {
         /// Minimum amount of GLV tokens to mint.
         #[arg(long, default_value_t = 0)]
         min_amount: u64,
+        /// Minimum amount of market tokens to mint.
+        #[arg(long, default_value_t = 0)]
+        min_market_token_amount: u64,
         /// The initial long token.
         #[arg(long, requires = "long_token_amount")]
         long_token: Option<Pubkey>,
@@ -273,6 +276,7 @@ impl Args {
                 first_deposit,
                 extra_execution_fee,
                 min_amount,
+                min_market_token_amount,
                 long_token,
                 short_token,
                 market_token_account,
@@ -307,6 +311,7 @@ impl Args {
                 let (rpc, deposit) = builder
                     .max_execution_fee(*extra_execution_fee + GlvDeposit::MIN_EXECUTION_LAMPORTS)
                     .min_glv_token_amount(*min_amount)
+                    .min_market_token_amount(*min_market_token_amount)
                     .long_token_swap_path(long_swap.clone())
                     .short_token_swap_path(short_swap.clone())
                     .receiver(if *first_deposit {

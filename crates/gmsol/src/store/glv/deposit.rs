@@ -176,6 +176,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         self
     }
 
+    /// Set min market token amount.
+    pub fn min_market_token_amount(&mut self, amount: u64) -> &mut Self {
+        self.min_market_token_amount = amount;
+        self
+    }
+
     /// Set whether to unwrap native token.
     /// Defaults to should unwrap.
     pub fn should_unwrap_native_token(&mut self, should_unwrap: bool) -> &mut Self {
