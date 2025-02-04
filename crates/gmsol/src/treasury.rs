@@ -747,11 +747,6 @@ where
             swap_in_token,
             &token_program_id,
         );
-        let swap_out_token_receiver_vault = get_associated_token_address_with_program_id(
-            &receiver,
-            swap_out_token,
-            &token_program_id,
-        );
 
         let market = self.find_market_address(store, market_token);
 
@@ -793,7 +788,6 @@ where
                 swap_in_token: *swap_in_token,
                 swap_out_token: *swap_out_token,
                 swap_in_token_receiver_vault,
-                swap_out_token_receiver_vault,
                 market,
                 receiver,
                 user,
@@ -859,9 +853,6 @@ where
         let swap_out_token_escrow =
             get_associated_token_address_with_program_id(order, &swap_out_token, &token_program_id);
 
-        let swap_in_token_vault = self.find_market_vault_address(store, &swap_in_token);
-        let swap_out_token_vault = self.find_market_vault_address(store, &swap_out_token);
-
         let prepare = self.prepare_associated_token_account(
             &swap_out_token,
             &token_program_id,
@@ -885,8 +876,6 @@ where
                 swap_in_token_escrow,
                 swap_out_token_escrow,
                 order: *order,
-                swap_in_token_vault,
-                swap_out_token_vault,
                 event_authority: self.store_event_authority(),
                 store_program: *self.store_program_id(),
                 token_program: token_program_id,

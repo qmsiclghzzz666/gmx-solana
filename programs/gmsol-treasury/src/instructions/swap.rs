@@ -55,13 +55,6 @@ pub struct CreateSwap<'info> {
         associated_token::mint = swap_in_token,
     )]
     pub swap_in_token_receiver_vault: Account<'info, TokenAccount>,
-    /// Swap out token receiver vault.
-    #[account(
-        mut,
-        associated_token::authority = receiver,
-        associated_token::mint = swap_out_token,
-    )]
-    pub swap_out_token_receiver_vault: Account<'info, TokenAccount>,
     /// Market.
     /// CHECK: check by CPI.
     #[account(mut)]
@@ -259,14 +252,6 @@ pub struct CancelSwap<'info> {
     /// CHECK: check by CPI.
     #[account(mut)]
     pub order: UncheckedAccount<'info>,
-    /// The vault for swap in token.
-    /// CHECK: check by CPI.
-    #[account(mut)]
-    pub swap_in_token_vault: UncheckedAccount<'info>,
-    /// The vault for swap out token.
-    /// CHECK: check by CPI.
-    #[account(mut)]
-    pub swap_out_token_vault: UncheckedAccount<'info>,
     /// Event authority.
     /// CHECK: check by CPI.
     pub event_authority: UncheckedAccount<'info>,
