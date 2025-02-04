@@ -157,6 +157,18 @@ impl GtState {
             CoreError::InvalidArgument
         );
 
+        // Factors must be storted.
+        require!(
+            factors.windows(2).all(|ab| {
+                if let [a, b] = &ab {
+                    a <= b
+                } else {
+                    false
+                }
+            }),
+            CoreError::InvalidArgument
+        );
+
         let target = &mut self.referral_reward_factors[0..factors.len()];
         target.copy_from_slice(factors);
 
