@@ -24,7 +24,7 @@ use crate::{
     client::SendAndConfirm,
     cluster::Cluster,
     compute_budget::ComputeBudget,
-    signer::BoxSigner,
+    signer::BoxClonableSigner,
 };
 
 /// Wallet Config.
@@ -91,12 +91,13 @@ impl<C: Deref<Target = impl Signer>> Config<C> {
 
 /// A builder for a transaction.
 #[must_use = "transaction builder do nothing if not built"]
+#[derive(Clone)]
 pub struct TransactionBuilder<'a, C, T = ()> {
     output: T,
     program_id: Pubkey,
     cfg: Config<C>,
     signers: Vec<&'a dyn Signer>,
-    owned_signers: Vec<BoxSigner>,
+    owned_signers: Vec<BoxClonableSigner>,
     pre_instructions: Vec<Instruction>,
     accounts: Vec<AccountMeta>,
     instruction_data: Option<Vec<u8>>,
@@ -238,7 +239,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
     }
 
     /// Add a owned sigenr to the signer list.
-    pub fn owned_signer(mut self, signer: impl Signer + 'static) -> Self {
+    pub fn owned_signer(mut self, signer: impl Signer + Clone + 'static) -> Self {
         self.owned_signers.push(Box::new(signer));
         self
     }
@@ -484,7 +485,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
         let mut signers = self.signers.clone();
         signers.push(&*self.cfg.payer);
         for signer in self.owned_signers.iter() {
-            signers.push(&**signer);
+            signers.push(signer);
         }
 
         let tx = VersionedTransaction::try_new(message, &signers)?;

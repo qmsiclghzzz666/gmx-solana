@@ -1,4 +1,4 @@
-use std::{future::Future, ops::Deref};
+use std::{future::Future, ops::Deref, sync::Arc};
 
 use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, system_instruction},
@@ -102,7 +102,7 @@ where
                 encoded_vaa: encoded_vaa.pubkey(),
             })
             .output(encoded_vaa.pubkey())
-            .owned_signer(encoded_vaa)
+            .owned_signer(Arc::new(encoded_vaa))
             .compute_budget(ComputeBudget::default().with_limit(INIT_ENCODED_VAA_COMPUTE_BUDGET));
         Ok(request)
     }

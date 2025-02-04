@@ -118,6 +118,19 @@ impl<C> BundleBuilder<'_, C> {
     pub fn is_empty(&self) -> bool {
         self.builders.is_empty()
     }
+
+    /// Try clone empty.
+    pub fn try_clone_empty(&self) -> crate::Result<Self> {
+        let cluster = self.client.url().parse()?;
+        let commitment = self.client.commitment();
+        Ok(Self::new_with_options(CreateBundleOptions {
+            cluster,
+            commitment,
+            force_one_transaction: self.force_one_transaction,
+            max_packet_size: self.max_packet_size,
+            max_instructions_for_one_tx: Some(self.max_instructions_for_one_tx),
+        }))
+    }
 }
 
 impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {

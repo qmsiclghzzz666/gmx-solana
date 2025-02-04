@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 use anchor_client::{
     anchor_lang::system_program,
@@ -77,7 +77,7 @@ where
             });
 
         for signer in authority.into_iter().chain(receiver).chain(holding) {
-            rpc = rpc.owned_signer(signer);
+            rpc = rpc.owned_signer(Arc::new(signer));
         }
 
         rpc

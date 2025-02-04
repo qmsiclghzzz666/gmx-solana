@@ -16,6 +16,7 @@ url = { workspace = true }
 tokio = { workspace = true }
 futures-util = { workspace = true }
 base64 = { workspace = true }
+dyn-clone = { workspace = true }
 
 serde = { workspace = true, optional = true, features = ["derive"] }
 anchor-lang = { workspace = true, optional = true }

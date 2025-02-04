@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 use anchor_client::solana_sdk::{
     pubkey::Pubkey, signature::Keypair, signer::Signer, system_program,
@@ -78,7 +78,7 @@ where
                 system_program: system_program::ID,
                 write_authority: self.payer(),
             })
-            .owned_signer(price_update)
+            .owned_signer(Arc::new(price_update))
             .compute_budget(ComputeBudget::default().with_limit(POST_PRICE_UPDATE_COMPUTE_BUDGET)))
     }
 

@@ -1,4 +1,4 @@
-use std::{future::Future, ops::Deref};
+use std::{future::Future, ops::Deref, sync::Arc};
 
 use anchor_client::{
     anchor_lang::{prelude::AccountMeta, system_program},
@@ -211,7 +211,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 system_program: system_program::ID,
             })
             .accounts(instruction.accounts)
-            .owned_signer(buffer)
+            .owned_signer(Arc::new(buffer))
             .output(instruction_buffer);
         Ok(rpc)
     }
