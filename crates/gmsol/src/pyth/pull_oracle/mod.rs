@@ -84,6 +84,7 @@ where
         self,
         compute_unit_price_micro_lamports: Option<u64>,
         skip_preflight: bool,
+        enable_tracing: bool,
     ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
         let mut error: Option<crate::Error> = None;
 
@@ -97,6 +98,7 @@ where
                     skip_preflight,
                     ..Default::default()
                 },
+                disable_error_tracing: !enable_tracing,
                 ..Default::default()
             })
             .await
@@ -119,6 +121,7 @@ where
                         skip_preflight,
                         ..Default::default()
                     },
+                    disable_error_tracing: !enable_tracing,
                     ..Default::default()
                 })
                 .await
@@ -143,6 +146,7 @@ where
                     skip_preflight,
                     ..Default::default()
                 },
+                disable_error_tracing: !enable_tracing,
                 ..Default::default()
             })
             .await
@@ -471,7 +475,11 @@ pub trait ExecuteWithPythPrices<'a, C> {
     {
         async move {
             match txns
-                .send_all(compute_unit_price_micro_lamports, skip_preflight)
+                .send_all(
+                    compute_unit_price_micro_lamports,
+                    skip_preflight,
+                    enable_tracing,
+                )
                 .await
             {
                 Ok(signatures) => {

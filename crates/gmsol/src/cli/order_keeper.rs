@@ -339,7 +339,7 @@ impl KeeperArgs {
                         })
                         .await?;
                     match with_prices
-                        .send_all(Some(self.compute_unit_price), true)
+                        .send_all(Some(self.compute_unit_price), true, true)
                         .await
                     {
                         Ok(signatures) => {
@@ -429,7 +429,7 @@ impl KeeperArgs {
                         })
                         .await?;
                     match with_prices
-                        .send_all(Some(self.compute_unit_price), true)
+                        .send_all(Some(self.compute_unit_price), true, true)
                         .await
                     {
                         Ok(signatures) => {
@@ -496,7 +496,7 @@ impl KeeperArgs {
                         })
                         .await?;
                     match with_prices
-                        .send_all(Some(self.compute_unit_price), true)
+                        .send_all(Some(self.compute_unit_price), true, true)
                         .await
                     {
                         Ok(signatures) => {
@@ -575,7 +575,7 @@ impl KeeperArgs {
                         })
                         .await?;
                     match with_prices
-                        .send_all(Some(self.compute_unit_price), true)
+                        .send_all(Some(self.compute_unit_price), true, true)
                         .await
                     {
                         Ok(signatures) => {
@@ -625,7 +625,7 @@ impl KeeperArgs {
                         })
                         .await?;
                     match with_prices
-                        .send_all(Some(self.compute_unit_price), true)
+                        .send_all(Some(self.compute_unit_price), true, true)
                         .await
                     {
                         Ok(signatures) => {
