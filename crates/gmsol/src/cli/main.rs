@@ -313,8 +313,8 @@ impl Cli {
                 args.run(&client, &store).await?
             }
             Command::Order(args) => {
-                crate::utils::instruction_buffer_not_supported(instruction_buffer_ctx)?;
-                args.run(&client, &store, self.serialize_only).await?
+                args.run(&client, &store, instruction_buffer_ctx, self.serialize_only)
+                    .await?
             }
             Command::Market(args) => {
                 args.run(&client, &store, instruction_buffer_ctx, self.serialize_only)

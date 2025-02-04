@@ -28,7 +28,7 @@ use gmsol_solana_utils::{bundle_builder::SendBundleOptions, compute_budget::Comp
 use gmsol_store::states::PriceProviderKind;
 use tokio::{sync::mpsc::UnboundedSender, time::Instant};
 
-use crate::{utils::Side, GMSOLClient};
+use crate::{utils::Side, GMSOLClient, InstructionBufferCtx};
 
 #[derive(clap::Args, Clone)]
 pub(super) struct KeeperArgs {
@@ -146,6 +146,7 @@ impl KeeperArgs {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
+        ctx: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
     ) -> gmsol::Result<()> {
         if serialize_only.is_some() {
@@ -155,6 +156,7 @@ impl KeeperArgs {
         }
         match &self.command {
             Command::Watch { wait } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let task = Box::pin(self.start_watching(client, store, *wait));
                 task.await?;
             }
@@ -188,7 +190,7 @@ impl KeeperArgs {
                             if *execute {
                                 Box::pin(
                                     self.with_command(Command::ExecuteDeposit { deposit: pubkey })
-                                        .run(client, store, serialize_only),
+                                        .run(client, store, None, serialize_only),
                                 )
                                 .await?;
                             }
@@ -220,6 +222,7 @@ impl KeeperArgs {
                                     .run(
                                         client,
                                         store,
+                                        None,
                                         serialize_only,
                                     ),
                                 )
@@ -248,7 +251,7 @@ impl KeeperArgs {
                             if *execute {
                                 Box::pin(
                                     self.with_command(Command::ExecuteOrder { order: pubkey })
-                                        .run(client, store, serialize_only),
+                                        .run(client, store, None, serialize_only),
                                 )
                                 .await?;
                             }
@@ -257,6 +260,7 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteDeposit { deposit } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let mut builder = client.execute_deposit(store, self.oracle()?, deposit, true);
                 let execution_fee = builder.build().await?.estimate_execution_fee(None).await?;
                 builder.set_execution_fee(execution_fee);
@@ -295,6 +299,7 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteWithdrawal { withdrawal } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let mut builder =
                     client.execute_withdrawal(store, self.oracle()?, withdrawal, true);
                 let execution_fee = self
@@ -358,6 +363,7 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteOrder { order } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let order_account = client.order(order).await?;
                 if let Some(position) = order_account.params().position() {
                     if let Err(gmsol::Error::NotFound) = client.position(position).await {
@@ -447,6 +453,7 @@ impl KeeperArgs {
                 }
             }
             Command::Liquidate { position } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let mut builder = client.liquidate(self.oracle()?, position)?;
                 for alt in &self.alts {
                     let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
@@ -517,6 +524,7 @@ impl KeeperArgs {
                 size,
                 close_all,
             } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let size = match size {
                     Some(size) => *size,
                     None => {
@@ -591,6 +599,7 @@ impl KeeperArgs {
                 }
             }
             Command::UpdateAdl { market_token, side } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let mut builder =
                     client.update_adl(store, self.oracle()?, market_token, side.is_long())?;
 
@@ -642,6 +651,7 @@ impl KeeperArgs {
                 }
             }
             Command::CancelOrderIfNoPosition { order, keep } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let cancel = client
                     .cancel_order_if_no_position(store, order, None)
                     .await?;
@@ -664,6 +674,7 @@ impl KeeperArgs {
                 tracing::info!(%order, "cancelled order at {signature}");
             }
             Command::ExecuteGlvDeposit { deposit } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let mut builder = client.execute_glv_deposit(self.oracle()?, deposit, true);
                 for alt in &self.alts {
                     let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
@@ -706,6 +717,7 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteGlvWithdrawal { withdrawal } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let mut builder = client.execute_glv_withdrawal(self.oracle()?, withdrawal, true);
                 for alt in &self.alts {
                     let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
@@ -748,6 +760,7 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteGlvShift { shift } => {
+                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let mut builder = client.execute_glv_shift(self.oracle()?, shift, true);
                 for alt in &self.alts {
                     let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
@@ -876,7 +889,11 @@ impl KeeperArgs {
         let worker = async move {
             while let Some(command) = rx.recv().await {
                 tracing::info!(?command, "received new command");
-                match self.with_command(command).run(client, &store, None).await {
+                match self
+                    .with_command(command)
+                    .run(client, &store, None, None)
+                    .await
+                {
                     Ok(()) => {
                         tracing::info!("command executed");
                     }
