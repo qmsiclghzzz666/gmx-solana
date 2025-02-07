@@ -322,7 +322,10 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         let reserved_value = self.reserved_value(&prices.index_token_price, is_long)?;
 
         if reserved_value > max_reserved_value {
-            Err(crate::Error::InsufficientReserve)
+            Err(crate::Error::InsufficientReserve(
+                reserved_value.to_string(),
+                max_reserved_value.to_string(),
+            ))
         } else {
             Ok(())
         }

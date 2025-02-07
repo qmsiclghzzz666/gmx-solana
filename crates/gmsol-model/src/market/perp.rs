@@ -254,7 +254,10 @@ pub trait PerpMarketExt<const DECIMALS: u8>: PerpMarket<DECIMALS> {
         let reserved_value = self.reserved_value(&prices.index_token_price, is_long)?;
 
         if reserved_value > max_reserved_value {
-            Err(crate::Error::InsufficientReserveForOpenInterest)
+            Err(crate::Error::InsufficientReserveForOpenInterest(
+                reserved_value.to_string(),
+                max_reserved_value.to_string(),
+            ))
         } else {
             Ok(())
         }
