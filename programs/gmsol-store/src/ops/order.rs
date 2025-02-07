@@ -1471,7 +1471,7 @@ fn execute_decrease_position(
                 .pnl_factor_config(PnlFactorKind::MinAfterAdl, params.side()?.is_long())
                 .and_then(|factor| factor.to_signed())
                 .map_err(ModelError::from)?;
-            require_gt!(
+            require_gte!(
                 pnl_factor_after_execution,
                 min_pnl_factor,
                 CoreError::InvalidAdl
