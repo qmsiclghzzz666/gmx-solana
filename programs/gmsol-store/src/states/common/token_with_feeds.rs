@@ -66,8 +66,9 @@ impl TokensWithFeed {
     pub fn try_from_records(mut records: Vec<TokenRecord>) -> Result<Self> {
         records.sort_by_key(|r| r.provider);
         let mut chunks = chunk_by(&records, |a, b| a.provider == b.provider);
-        let mut providers = Vec::with_capacity(chunks.size_hint().0);
-        let mut nums = Vec::with_capacity(chunks.size_hint().0);
+        let capacity = chunks.size_hint().0;
+        let mut providers = Vec::with_capacity(capacity);
+        let mut nums = Vec::with_capacity(capacity);
         chunks.try_for_each(|chunk| {
             providers.push(chunk[0].provider);
             nums.push(u16::try_from(chunk.len()).map_err(|_| CoreError::ExceedMaxLengthLimit)?);
