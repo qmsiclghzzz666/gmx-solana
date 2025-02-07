@@ -105,7 +105,7 @@ impl SwapParams {
         self.tokens().iter().map(|token| {
             let config = map
                 .get(token)
-                .ok_or_else(|| error!(CoreError::UnknownOrDisabledToken))?;
+                .ok_or_else(|| error!(CoreError::UnknownToken))?;
             TokenRecord::from_config(*token, config)
         })
     }

@@ -565,7 +565,7 @@ pub trait TokenMapAccess {
     fn sort_tokens_by_provider(&self, tokens: &mut [Pubkey]) -> Result<()> {
         // Check the existence of token configs.
         for token in tokens.iter() {
-            require!(self.get(token).is_some(), CoreError::UnknownOrDisabledToken);
+            require!(self.get(token).is_some(), CoreError::UnknownToken);
         }
         tokens.sort_by_key(|token| self.get(token).unwrap().expected_provider);
         Ok(())

@@ -3497,9 +3497,9 @@ pub enum CoreError {
     /// Token amount exceeds limit.
     #[msg("token amount exceeds limit")]
     TokenAmountExceedsLimit,
-    /// Unknown or disabled token.
-    #[msg("unknown or disabled token")]
-    UnknownOrDisabledToken,
+    /// Unknown token.
+    #[msg("unknown token")]
+    UnknownToken,
     /// Not enough execution fee.
     #[msg("not enough execution fee")]
     NotEnoughExecutionFee,
