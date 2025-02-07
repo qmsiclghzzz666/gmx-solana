@@ -943,7 +943,7 @@ impl ExecuteOrderOperation<'_, '_> {
                 let event_loader = self
                     .event
                     .as_ref()
-                    .ok_or(error!(CoreError::PositionIsRequired))?;
+                    .ok_or(error!(CoreError::EventBufferNotProvided))?;
                 {
                     let position = position_loader.load()?;
                     let mut event = event_loader.load_mut()?;

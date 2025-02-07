@@ -329,7 +329,7 @@ pub(crate) fn unchecked_execute_increase_or_swap_order<'info>(
         let event_loader = accounts.event.clone();
         let event = event_loader
             .as_ref()
-            .ok_or_else(|| error!(CoreError::PositionIsRequired))?
+            .ok_or_else(|| error!(CoreError::EventBufferNotProvided))?
             .load()?;
         let event = TradeEventRef::from(&*event);
         event_emitter.emit_cpi(&event)?;

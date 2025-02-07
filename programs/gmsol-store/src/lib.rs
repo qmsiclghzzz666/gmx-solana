@@ -3696,6 +3696,9 @@ pub enum CoreError {
     /// but the token amounts are not merged togather.
     #[msg("same output tokens not merged")]
     SameOutputTokensNotMerged,
+    /// Event buffer is not provided.
+    #[msg("event buffer is not provided")]
+    EventBufferNotProvided,
     // ===========================================
     //                 Shift Errors
     // ===========================================
