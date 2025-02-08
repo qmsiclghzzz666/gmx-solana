@@ -832,8 +832,9 @@ impl<'info> CloseOrder<'info> {
 
             event_emitter.emit_cpi(&GtUpdated::rewarded(
                 referrer_user.owner,
-                amount,
+                reward,
                 store.gt(),
+                Some(referrer_user.gt()),
             ))?;
         }
 

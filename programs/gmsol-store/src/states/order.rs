@@ -613,6 +613,7 @@ impl Order {
             minting_cost,
             minted,
             store.gt(),
+            Some(user.gt()),
         ))?;
 
         Ok(())
