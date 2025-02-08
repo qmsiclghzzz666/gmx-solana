@@ -265,12 +265,7 @@ pub(crate) fn request_gt_exchange(ctx: Context<RequestGtExchange>, amount: u64) 
         .unchecked_request_exchange(&mut user, &mut vault, &mut exchange, amount)?;
 
     let event_emitter = EventEmitter::new(&accounts.event_authority, ctx.bumps.event_authority);
-    event_emitter.emit_cpi(&GtUpdated::burned(
-        user.owner,
-        amount,
-        store.gt(),
-        Some(user.gt()),
-    ))?;
+    event_emitter.emit_cpi(&GtUpdated::burned(amount, store.gt(), Some(&user)))?;
 
     Ok(())
 }
@@ -354,12 +349,7 @@ pub(crate) fn unchecked_confirm_gt_exchange_vault(
 
     let event_emitter = EventEmitter::new(&ctx.accounts.event_authority, ctx.bumps.event_authority);
     // Since no GT is minted, the rewarded amount is zero.
-    event_emitter.emit_cpi(&GtUpdated::rewarded(
-        ctx.accounts.authority.key(),
-        0,
-        store.gt(),
-        None,
-    ))?;
+    event_emitter.emit_cpi(&GtUpdated::rewarded(0, store.gt(), None))?;
     Ok(())
 }
 

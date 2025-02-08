@@ -596,7 +596,7 @@ impl Order {
         let value_to_mint_for = next_paid_fee_value.saturating_sub(minted_fee_value);
 
         let (minted, delta_minted_value, minting_cost) =
-            store.gt_mut().get_mint_amount(value_to_mint_for)?;
+            store.gt().get_mint_amount(value_to_mint_for)?;
 
         let next_minted_value = minted_fee_value
             .checked_add(delta_minted_value)
@@ -608,13 +608,14 @@ impl Order {
         user.gt.paid_fee_value = next_paid_fee_value;
         user.gt.minted_fee_value = next_minted_value;
 
-        event_emitter.emit_cpi(&GtUpdated::minted(
-            user.owner,
-            minting_cost,
-            minted,
-            store.gt(),
-            Some(user.gt()),
-        ))?;
+        event_emitter
+            .emit_cpi(&GtUpdated::minted(
+                minting_cost,
+                minted,
+                store.gt(),
+                Some(user),
+            ))
+            .expect("failed to emit GT minted event");
 
         Ok(())
     }

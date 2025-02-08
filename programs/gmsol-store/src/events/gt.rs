@@ -10,12 +10,10 @@ use super::Event;
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[derive(InitSpace)]
 pub struct GtUpdated {
+    /// Update kind.
+    pub kind: GtUpdateKind,
     /// Receiver.
-    pub receiver: Pubkey,
-    /// Whether the GT is minted or burned.
-    pub is_minted: bool,
-    /// Whether the GT is reward.
-    pub is_reward: bool,
+    pub receiver: Option<Pubkey>,
     /// Receiver Delta.
     pub receiver_delta: u64,
     /// Receiver balance.
@@ -34,6 +32,18 @@ pub struct GtUpdated {
     reserved: [u8; 64],
 }
 
+/// GT Update Kind.
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace)]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+pub enum GtUpdateKind {
+    /// Reward.
+    Reward,
+    /// Mint,
+    Mint,
+    /// Burn,
+    Burn,
+}
+
 impl gmsol_utils::InitSpace for GtUpdated {
     const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
 }
@@ -42,19 +52,17 @@ impl Event for GtUpdated {}
 
 impl GtUpdated {
     fn new(
-        receiver: Pubkey,
+        kind: GtUpdateKind,
         minting_cost: Option<u128>,
-        is_reward: bool,
         delta: u64,
         state: &GtState,
-        receiver_state: Option<&user::GtState>,
+        receiver: Option<&user::UserHeader>,
     ) -> Self {
         Self {
-            receiver,
-            is_minted: minting_cost.is_some(),
-            is_reward,
+            kind,
+            receiver: receiver.map(|header| header.owner),
             receiver_delta: delta,
-            receiver_balance: receiver_state.map(|state| state.amount),
+            receiver_balance: receiver.map(|header| header.gt().amount()),
             minting_cost: minting_cost.unwrap_or(state.minting_cost()),
             total_minted: state.total_minted(),
             grow_steps: state.grow_steps(),
@@ -65,47 +73,28 @@ impl GtUpdated {
     }
 
     /// Create a new rewarded event.
-    pub fn rewarded(
-        receiver: Pubkey,
-        amount: u64,
-        state: &GtState,
-        receiver_state: Option<&user::GtState>,
-    ) -> Self {
-        Self::new(
-            receiver,
-            Some(state.minting_cost()),
-            true,
-            amount,
-            state,
-            receiver_state,
-        )
+    pub fn rewarded(amount: u64, state: &GtState, receiver: Option<&user::UserHeader>) -> Self {
+        Self::new(GtUpdateKind::Reward, None, amount, state, receiver)
     }
 
     /// Create a new minted event.
     pub fn minted(
-        receiver: Pubkey,
         minting_cost: u128,
         amount: u64,
         state: &GtState,
-        receiver_state: Option<&user::GtState>,
+        receiver: Option<&user::UserHeader>,
     ) -> Self {
         Self::new(
-            receiver,
+            GtUpdateKind::Mint,
             Some(minting_cost),
-            false,
             amount,
             state,
-            receiver_state,
+            receiver,
         )
     }
 
     /// Create a new burned event.
-    pub fn burned(
-        receiver: Pubkey,
-        amount: u64,
-        state: &GtState,
-        receiver_state: Option<&user::GtState>,
-    ) -> Self {
-        Self::new(receiver, None, false, amount, state, receiver_state)
+    pub fn burned(amount: u64, state: &GtState, receiver: Option<&user::UserHeader>) -> Self {
+        Self::new(GtUpdateKind::Burn, None, amount, state, receiver)
     }
 }
