@@ -78,6 +78,38 @@ impl Initialize<'_> {
 }
 
 /// The accounts definition for
+/// [`update_last_restarted_slot`](crate::gmsol_store::update_last_restarted_slot).
+#[derive(Accounts)]
+pub struct UpdateLastRestartedSlot<'info> {
+    /// The caller of this instruction.
+    pub authority: Signer<'info>,
+    /// The store account whose authority is to be transferred.
+    #[account(mut)]
+    pub store: AccountLoader<'info, Store>,
+}
+
+/// Update last restarted slot.
+pub(crate) fn update_last_restarted_slot(ctx: Context<UpdateLastRestartedSlot>) -> Result<()> {
+    let slot = ctx
+        .accounts
+        .store
+        .load_mut()?
+        .update_last_restarted_slot(true)?;
+    msg!("[Store] the last_restarted_slot is now {}", slot);
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for UpdateLastRestartedSlot<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// The accounts definition for
 /// [`transfer_store_authority`](crate::gmsol_store::transfer_store_authority).
 #[derive(Accounts)]
 pub struct TransferStoreAuthority<'info> {
@@ -131,7 +163,12 @@ pub struct AcceptStoreAuthority<'info> {
 }
 
 pub(crate) fn accept_store_authority(ctx: Context<AcceptStoreAuthority>) -> Result<()> {
-    let authority = ctx.accounts.store.load_mut()?.update_authority()?;
+    let authority = ctx
+        .accounts
+        .store
+        .load_mut()?
+        .validate_not_restarted_mut()?
+        .update_authority()?;
     msg!("[Store] the authority is now {}", authority);
     Ok(())
 }
@@ -156,6 +193,7 @@ pub(crate) fn transfer_receiver(ctx: Context<TransferReceiver>) -> Result<()> {
     ctx.accounts
         .store
         .load_mut()?
+        .validate_not_restarted_mut()?
         .set_next_receiver(ctx.accounts.next_receiver.key)?;
     msg!(
         "[Treasury] the next_receiver is now {}",
@@ -178,7 +216,12 @@ pub struct AcceptReceiver<'info> {
 }
 
 pub(crate) fn accept_receiver(ctx: Context<AcceptReceiver>) -> Result<()> {
-    let receiver = ctx.accounts.store.load_mut()?.update_receiver()?;
+    let receiver = ctx
+        .accounts
+        .store
+        .load_mut()?
+        .validate_not_restarted_mut()?
+        .update_receiver()?;
     msg!("[Treasury] the receiver is now {}", receiver);
     Ok(())
 }
@@ -222,5 +265,11 @@ pub struct ReadStore<'info> {
 
 /// Get the token map address of the store.
 pub(crate) fn _get_token_map(ctx: Context<ReadStore>) -> Result<Option<Pubkey>> {
-    Ok(ctx.accounts.store.load()?.token_map().copied())
+    Ok(ctx
+        .accounts
+        .store
+        .load()?
+        .validate_not_restarted()?
+        .token_map()
+        .copied())
 }

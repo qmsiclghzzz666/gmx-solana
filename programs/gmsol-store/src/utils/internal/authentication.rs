@@ -16,7 +16,7 @@ pub(crate) trait Authentication<'info> {
     /// Check that the `authority` is an admin.
     fn only_admin(&self) -> Result<()> {
         require!(
-            self.store().load()?.is_authority(self.authority().key),
+            self.store().load()?.has_admin_role(self.authority().key)?,
             CoreError::NotAnAdmin
         );
         Ok(())

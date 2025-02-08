@@ -1,6 +1,6 @@
 use std::{num::NonZeroU64, str::FromStr};
 
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::last_restart_slot::LastRestartSlot};
 use bytemuck::Zeroable;
 use gmsol_utils::to_seed;
 
@@ -9,7 +9,7 @@ use crate::{constants, states::feature::display_feature, CoreError, CoreResult};
 use super::{
     feature::{ActionDisabledFlag, DisabledFeatures, DomainDisabledFlag},
     gt::GtState,
-    Amount, Factor, InitSpace, RoleStore, Seed,
+    Amount, Factor, InitSpace, RoleKey, RoleStore, Seed,
 };
 
 const MAX_LEN: usize = 32;
@@ -34,7 +34,9 @@ pub struct Store {
     /// Disabled features.
     disabled_features: DisabledFeatures,
     #[cfg_attr(feature = "debug", debug(skip))]
-    padding_1: [u8; 12],
+    padding_1: [u8; 4],
+    /// Cached last cluster restart slot.
+    last_restarted_slot: u64,
     /// Treasury Config.
     treasury: Treasury,
     /// Amounts.
@@ -107,6 +109,9 @@ impl Store {
         self.amount.init();
         self.factor.init();
         self.address.init(holding);
+
+        self.update_last_restarted_slot(false)?;
+
         Ok(())
     }
 
@@ -136,8 +141,20 @@ impl Store {
 
     /// Check if the roles has the given enabled role.
     /// Returns `true` only when the `role` is enabled and the `roles` has that role.
+    ///
+    /// # Note
+    /// - If the cluster [has restarted](Self::has_restarted), this function returns `true` if and only if
+    ///   the `authority` has the [`RESTART_ADMIN`](RoleKey::RESTART_ADMIN) role.
     pub fn has_role(&self, authority: &Pubkey, role: &str) -> Result<bool> {
-        self.role.has_role(authority, role)
+        if self.has_restarted()? {
+            if self.role.has_role(authority, RoleKey::RESTART_ADMIN)? {
+                Ok(true)
+            } else {
+                err!(CoreError::StoreOutdated)
+            }
+        } else {
+            self.role.has_role(authority, role)
+        }
     }
 
     /// Grant a role.
@@ -153,6 +170,21 @@ impl Store {
     /// Check if the given pubkey is the authority of the store.
     pub fn is_authority(&self, authority: &Pubkey) -> bool {
         self.authority == *authority
+    }
+
+    /// Check if the given authority has the ADMIN role.
+    ///
+    /// # Note
+    /// - If the cluster [has restarted](Self::has_restarted), addresses with the
+    ///   [`RESTART_ADMIN`](RoleKey::RESTART_ADMIN) role also have the ADMIN role.
+    pub fn has_admin_role(&self, authority: &Pubkey) -> Result<bool> {
+        if self.is_authority(authority) {
+            Ok(true)
+        } else if self.has_restarted()? {
+            self.role.has_role(authority, RoleKey::RESTART_ADMIN)
+        } else {
+            Ok(false)
+        }
     }
 
     pub(crate) fn set_next_authority(&mut self, next_authority: &Pubkey) -> Result<()> {
@@ -355,6 +387,40 @@ impl Store {
     ) {
         self.disabled_features
             .set_disabled(domain, action, disabled)
+    }
+
+    /// Returns whether the cluster has restarted since last update.
+    pub fn has_restarted(&self) -> Result<bool> {
+        Ok(self.last_restarted_slot != LastRestartSlot::get()?.last_restart_slot)
+    }
+
+    /// Validate the cluster has not restarted.
+    pub fn validate_not_restarted(&self) -> Result<&Self> {
+        require_eq!(
+            self.last_restarted_slot,
+            LastRestartSlot::get()?.last_restart_slot,
+            CoreError::StoreOutdated
+        );
+        Ok(self)
+    }
+
+    /// Validate the cluster has not restarted for mutable reference.
+    pub fn validate_not_restarted_mut(&mut self) -> Result<&mut Self> {
+        self.validate_not_restarted()?;
+        Ok(self)
+    }
+
+    pub(crate) fn update_last_restarted_slot(&mut self, update: bool) -> Result<u64> {
+        let current = LastRestartSlot::get()?.last_restart_slot;
+        if update {
+            require_neq!(
+                self.last_restarted_slot,
+                current,
+                CoreError::PreconditionsAreNotMet
+            );
+        }
+        self.last_restarted_slot = current;
+        Ok(self.last_restarted_slot)
     }
 
     /// Get order fee discount factor.

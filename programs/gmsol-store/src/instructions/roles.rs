@@ -14,11 +14,10 @@ pub struct CheckRole<'info> {
 
 /// Verify that the `user` is an admin of the given `store`.
 pub(crate) fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
-    Ok(ctx
-        .accounts
+    ctx.accounts
         .store
         .load()?
-        .is_authority(ctx.accounts.authority.key))
+        .has_admin_role(ctx.accounts.authority.key)
 }
 
 /// Verify that the `authority` has the given role in the given `store`.
@@ -37,14 +36,14 @@ pub struct HasRole<'info> {
     pub store: AccountLoader<'info, Store>,
 }
 
+/// Verify that the `user` is an admin of the given `store` without signing.
+pub fn has_admin(ctx: Context<HasRole>, authority: Pubkey) -> Result<bool> {
+    ctx.accounts.store.load()?.has_admin_role(&authority)
+}
+
 /// Verify that the `authority` has the given role in the given `store` without signing.
 pub fn has_role(ctx: Context<HasRole>, authority: Pubkey, role: String) -> Result<bool> {
     ctx.accounts.store.load()?.has_role(&authority, &role)
-}
-
-/// Verify that the `user` is an admin of the given `store` without signing.
-pub fn has_admin(ctx: Context<HasRole>, authority: Pubkey) -> Result<bool> {
-    Ok(ctx.accounts.store.load()?.is_authority(&authority))
 }
 
 /// The accounts definition for [`enable_role`](crate::gmsol_store::enable_role).
