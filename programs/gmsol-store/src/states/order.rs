@@ -950,6 +950,11 @@ impl OrderParams {
     pub fn min_output(&self) -> u128 {
         self.min_output
     }
+
+    /// Get valid from ts.
+    pub fn valid_from_ts(&self) -> i64 {
+        self.valid_from_ts
+    }
 }
 
 /// Order side.
