@@ -9,7 +9,15 @@ use solana_sdk::{
 pub type BoxSigner = Box<dyn Signer>;
 
 /// Boxed Clonable Signer.
-pub type BoxClonableSigner = Box<dyn CloneableSigner>;
+#[derive(Clone)]
+pub struct BoxClonableSigner<'a>(pub Box<dyn CloneableSigner + 'a>);
+
+impl<'a> BoxClonableSigner<'a> {
+    /// Create from `impl Signer`.
+    pub fn new(signer: impl Signer + Clone + 'a) -> Self {
+        Self(Box::new(signer))
+    }
+}
 
 /// Clonable Signer.
 pub trait CloneableSigner: Signer + DynClone {}
@@ -18,24 +26,24 @@ impl<T: Signer + Clone> CloneableSigner for T {}
 
 clone_trait_object!(CloneableSigner);
 
-impl Signer for BoxClonableSigner {
+impl Signer for BoxClonableSigner<'_> {
     fn pubkey(&self) -> Pubkey {
-        (**self).pubkey()
+        self.0.pubkey()
     }
 
     fn sign_message(&self, message: &[u8]) -> Signature {
-        (**self).sign_message(message)
+        self.0.sign_message(message)
     }
 
     fn try_pubkey(&self) -> Result<Pubkey, SignerError> {
-        (**self).try_pubkey()
+        self.0.try_pubkey()
     }
 
     fn try_sign_message(&self, message: &[u8]) -> Result<Signature, SignerError> {
-        (**self).try_sign_message(message)
+        self.0.try_sign_message(message)
     }
 
     fn is_interactive(&self) -> bool {
-        (**self).is_interactive()
+        self.0.is_interactive()
     }
 }

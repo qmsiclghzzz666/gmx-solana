@@ -97,7 +97,7 @@ pub struct TransactionBuilder<'a, C, T = ()> {
     program_id: Pubkey,
     cfg: Config<C>,
     signers: Vec<&'a dyn Signer>,
-    owned_signers: Vec<BoxClonableSigner>,
+    owned_signers: Vec<BoxClonableSigner<'static>>,
     pre_instructions: Vec<Instruction>,
     accounts: Vec<AccountMeta>,
     instruction_data: Option<Vec<u8>>,
@@ -240,7 +240,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
 
     /// Add a owned sigenr to the signer list.
     pub fn owned_signer(mut self, signer: impl Signer + Clone + 'static) -> Self {
-        self.owned_signers.push(Box::new(signer));
+        self.owned_signers.push(BoxClonableSigner::new(signer));
         self
     }
 
