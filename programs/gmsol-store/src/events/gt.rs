@@ -38,9 +38,9 @@ pub struct GtUpdated {
 pub enum GtUpdateKind {
     /// Reward.
     Reward,
-    /// Mint,
+    /// Mint.
     Mint,
-    /// Burn,
+    /// Burn.
     Burn,
 }
 
