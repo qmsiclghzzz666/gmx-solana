@@ -72,7 +72,7 @@ squads-multisig = "2.0.1"
 static_assertions = "1.1.0"
 strum = "0.26.2"
 switchboard-on-demand = { version = "0.2.2", features = ["anchor"] }
-switchboard-on-demand-client = { version = "0.2.9", features = [] }
+switchboard-on-demand-client = { version = "=0.2.11", features = [] }
 thiserror = "1.0.67"
 tokio = "1.41.0"
 tokio-stream = "0.1.15"
