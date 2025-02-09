@@ -1219,6 +1219,7 @@ impl MarketConfigMap {
         };
 
         tracing::info!("Buffer account to be pushed to: {buffer}");
+        println!("{buffer}");
 
         let configs = self.0.iter().collect::<Vec<_>>();
         for batch in configs.chunks(batch.get()) {
@@ -1235,7 +1236,7 @@ impl MarketConfigMap {
             serialize_only,
             skip_preflight,
             |signatures, error| {
-                println!("{signatures:#?}");
+                tracing::info!("{signatures:#?}");
                 match error {
                     None => Ok(()),
                     Some(err) => Err(err),

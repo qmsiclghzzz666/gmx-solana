@@ -56,6 +56,9 @@ else
     echo "GMSOL_TIME_WINDOW is set to: $GMSOL_TIME_WINDOW"
 fi
 
+export CLUSTER=localnet
+export STORE_PROGRAM_ID="Gmso1uvJnLbawvw7yezdfCDcPydwW2s2iqG3w6MDucLo"
+
 export KEEPER_ADDRESS=$(solana-keygen pubkey $GMSOL_KEEPER)
 solana -ul airdrop 10000 $KEEPER_ADDRESS
 solana -ul airdrop 1 11111111111111111111111111111112
@@ -71,19 +74,22 @@ spl-token -ul create-token $LOCALNET_BTC_KEYPAIR --decimals 8
 spl-token -ul create-account $BTC
 spl-token -ul mint $BTC 1000000000
 
-cargo gmsol -ul other init-mock-chainlink-verifier
+export WSOL="So11111111111111111111111111111111111111112"
+export SOL="11111111111111111111111111111111"
+
+cargo gmsol other init-mock-chainlink-verifier
 
 export ADDRESS=$(solana address)
 
-export STORE=$(cargo gmsol -ul admin create-store)
+export STORE=$(cargo gmsol admin create-store)
 
-export RECEIVER=$(cargo gmsol -ul treasury receiver)
+export RECEIVER=$(cargo gmsol treasury receiver)
 
-cargo gmsol -ul admin transfer-receiver $RECEIVER --confirm
+cargo gmsol admin transfer-receiver $RECEIVER --confirm
 
-export CONFIG=$(cargo gmsol -ul treasury init-config)
+export CONFIG=$(cargo gmsol treasury init-config)
 
-cargo gmsol -ul admin init-roles \
+cargo gmsol admin init-roles \
     --market-keeper $KEEPER_ADDRESS \
     --order-keeper $KEEPER_ADDRESS \
     --treasury-admin $KEEPER_ADDRESS \
@@ -92,17 +98,17 @@ cargo gmsol -ul admin init-roles \
     --timelock-admin $ADDRESS \
     --allow-multiple-transactions
 
-export TREASURY=$(cargo gmsol -ul -w $GMSOL_KEEPER treasury init-treasury 0)
-cargo gmsol -ul -w $GMSOL_KEEPER treasury set-treasury $TREASURY
+export TREASURY=$(cargo gmsol -w $GMSOL_KEEPER treasury init-treasury 0)
+cargo gmsol -w $GMSOL_KEEPER treasury set-treasury $TREASURY
 
-cargo gmsol -ul -w $GMSOL_KEEPER treasury insert-token So11111111111111111111111111111111111111112
-cargo gmsol -ul -w $GMSOL_KEEPER treasury toggle-token-flag So11111111111111111111111111111111111111112 allow_deposit --enable
-cargo gmsol -ul -w $GMSOL_KEEPER treasury toggle-token-flag So11111111111111111111111111111111111111112 allow_withdrawal --enable
-cargo gmsol -ul -w $GMSOL_KEEPER treasury insert-token $USDG
-cargo gmsol -ul -w $GMSOL_KEEPER treasury toggle-token-flag $USDG allow_deposit --enable
-cargo gmsol -ul -w $GMSOL_KEEPER treasury toggle-token-flag $USDG allow_withdrawal --enable
+cargo gmsol -w $GMSOL_KEEPER treasury insert-token $WSOL
+cargo gmsol -w $GMSOL_KEEPER treasury toggle-token-flag $WSOL allow_deposit --enable
+cargo gmsol -w $GMSOL_KEEPER treasury toggle-token-flag $WSOL allow_withdrawal --enable
+cargo gmsol -w $GMSOL_KEEPER treasury insert-token $USDG
+cargo gmsol -w $GMSOL_KEEPER treasury toggle-token-flag $USDG allow_deposit --enable
+cargo gmsol -w $GMSOL_KEEPER treasury toggle-token-flag $USDG allow_withdrawal --enable
 
-cargo gmsol -ul -w $GMSOL_KEEPER market init-gt \
+cargo gmsol -w $GMSOL_KEEPER market init-gt \
     -c 100000000000 \
     --grow-factor 102100000000000000000 \
     --grow-step 2100000000000 \
@@ -116,11 +122,11 @@ cargo gmsol -ul -w $GMSOL_KEEPER market init-gt \
     20000000000000 \
     60000000000000
 
-cargo gmsol -ul admin grant-role $KEEPER_ADDRESS GT_CONTROLLER
-cargo gmsol -ul -w $GMSOL_KEEPER gt set-exchange-time-window $GMSOL_TIME_WINDOW
-cargo gmsol -ul admin revoke-role $KEEPER_ADDRESS GT_CONTROLLER
+cargo gmsol admin grant-role $KEEPER_ADDRESS GT_CONTROLLER
+cargo gmsol -w $GMSOL_KEEPER gt set-exchange-time-window $GMSOL_TIME_WINDOW
+cargo gmsol admin revoke-role $KEEPER_ADDRESS GT_CONTROLLER
 
-cargo gmsol -ul -w $GMSOL_KEEPER market set-order-fee-discount-factors \
+cargo gmsol -w $GMSOL_KEEPER market set-order-fee-discount-factors \
     0 \
     2000000000000000000 \
     3000000000000000000 \
@@ -132,7 +138,7 @@ cargo gmsol -ul -w $GMSOL_KEEPER market set-order-fee-discount-factors \
     9000000000000000000 \
     10000000000000000000
 
-cargo gmsol -ul -w $GMSOL_KEEPER treasury set-referral-reward \
+cargo gmsol -w $GMSOL_KEEPER treasury set-referral-reward \
     0 \
     2000000000000000000 \
     3000000000000000000 \
@@ -144,29 +150,46 @@ cargo gmsol -ul -w $GMSOL_KEEPER treasury set-referral-reward \
     9000000000000000000 \
     10000000000000000000
 
-cargo gmsol -ul -w $GMSOL_KEEPER market set-referred-discount-factor 10000000000000000000
+cargo gmsol -w $GMSOL_KEEPER market set-referred-discount-factor 10000000000000000000
 
-cargo gmsol -ul -w $GMSOL_KEEPER treasury set-gt-factor 51428600000000000000
+cargo gmsol -w $GMSOL_KEEPER treasury set-gt-factor 51428600000000000000
 
-cargo gmsol -ul -w $GMSOL_KEEPER treasury set-buyback-factor 2000000000000000000
+cargo gmsol -w $GMSOL_KEEPER treasury set-buyback-factor 2000000000000000000
 
-export TOKEN_MAP=$(cargo gmsol -ul market create-token-map)
-export ORACLE=$(cargo gmsol -ul market init-oracle --seed $GMSOL_ORACLE_SEED --authority $CONFIG)
-cargo gmsol -ul -w $GMSOL_KEEPER market insert-token-configs $GMSOL_TOKENS --token-map $TOKEN_MAP --set-token-map
-cargo gmsol -ul -w $GMSOL_KEEPER market create-markets $GMSOL_MARKETS --enable
-cargo gmsol -ul -w $GMSOL_KEEPER market update-configs $GMSOL_MARKET_CONFIGS
+export TOKEN_MAP=$(cargo gmsol market create-token-map)
+export ORACLE=$(cargo gmsol market init-oracle --seed $GMSOL_ORACLE_SEED --authority $CONFIG)
+cargo gmsol -w $GMSOL_KEEPER market insert-token-configs $GMSOL_TOKENS --token-map $TOKEN_MAP --set-token-map
+cargo gmsol -w $GMSOL_KEEPER market create-markets $GMSOL_MARKETS --enable
 
-cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting HhLa62Wzhb8AXSWHMBT8cCSWtjqKujh1VfvSPbjuBkyP --enable
-cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting BS1atVNQs2CFwf8EuLivrVxm14SBXoiYdMBfg7budTQg --enable
-cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting DmZeSpGmGwNWSv66CrbXijGjLwZD5E6zkx4aKHgn266M --enable
+export SOL_WSOL_WSOL=$(solana find-program-derived-address $STORE_PROGRAM_ID string:market_token_mint pubkey:$STORE pubkey:$SOL pubkey:$WSOL pubkey:$WSOL)
+export SOL_WSOL_USDG=$(solana find-program-derived-address $STORE_PROGRAM_ID string:market_token_mint pubkey:$STORE pubkey:$SOL pubkey:$WSOL pubkey:$USDG)
+export BTC_BTC_USDG=$(solana find-program-derived-address $STORE_PROGRAM_ID string:market_token_mint pubkey:$STORE pubkey:$BTC pubkey:$BTC pubkey:$USDG)
+export BTC_WSOL_USDG=$(solana find-program-derived-address $STORE_PROGRAM_ID string:market_token_mint pubkey:$STORE pubkey:$BTC pubkey:$WSOL pubkey:$USDG)
 
-export COMMON_ALT=$(cargo gmsol -ul alt extend --init common $ORACLE)
-export MARKET_ALT=$(cargo gmsol -ul alt extend --init market)
+export BUFFER=$(cargo gmsol -w $GMSOL_KEEPER market push-to-buffer $GMSOL_MARKET_CONFIGS --init --market-token 11111111111111111111111111111112)
+cargo gmsol -w $GMSOL_KEEPER market update-config $SOL_WSOL_WSOL --buffer $BUFFER
 
-cargo gmsol -ul timelock init-executor ADMIN
-export ADMIN_EXECUTOR_WALLET=$(cargo gmsol -ul timelock executor-wallet ADMIN)
-cargo gmsol -ul admin transfer-store-authority --new-authority $ADMIN_EXECUTOR_WALLET --confirm
-cargo gmsol -ul timelock init-config --initial-delay 300
+export BUFFER=$(cargo gmsol -w $GMSOL_KEEPER market push-to-buffer $GMSOL_MARKET_CONFIGS --init --market-token 11111111111111111111111111111113)
+cargo gmsol -w $GMSOL_KEEPER market update-config $SOL_WSOL_USDG --buffer $BUFFER
+
+export BUFFER=$(cargo gmsol -w $GMSOL_KEEPER market push-to-buffer $GMSOL_MARKET_CONFIGS --init --market-token 11111111111111111111111111111114)
+cargo gmsol -w $GMSOL_KEEPER market update-config $BTC_BTC_USDG --buffer $BUFFER
+
+export BUFFER=$(cargo gmsol -w $GMSOL_KEEPER market push-to-buffer $GMSOL_MARKET_CONFIGS --init --market-token 11111111111111111111111111111115)
+cargo gmsol -w $GMSOL_KEEPER market update-config $BTC_WSOL_USDG --buffer $BUFFER
+
+cargo gmsol -w $GMSOL_KEEPER market toggle-gt-minting $SOL_WSOL_WSOL --enable
+cargo gmsol -w $GMSOL_KEEPER market toggle-gt-minting $SOL_WSOL_USDG --enable
+cargo gmsol -w $GMSOL_KEEPER market toggle-gt-minting $BTC_BTC_USDG --enable
+cargo gmsol -w $GMSOL_KEEPER market toggle-gt-minting $BTC_WSOL_USDG --enable
+
+export COMMON_ALT=$(cargo gmsol alt extend --init common $ORACLE)
+export MARKET_ALT=$(cargo gmsol alt extend --init market)
+
+cargo gmsol timelock init-executor ADMIN
+export ADMIN_EXECUTOR_WALLET=$(cargo gmsol timelock executor-wallet ADMIN)
+cargo gmsol admin transfer-store-authority --new-authority $ADMIN_EXECUTOR_WALLET --confirm
+cargo gmsol timelock init-config --initial-delay 300
 
 echo "STORE: $STORE"
 echo "ADMIN_EXECUTOR_WALLET: $ADMIN_EXECUTOR_WALLET"

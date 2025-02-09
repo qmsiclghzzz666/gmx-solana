@@ -1,4 +1,4 @@
-[HhLa62Wzhb8AXSWHMBT8cCSWtjqKujh1VfvSPbjuBkyP]
+[11111111111111111111111111111112]
 swap_impact_exponent = "100_000_000_000_000_000_000"
 swap_impact_positive_factor = "0"
 swap_impact_negative_factor = "0"
@@ -60,8 +60,9 @@ max_pool_value_for_deposit_for_long_token = "75_000_000_000_000_000_000_000_000"
 max_pool_value_for_deposit_for_short_token = "75_000_000_000_000_000_000_000_000"
 max_open_interest_for_long = "45_000_000_000_000_000_000_000_000"
 max_open_interest_for_short = "45_000_000_000_000_000_000_000_000"
+min_tokens_for_first_deposit = "1"
 
-[BS1atVNQs2CFwf8EuLivrVxm14SBXoiYdMBfg7budTQg]
+[11111111111111111111111111111113]
 swap_impact_exponent = "200_000_000_000_000_000_000"
 swap_impact_positive_factor = "175_000_000_000"
 swap_impact_negative_factor = "350_000_000_000"
@@ -123,8 +124,9 @@ max_pool_value_for_deposit_for_long_token = "1_750_000_000_000_000_000_000_000_0
 max_pool_value_for_deposit_for_short_token = "1_750_000_000_000_000_000_000_000_000"
 max_open_interest_for_long = "175_000_000_000_000_000_000_000_000"
 max_open_interest_for_short = "175_000_000_000_000_000_000_000_000"
+min_tokens_for_first_deposit = "1"
 
-[DmZeSpGmGwNWSv66CrbXijGjLwZD5E6zkx4aKHgn266M]
+[11111111111111111111111111111114]
 swap_impact_exponent = "200_000_000_000_000_000_000"
 swap_impact_positive_factor = "175_000_000_000"
 swap_impact_negative_factor = "350_000_000_000"
@@ -186,8 +188,9 @@ max_pool_value_for_deposit_for_long_token = "10_000_000_000_000_000_000_000_000_
 max_pool_value_for_deposit_for_short_token = "10_000_000_000_000_000_000_000_000_000"
 max_open_interest_for_long = "400_000_000_000_000_000_000_000_000"
 max_open_interest_for_short = "400_000_000_000_000_000_000_000_000"
+min_tokens_for_first_deposit = "1"
 
-[2o84toWK58xBnmaX8bCzUERWyLWhpthLyD8u2d7FQyD8]
+[11111111111111111111111111111115]
 swap_impact_exponent = "200_000_000_000_000_000_000"
 swap_impact_positive_factor = "175_000_000_000"
 swap_impact_negative_factor = "350_000_000_000"
@@ -249,3 +252,4 @@ max_pool_value_for_deposit_for_long_token = "1_750_000_000_000_000_000_000_000_0
 max_pool_value_for_deposit_for_short_token = "1_750_000_000_000_000_000_000_000_000"
 max_open_interest_for_long = "175_000_000_000_000_000_000_000_000"
 max_open_interest_for_short = "175_000_000_000_000_000_000_000_000"
+min_tokens_for_first_deposit = "1"
