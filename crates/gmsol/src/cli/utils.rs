@@ -194,6 +194,7 @@ where
                             &message,
                             None,
                             draft,
+                            Some(txn_idx as u64),
                         )
                         .await?
                         .swap_output(());

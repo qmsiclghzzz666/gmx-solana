@@ -133,6 +133,7 @@ pub trait SquadsOps<C> {
         message: &VersionedMessage,
         memo: Option<String>,
         draft: bool,
+        offset: Option<u64>,
     ) -> impl Future<Output = crate::Result<TransactionBuilder<C, Pubkey>>>;
 }
 
@@ -206,6 +207,7 @@ impl<C: Deref<Target = impl Signer> + Clone> SquadsOps<C> for crate::Client<C> {
         message: &VersionedMessage,
         memo: Option<String>,
         draft: bool,
+        offset: Option<u64>,
     ) -> crate::Result<TransactionBuilder<C, Pubkey>> {
         let multisig_data = get_multisig(&self.store_program().rpc(), multisig)
             .await
@@ -214,7 +216,7 @@ impl<C: Deref<Target = impl Signer> + Clone> SquadsOps<C> for crate::Client<C> {
         self.squads_create_vault_transaction_with_index(
             multisig,
             vault_index,
-            multisig_data.transaction_index + 1,
+            multisig_data.transaction_index + 1 + offset.unwrap_or(0),
             message,
             memo,
             draft,
