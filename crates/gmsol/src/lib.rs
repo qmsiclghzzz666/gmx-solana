@@ -60,6 +60,7 @@ mod test;
 pub use client::{Client, ClientOptions};
 pub use error::Error;
 pub use gmsol_model as model;
+pub use gmsol_solana_utils as solana_utils;
 
 #[cfg(feature = "decode")]
 pub use gmsol_decode as decode;
