@@ -1019,6 +1019,17 @@ impl InspectArgs {
                     unsigned_value_to_decimal(glv.shift_max_price_impact_factor()).normalize()
                         * rust_decimal::Decimal::ONE_HUNDRED
                 );
+                println!(
+                    "Shift min value: {}",
+                    unsigned_value_to_decimal(glv.shift_min_value()).normalize()
+                );
+                println!(
+                    "Min tokens for first depost: {}",
+                    unsigned_amount_to_decimal(
+                        glv.min_tokens_for_first_deposit(),
+                        constants::MARKET_TOKEN_DECIMALS
+                    ),
+                );
                 println!();
                 let mut table = Table::new();
                 table.set_titles(row![

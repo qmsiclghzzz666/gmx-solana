@@ -549,6 +549,11 @@ impl Glv {
     pub fn shift_min_value(&self) -> u128 {
         self.shift_min_value
     }
+
+    /// Get min tokens for first deposit.
+    pub fn min_tokens_for_first_deposit(&self) -> u64 {
+        self.min_tokens_for_first_deposit
+    }
 }
 
 /// GLV Update Params.
