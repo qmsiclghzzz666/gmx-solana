@@ -1,4 +1,10 @@
-use crate::{utils::ToggleValue, GMSOLClient, InstructionBufferCtx};
+use std::path::PathBuf;
+
+use crate::{
+    ser::SerdeFactor,
+    utils::{toml_from_file, ToggleValue},
+    GMSOLClient, InstructionBufferCtx,
+};
 use gmsol::{
     store::glv::GlvOps,
     types::{
@@ -8,6 +14,8 @@ use gmsol::{
     },
     utils::instruction::InstructionSerialization,
 };
+use indexmap::IndexMap;
+use serde_with::serde_as;
 use solana_sdk::pubkey::Pubkey;
 
 #[derive(clap::Args)]
@@ -161,6 +169,9 @@ struct GlvToken {
 #[derive(clap::Args)]
 #[group(required = true, multiple = true)]
 struct UpdateGlvArgs {
+    /// Path to the update file (TOML).
+    #[arg(long, short)]
+    file: Option<PathBuf>,
     /// Minimum amount for the first GLV deposit.
     #[arg(long)]
     min_tokens_for_first_deposit: Option<u64>,
@@ -186,7 +197,7 @@ impl<'a> From<&'a UpdateGlvArgs> for UpdateGlvParams {
     }
 }
 
-#[derive(clap::Args)]
+#[derive(clap::Args, Debug, serde::Serialize, serde::Deserialize)]
 #[group(required = true, multiple = true)]
 struct Config {
     #[arg(long)]
@@ -206,6 +217,7 @@ impl GlvToken {
 }
 
 impl Args {
+    #[allow(clippy::too_many_arguments)]
     pub(super) async fn run(
         &self,
         client: &GMSOLClient,
@@ -214,6 +226,7 @@ impl Args {
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
         priority_lamports: u64,
+        max_transaction_size: Option<usize>,
     ) -> gmsol::Result<()> {
         let selected = &self.glv_token;
         let mut rpc = match &self.command {
@@ -235,7 +248,56 @@ impl Args {
             }
             Command::Update(args) => {
                 let glv_token = selected.address(client, store);
-                client.update_glv_config(store, &glv_token, args.into())
+                match &args.file {
+                    Some(file) => {
+                        let UpdateGlv { glv, market } = toml_from_file(file)?;
+
+                        let mut bundle =
+                            client.bundle_with_options(false, max_transaction_size, None);
+
+                        let params: UpdateGlvParams = glv.try_into()?;
+                        if !params.is_empty() {
+                            bundle.push(client.update_glv_config(store, &glv_token, params))?;
+                        }
+
+                        for (market_token, MarketConfigWithFlag { config, flag }) in market {
+                            bundle.push(client.update_glv_market_config(
+                                store,
+                                &glv_token,
+                                &market_token,
+                                config.max_amount()?,
+                                config.max_value(),
+                            ))?;
+
+                            for (flag, enable) in flag {
+                                bundle.push(client.toggle_glv_market_flag(
+                                    store,
+                                    &glv_token,
+                                    &market_token,
+                                    flag,
+                                    enable,
+                                ))?;
+                            }
+                        }
+
+                        return crate::utils::send_or_serialize_bundle(
+                            store,
+                            bundle,
+                            timelock,
+                            serialize_only,
+                            skip_preflight,
+                            |signatures, err| {
+                                tracing::info!("{signatures:#?}");
+                                match err {
+                                    None => Ok(()),
+                                    Some(err) => Err(err),
+                                }
+                            },
+                        )
+                        .await;
+                    }
+                    None => client.update_glv_config(store, &glv_token, args.into()),
+                }
             }
             Command::ToggleMarketFlag {
                 market_token,
@@ -408,4 +470,78 @@ impl Args {
         )
         .await
     }
+}
+
+#[serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct UpdateGlv {
+    #[serde(flatten)]
+    glv: GlvConfig,
+    #[serde(flatten)]
+    #[serde_as(as = "IndexMap<serde_with::DisplayFromStr, _>")]
+    market: IndexMap<Pubkey, MarketConfigWithFlag>,
+}
+
+#[serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct GlvConfig {
+    #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
+    min_tokens_for_first_deposit: Option<SerdeFactor>,
+    #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
+    shift_min_interval: Option<humantime::Duration>,
+    #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
+    shift_max_price_impact_factor: Option<SerdeFactor>,
+    #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
+    shift_min_value: Option<SerdeFactor>,
+}
+
+impl TryFrom<GlvConfig> for UpdateGlvParams {
+    type Error = gmsol::Error;
+
+    fn try_from(config: GlvConfig) -> Result<Self, Self::Error> {
+        Ok(Self {
+            min_tokens_for_first_deposit: config
+                .min_tokens_for_first_deposit
+                .map(|f| f.0.try_into().map_err(gmsol::Error::unknown))
+                .transpose()?,
+            shift_min_interval_secs: config
+                .shift_min_interval
+                .map(|d| d.as_secs().try_into().map_err(gmsol::Error::unknown))
+                .transpose()?,
+            shift_max_price_impact_factor: config.shift_max_price_impact_factor.map(|f| f.0),
+            shift_min_value: config.shift_min_value.map(|f| f.0),
+        })
+    }
+}
+
+#[serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct MarketConfig {
+    #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
+    max_amount: Option<SerdeFactor>,
+    #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
+    max_value: Option<SerdeFactor>,
+}
+
+impl MarketConfig {
+    fn max_amount(&self) -> gmsol::Result<Option<u64>> {
+        self.max_amount
+            .as_ref()
+            .map(|f| f.0.try_into().map_err(gmsol::Error::unknown))
+            .transpose()
+    }
+
+    fn max_value(&self) -> Option<u128> {
+        self.max_value.as_ref().map(|f| f.0)
+    }
+}
+
+#[serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct MarketConfigWithFlag {
+    #[serde(flatten)]
+    config: MarketConfig,
+    #[serde(flatten)]
+    #[serde_as(as = "IndexMap<serde_with::DisplayFromStr, _>")]
+    flag: IndexMap<GlvMarketFlag, bool>,
 }

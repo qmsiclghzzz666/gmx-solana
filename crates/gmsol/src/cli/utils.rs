@@ -410,6 +410,17 @@ impl ToggleValue {
     }
 }
 
+pub(crate) fn toml_from_file<T>(path: &impl AsRef<std::path::Path>) -> gmsol::Result<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    use std::io::Read;
+
+    let mut buffer = String::new();
+    std::fs::File::open(path)?.read_to_string(&mut buffer)?;
+    toml::from_str(&buffer).map_err(gmsol::Error::invalid_argument)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

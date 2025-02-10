@@ -1,9 +1,4 @@
-use std::{
-    collections::HashSet,
-    io::Read,
-    num::NonZeroUsize,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, num::NonZeroUsize, path::PathBuf};
 
 use anchor_client::solana_sdk::{
     pubkey::Pubkey,
@@ -34,9 +29,12 @@ use gmsol_store::states::{
 };
 use indexmap::IndexMap;
 use rand::{rngs::StdRng, SeedableRng};
-use serde::de::DeserializeOwned;
 
-use crate::{ser::MarketConfigMap, utils::ToggleValue, GMSOLClient, InstructionBufferCtx};
+use crate::{
+    ser::MarketConfigMap,
+    utils::{toml_from_file, ToggleValue},
+    GMSOLClient, InstructionBufferCtx,
+};
 
 #[derive(clap::Args)]
 pub(super) struct Args {
@@ -1348,13 +1346,4 @@ impl MarketConfigs {
         .await?;
         Ok(())
     }
-}
-
-fn toml_from_file<T>(path: &impl AsRef<Path>) -> gmsol::Result<T>
-where
-    T: DeserializeOwned,
-{
-    let mut buffer = String::new();
-    std::fs::File::open(path)?.read_to_string(&mut buffer)?;
-    toml::from_str(&buffer).map_err(gmsol::Error::invalid_argument)
 }

@@ -571,24 +571,27 @@ pub struct UpdateGlvParams {
 }
 
 impl UpdateGlvParams {
+    /// Returns whether the update is empty.
+    pub fn is_empty(&self) -> bool {
+        self.min_tokens_for_first_deposit.is_none()
+            && self.shift_min_interval_secs.is_none()
+            && self.shift_max_price_impact_factor.is_none()
+            && self.shift_min_value.is_none()
+    }
+
     pub(crate) fn validate(&self) -> Result<()> {
-        require!(
-            self.min_tokens_for_first_deposit.is_some()
-                || self.shift_min_interval_secs.is_some()
-                || self.shift_max_price_impact_factor.is_some()
-                || self.shift_min_value.is_some(),
-            CoreError::InvalidArgument
-        );
+        require!(!self.is_empty(), CoreError::InvalidArgument);
         Ok(())
     }
 }
 
 /// GLV Market Config Flag.
 #[derive(
-    num_enum::IntoPrimitive, Clone, Copy, strum::EnumString, strum::Display, PartialEq, Eq,
+    num_enum::IntoPrimitive, Clone, Copy, strum::EnumString, strum::Display, PartialEq, Eq, Hash,
 )]
 #[strum(serialize_all = "snake_case")]
 #[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
+#[cfg_attr(feature = "debug", derive(Debug))]
 #[repr(u8)]
 pub enum GlvMarketFlag {
     /// Is deposit allowed.

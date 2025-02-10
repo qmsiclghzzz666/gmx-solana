@@ -1,0 +1,14 @@
+min_tokens_for_first_deposit = "1_000_000_000"
+shift_min_interval = "2h"
+shift_max_price_impact_factor = "100_000_000_000_000_000"
+shift_min_value = "100_000_000_000_000_000_000"
+
+[338dwWNqFoXsaw8UzGjVnxqzvrfLWqtMTSUSeZXwaQnY]
+max_amount = "5_000_000_000_000_000"
+max_value = "500_000_000_000_000_000_000_000_000"
+is_deposit_allowed = false
+
+[7VuNcy1A22rYfiaqaqbGZr9z9PmmahAsc6RNET165GiW]
+max_amount = "5_000_000_000_000_000"
+max_value = "500_000_000_000_000_000_000_000_000"
+is_deposit_allowed = false

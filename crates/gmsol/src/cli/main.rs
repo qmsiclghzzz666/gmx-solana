@@ -89,6 +89,9 @@ struct Cli {
     /// Whether to skip preflight.
     #[arg(long, group = "ts-opts")]
     skip_preflight: bool,
+    /// Max transaction size.
+    #[arg(long)]
+    max_transaction_size: Option<usize>,
     /// Use this address as payer.
     ///
     /// Only available in `serialize-only` mode.
@@ -328,6 +331,7 @@ impl Cli {
                     self.serialize_only,
                     self.skip_preflight,
                     self.priority_lamports,
+                    self.max_transaction_size,
                 )
                 .await?
             }
