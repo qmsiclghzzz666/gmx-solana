@@ -1024,11 +1024,12 @@ impl InspectArgs {
                     unsigned_value_to_decimal(glv.shift_min_value()).normalize()
                 );
                 println!(
-                    "Min tokens for first depost: {}",
+                    "Min tokens for first deposit: {}",
                     unsigned_amount_to_decimal(
                         glv.min_tokens_for_first_deposit(),
                         constants::MARKET_TOKEN_DECIMALS
-                    ),
+                    )
+                    .normalize(),
                 );
                 println!();
                 let mut table = Table::new();
