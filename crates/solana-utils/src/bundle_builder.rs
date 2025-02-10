@@ -47,6 +47,8 @@ pub struct SendBundleOptions {
     pub config: RpcSendTransactionConfig,
     /// Whether to trace transaction error.
     pub disable_error_tracing: bool,
+    /// Cluster of the inspector url.
+    pub inspector_cluster: Option<Cluster>,
 }
 
 /// Buidler for transaction bundle.
@@ -258,6 +260,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
             continue_on_error,
             mut config,
             disable_error_tracing,
+            inspector_cluster,
         } = opts;
         config.preflight_commitment = config
             .preflight_commitment
@@ -291,6 +294,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
             update_recent_block_hash_before_send,
             continue_on_error,
             !disable_error_tracing,
+            inspector_cluster,
         )
         .await
     }
@@ -330,6 +334,7 @@ async fn send_all_txs(
     update_recent_block_hash_before_send: bool,
     continue_on_error: bool,
     enable_tracing: bool,
+    inspector_cluster: Option<Cluster>,
 ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
     let txs = txs.into_iter();
     let (min, max) = txs.size_hint();
@@ -361,9 +366,9 @@ async fn send_all_txs(
             }
             Err(err) => {
                 if enable_tracing {
-                    let cluster = client.url().parse().ok().and_then(|cluster| {
-                        (!matches!(cluster, Cluster::Custom(_, _))).then_some(cluster)
-                    });
+                    let cluster = inspector_cluster
+                        .clone()
+                        .or_else(|| client.url().parse().ok());
                     let inspector_url = inspect_transaction(&tx.message, cluster.as_ref(), false);
                     let hash = tx.message.recent_blockhash();
                     tracing::error!(%err, %hash, ?config, "transaction {idx} failed: {inspector_url}");
