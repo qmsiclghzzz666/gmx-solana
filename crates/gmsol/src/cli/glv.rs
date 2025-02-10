@@ -51,9 +51,15 @@ enum Command {
         config: Config,
     },
     /// Insert Market.
-    InsertMarket { market_token: Pubkey },
+    InsertMarket {
+        #[clap(required = true)]
+        market_tokens: Vec<Pubkey>,
+    },
     /// Remove Market.
-    RemoveMarket { market_token: Pubkey },
+    RemoveMarket {
+        #[clap(required = true)]
+        market_tokens: Vec<Pubkey>,
+    },
     /// Create GLV deposit.
     Deposit {
         /// The address of the market token of the GLV Market to deposit into.
@@ -222,7 +228,7 @@ impl Args {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
-        timelock: Option<InstructionBufferCtx<'_>>,
+        ctx: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
         priority_lamports: u64,
@@ -283,7 +289,7 @@ impl Args {
                         return crate::utils::send_or_serialize_bundle(
                             store,
                             bundle,
-                            timelock,
+                            ctx,
                             serialize_only,
                             skip_preflight,
                             |signatures, err| {
@@ -320,18 +326,37 @@ impl Args {
                 config.max_amount,
                 config.max_value,
             ),
-            Command::InsertMarket { market_token } => client.insert_glv_market(
-                store,
-                &selected.address(client, store),
-                market_token,
-                None,
-            ),
-            Command::RemoveMarket { market_token } => client.remove_glv_market(
-                store,
-                &selected.address(client, store),
-                market_token,
-                None,
-            ),
+            Command::InsertMarket { market_tokens } => {
+                let mut bundle = client.bundle_with_options(false, max_transaction_size, None);
+                let glv_token = selected.address(client, store);
+                for market_token in market_tokens {
+                    bundle.push(client.insert_glv_market(store, &glv_token, market_token, None))?;
+                }
+                return crate::utils::send_or_serialize_bundle_with_default_callback(
+                    store,
+                    bundle,
+                    ctx,
+                    serialize_only,
+                    skip_preflight,
+                )
+                .await;
+            }
+            Command::RemoveMarket { market_tokens } => {
+                let mut bundle = client.bundle_with_options(false, max_transaction_size, None);
+                let glv_token = selected.address(client, store);
+
+                for market_token in market_tokens {
+                    bundle.push(client.remove_glv_market(store, &glv_token, market_token, None))?;
+                }
+                return crate::utils::send_or_serialize_bundle_with_default_callback(
+                    store,
+                    bundle,
+                    ctx,
+                    serialize_only,
+                    skip_preflight,
+                )
+                .await;
+            }
             Command::Deposit {
                 market_token,
                 receiver,
@@ -460,7 +485,7 @@ impl Args {
         crate::utils::send_or_serialize_transaction(
             store,
             rpc,
-            timelock,
+            ctx,
             serialize_only,
             skip_preflight,
             |signature| {

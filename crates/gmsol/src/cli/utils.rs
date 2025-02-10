@@ -256,6 +256,34 @@ where
     Ok(())
 }
 
+pub(crate) async fn send_or_serialize_bundle_with_default_callback<C, S>(
+    store: &Pubkey,
+    builder: BundleBuilder<'_, C>,
+    instruction_buffer_ctx: Option<InstructionBufferCtx<'_>>,
+    serialize_only: Option<InstructionSerialization>,
+    skip_preflight: bool,
+) -> gmsol::Result<()>
+where
+    C: Clone + Deref<Target = S>,
+    S: Signer,
+{
+    send_or_serialize_bundle(
+        store,
+        builder,
+        instruction_buffer_ctx,
+        serialize_only,
+        skip_preflight,
+        |signatures, err| {
+            tracing::info!("{signatures:#?}");
+            match err {
+                None => Ok(()),
+                Some(err) => Err(err),
+            }
+        },
+    )
+    .await
+}
+
 pub(crate) fn table_format() -> TableFormat {
     use prettytable::format::{LinePosition, LineSeparator};
 
