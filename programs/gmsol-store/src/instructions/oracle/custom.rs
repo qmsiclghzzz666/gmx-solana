@@ -37,7 +37,7 @@ pub struct InitializePriceFeed<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// CHECK: only ORDER_KEEPER is allowed to initialize price feed.
+/// CHECK: only PRICE_KEEPER is allowed to initialize price feed.
 pub(crate) fn unchecked_initialize_price_feed(
     ctx: Context<InitializePriceFeed>,
     index: u8,
@@ -95,7 +95,7 @@ pub struct UpdatePriceFeedWithChainlink<'info> {
     pub chainlink: Interface<'info, ChainlinkDataStreamsInterface>,
 }
 
-/// CHECK: only ORDER_KEEPER can update custom price feed.
+/// CHECK: only PRICE_KEEPER can update custom price feed.
 pub(crate) fn unchecked_update_price_feed_with_chainlink(
     ctx: Context<UpdatePriceFeedWithChainlink>,
     compressed_report: Vec<u8>,

@@ -290,6 +290,7 @@ impl InitializeRoles {
                     RoleKey::GT_CONTROLLER,
                     RoleKey::MARKET_KEEPER,
                     RoleKey::ORDER_KEEPER,
+                    RoleKey::PRICE_KEEPER,
                     RoleKey::FEATURE_KEEPER,
                     RoleKey::CONFIG_KEEPER,
                     RoleKey::ORACLE_CONTROLLER,
@@ -344,7 +345,9 @@ impl InitializeRoles {
             ))?;
 
         for keeper in self.unique_order_keepers() {
-            builder.try_push(client.grant_role(&store, keeper, RoleKey::ORDER_KEEPER))?;
+            builder
+                .try_push(client.grant_role(&store, keeper, RoleKey::ORDER_KEEPER))?
+                .try_push(client.grant_role(&store, keeper, RoleKey::PRICE_KEEPER))?;
         }
 
         crate::utils::send_or_serialize_bundle(

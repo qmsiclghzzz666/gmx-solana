@@ -1160,7 +1160,7 @@ pub mod gmsol_store {
     /// - `feed_id`: The feed ID defined by the price provider.
     ///
     /// # Errors
-    /// - The [`authority`](InitializePriceFeed::authority) must be a signer and have the ORDER_KEEPER
+    /// - The [`authority`](InitializePriceFeed::authority) must be a signer and have the PRICE_KEEPER
     ///   role in the store.
     /// - The [`store`](InitializePriceFeed::store) must be an initialized store account owned by
     ///   the store program.
@@ -1168,7 +1168,7 @@ pub mod gmsol_store {
     ///   must match the PDA derived from the `store`, `index`, `feed_id`, and other expected seeds.
     /// - The `provider` index must correspond to a valid [`PriceProviderKind`] that supports
     ///   custom price feeds.
-    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_price_keeper(&ctx))]
     pub fn initialize_price_feed(
         ctx: Context<InitializePriceFeed>,
         index: u8,
@@ -1193,7 +1193,7 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`authority`](UpdatePriceFeedWithChainlink::authority) must be a signer and have the
-    ///   ORDER_KEEPER role in the store.
+    ///   PRICE_KEEPER role in the store.
     /// - The [`store`](UpdatePriceFeedWithChainlink::store) must be an initialized store account
     /// - The [`verifier_account`](UpdatePriceFeedWithChainlink::verifier_account) must be a valid
     ///   Chainlink verifier account.
@@ -1210,7 +1210,7 @@ pub mod gmsol_store {
     /// - The current slot and timestamp must be >= the feed's last update.
     /// - The price data timestamp must be >= the feed's last price timestamp
     /// - The price data must meet all validity requirements (see the `update` method of [`PriceFeed`](states::oracle::PriceFeed)).
-    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_price_keeper(&ctx))]
     pub fn update_price_feed_with_chainlink(
         ctx: Context<UpdatePriceFeedWithChainlink>,
         compressed_report: Vec<u8>,

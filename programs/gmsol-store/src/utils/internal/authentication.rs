@@ -73,6 +73,11 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
     fn only_config_keeper(ctx: &Context<Self>) -> Result<()> {
         Self::only(ctx, RoleKey::CONFIG_KEEPER)
     }
+
+    /// Check that the `authority` has the [`PRICE_KEEPER`](`RoleKey::PRICE_KEEPER`) role.
+    fn only_price_keeper(ctx: &Context<Self>) -> Result<()> {
+        Self::only(ctx, RoleKey::PRICE_KEEPER)
+    }
 }
 
 impl<'info, T> Authenticate<'info> for T where T: Authentication<'info> + Bumps + Sized {}

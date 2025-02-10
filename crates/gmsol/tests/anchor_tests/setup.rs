@@ -576,6 +576,7 @@ impl Deployment {
                     RoleKey::GT_CONTROLLER,
                     RoleKey::MARKET_KEEPER,
                     RoleKey::ORDER_KEEPER,
+                    RoleKey::PRICE_KEEPER,
                     RoleKey::FEATURE_KEEPER,
                     RoleKey::CONFIG_KEEPER,
                 ]
@@ -585,6 +586,7 @@ impl Deployment {
             )?
             .push(client.grant_role(store, &keeper, RoleKey::MARKET_KEEPER))?
             .push(client.grant_role(store, &keeper, RoleKey::ORDER_KEEPER))?
+            .push(client.grant_role(store, &keeper, RoleKey::PRICE_KEEPER))?
             .push(client.grant_role(store, &keeper, RoleKey::FEATURE_KEEPER))?
             .push(client.grant_role(store, &keeper, RoleKey::CONFIG_KEEPER))?
             .push(client.grant_role(store, &keeper, RoleKey::GT_CONTROLLER))?;

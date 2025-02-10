@@ -47,6 +47,9 @@ impl RoleKey {
     /// Restart Admin.
     /// When the cluster restarts, this role can be used for **any** role, including ADMIN."
     pub const RESTART_ADMIN: &'static str = "RESTART_ADMIN";
+
+    /// Price Keeper.
+    pub const PRICE_KEEPER: &'static str = "PRICE_KEEPER";
 }
 
 impl Borrow<str> for RoleKey {
