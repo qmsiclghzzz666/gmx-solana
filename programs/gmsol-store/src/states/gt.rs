@@ -59,9 +59,8 @@ pub struct GtState {
     /* Configs */
     minting_cost_grow_factor: u128,
     minting_cost: u128,
-    reserve_factor: u128,
     #[cfg_attr(feature = "debug", debug(skip))]
-    padding_3: [u8; 16],
+    padding_3: [u8; 32],
     exchange_time_window: u32,
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_4: [u8; 12],
@@ -119,7 +118,6 @@ impl GtState {
         target.copy_from_slice(ranks);
         self.max_rank = max_rank as u64;
 
-        self.reserve_factor = constants::DEFAULT_GT_RESERVE_FACTOR;
         self.exchange_time_window = constants::DEFAULT_GT_VAULT_TIME_WINDOW;
 
         Ok(())

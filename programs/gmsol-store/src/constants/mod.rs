@@ -64,6 +64,3 @@ pub const DEFAULT_ORACLE_REF_PRICE_DEVIATION: Factor = 1_000_000_000_000_000;
 
 /// Default GT vault time window size.
 pub const DEFAULT_GT_VAULT_TIME_WINDOW: u32 = 24 * 60 * 60;
-
-/// Default GT reserve factor.
-pub const DEFAULT_GT_RESERVE_FACTOR: u128 = 5 * MARKET_USD_UNIT;
