@@ -27,6 +27,7 @@ mod other;
 mod ser;
 mod timelock;
 mod treasury;
+mod user;
 mod utils;
 
 type GMSOLClient = gmsol::Client<LocalSignerRef>;
@@ -112,6 +113,8 @@ enum Command {
     Whoami,
     /// Commands for admin.
     Admin(AdminArgs),
+    /// Commands for user.
+    User(user::Args),
     /// Commands for treasury.
     Treasury(treasury::Args),
     /// Commands for timelock.
@@ -286,6 +289,17 @@ impl Cli {
                 args.run(
                     &client,
                     &store_key,
+                    instruction_buffer_ctx,
+                    self.serialize_only,
+                    self.skip_preflight,
+                    self.max_transaction_size,
+                )
+                .await?
+            }
+            Command::User(args) => {
+                args.run(
+                    &client,
+                    &store,
                     instruction_buffer_ctx,
                     self.serialize_only,
                     self.skip_preflight,
