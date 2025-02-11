@@ -1,6 +1,9 @@
 use std::ops::Deref;
 
-use gmsol_solana_utils::{bundle_builder::BundleBuilder, transaction_builder::TransactionBuilder};
+use gmsol_solana_utils::{
+    bundle_builder::{BundleBuilder, BundleOptions},
+    transaction_builder::TransactionBuilder,
+};
 use solana_sdk::signer::Signer;
 
 use super::MakeBundleBuilder;
@@ -40,8 +43,11 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> MakeBundleBuilder<'a, C> for
 where
     T: MakeBundleBuilder<'a, C>,
 {
-    async fn build(&mut self) -> crate::Result<BundleBuilder<'a, C>> {
-        let mut bundle = self.builder.build().await?;
+    async fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<'a, C>> {
+        let mut bundle = self.builder.build_with_options(options).await?;
 
         if !self.pre_transaction_stack.is_empty() {
             let mut pre_bundle = bundle.try_clone_empty()?;

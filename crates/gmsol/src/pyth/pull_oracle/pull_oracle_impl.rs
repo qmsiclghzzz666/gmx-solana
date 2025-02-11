@@ -5,6 +5,7 @@ use std::{
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
 use either::Either;
+use gmsol_solana_utils::bundle_builder::BundleOptions;
 use gmsol_store::states::PriceProviderKind;
 use pythnet_sdk::wire::v1::AccumulatorUpdateData;
 use time::OffsetDateTime;
@@ -114,11 +115,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
     async fn fetch_price_update_instructions(
         &self,
         price_updates: &Self::PriceUpdates,
+        options: BundleOptions,
     ) -> crate::Result<(
         PriceUpdateInstructions<'a, C>,
         HashMap<PriceProviderKind, FeedAddressMap>,
     )> {
-        let mut ixns = PriceUpdateInstructions::new(self.gmsol);
+        let mut ixns = PriceUpdateInstructions::new(self.gmsol, options);
 
         let PriceUpdates { updates, num_feeds } = price_updates;
 
@@ -224,10 +226,13 @@ where
     async fn fetch_price_update_instructions(
         &self,
         price_updates: &Self::PriceUpdates,
+        options: BundleOptions,
     ) -> crate::Result<(
         PriceUpdateInstructions<'a, C>,
         HashMap<PriceProviderKind, FeedAddressMap>,
     )> {
-        (*self).fetch_price_update_instructions(price_updates).await
+        (*self)
+            .fetch_price_update_instructions(price_updates, options)
+            .await
     }
 }

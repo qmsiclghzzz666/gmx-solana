@@ -8,7 +8,7 @@ use anchor_client::solana_client::nonblocking::rpc_client::RpcClient;
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
 use anchor_spl::associated_token::get_associated_token_address;
 use base64::prelude::*;
-use gmsol_solana_utils::program::Program;
+use gmsol_solana_utils::{bundle_builder::BundleOptions, program::Program};
 use gmsol_store::states::PriceProviderKind;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
@@ -192,6 +192,7 @@ impl<'a, C: Clone + Deref<Target = impl Signer>> PostPullOraclePrices<'a, C>
     async fn fetch_price_update_instructions(
         &self,
         price_updates: &Self::PriceUpdates,
+        options: BundleOptions,
     ) -> crate::Result<(
         PriceUpdateInstructions<'a, C>,
         HashMap<PriceProviderKind, FeedAddressMap>,
@@ -218,7 +219,7 @@ impl<'a, C: Clone + Deref<Target = impl Signer>> PostPullOraclePrices<'a, C>
         let mut luts = oracle_luts;
         luts.extend(pull_feed_luts);
         luts.extend(queue_lut);
-        let mut ixns = PriceUpdateInstructions::new(self.gmsol);
+        let mut ixns = PriceUpdateInstructions::new(self.gmsol, options);
 
         let payer = self.gmsol.payer();
         let mut prices = HashMap::<Pubkey, Pubkey>::new();

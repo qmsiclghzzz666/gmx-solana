@@ -5,7 +5,10 @@ use anchor_client::{
     solana_sdk::{address_lookup_table::AddressLookupTableAccount, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use gmsol_solana_utils::{bundle_builder::BundleBuilder, compute_budget::ComputeBudget};
+use gmsol_solana_utils::{
+    bundle_builder::{BundleBuilder, BundleOptions},
+    compute_budget::ComputeBudget,
+};
 use gmsol_store::{
     accounts, instruction,
     ops::order::PositionCutKind,
@@ -260,7 +263,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
 impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
     for PositionCutBuilder<'a, C>
 {
-    async fn build(&mut self) -> crate::Result<BundleBuilder<'a, C>> {
+    async fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<'a, C>> {
         let token_program_id = anchor_spl::token::ID;
 
         let payer = self.client.payer();
@@ -440,12 +446,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
         )
         .build(self.client);
 
-        let mut builder = BundleBuilder::from_rpc_client(self.client.store_program().rpc());
-        builder
+        let mut bundle = self.client.bundle_with_options(options);
+        bundle
             .try_push(pre_builder.merge(prepare_event_buffer))?
             .try_push(prepare.merge(exec_builder))?
             .try_push(post_builder)?;
-        Ok(builder)
+        Ok(bundle)
     }
 }
 

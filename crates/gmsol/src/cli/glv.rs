@@ -14,6 +14,7 @@ use gmsol::{
     },
     utils::instruction::InstructionSerialization,
 };
+use gmsol_solana_utils::bundle_builder::BundleOptions;
 use indexmap::IndexMap;
 use serde_with::serde_as;
 use solana_sdk::pubkey::Pubkey;
@@ -258,8 +259,10 @@ impl Args {
                     Some(file) => {
                         let UpdateGlv { glv, market } = toml_from_file(file)?;
 
-                        let mut bundle =
-                            client.bundle_with_options(false, max_transaction_size, None);
+                        let mut bundle = client.bundle_with_options(BundleOptions {
+                            max_packet_size: max_transaction_size,
+                            ..Default::default()
+                        });
 
                         let params: UpdateGlvParams = glv.try_into()?;
                         if !params.is_empty() {
@@ -327,7 +330,10 @@ impl Args {
                 config.max_value,
             ),
             Command::InsertMarket { market_tokens } => {
-                let mut bundle = client.bundle_with_options(false, max_transaction_size, None);
+                let mut bundle = client.bundle_with_options(BundleOptions {
+                    max_packet_size: max_transaction_size,
+                    ..Default::default()
+                });
                 let glv_token = selected.address(client, store);
                 for market_token in market_tokens {
                     bundle.push(client.insert_glv_market(store, &glv_token, market_token, None))?;
@@ -342,7 +348,10 @@ impl Args {
                 .await;
             }
             Command::RemoveMarket { market_tokens } => {
-                let mut bundle = client.bundle_with_options(false, max_transaction_size, None);
+                let mut bundle = client.bundle_with_options(BundleOptions {
+                    max_packet_size: max_transaction_size,
+                    ..Default::default()
+                });
                 let glv_token = selected.address(client, store);
 
                 for market_token in market_tokens {

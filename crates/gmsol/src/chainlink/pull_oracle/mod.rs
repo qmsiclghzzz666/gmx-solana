@@ -7,7 +7,7 @@ pub mod pull_oracle_impl;
 mod access_controller_address;
 
 pub use client::{ApiReport, Client, Credential};
-pub use pull_oracle_impl::{ChainlinkPullOracle, ChainlinkPullOracleFactory};
+pub use pull_oracle_impl::{filter_feed_ids, ChainlinkPullOracle, ChainlinkPullOracleFactory};
 
 pub type FeedId = [u8; 32];
 

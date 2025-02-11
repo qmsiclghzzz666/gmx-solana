@@ -9,7 +9,8 @@ use anchor_client::{
 };
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use gmsol_solana_utils::{
-    bundle_builder::BundleBuilder, compute_budget::ComputeBudget,
+    bundle_builder::{BundleBuilder, BundleOptions},
+    compute_budget::ComputeBudget,
     transaction_builder::TransactionBuilder,
 };
 use gmsol_store::{
@@ -772,8 +773,10 @@ mod pyth {
 impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
     for ExecuteGlvDepositBuilder<'a, C>
 {
-    /// Build.
-    async fn build(&mut self) -> crate::Result<BundleBuilder<'a, C>> {
+    async fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
 
         let token_program_id = anchor_spl::token::ID;
@@ -890,7 +893,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
             execute
         };
 
-        let mut tx = self.client.bundle();
+        let mut tx = self.client.bundle_with_options(options);
 
         tx.try_push(rpc)?;
 

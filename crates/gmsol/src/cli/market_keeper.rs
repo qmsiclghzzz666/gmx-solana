@@ -22,7 +22,7 @@ use gmsol::{
     },
     utils::instruction::InstructionSerialization,
 };
-use gmsol_solana_utils::bundle_builder::BundleBuilder;
+use gmsol_solana_utils::bundle_builder::{BundleBuilder, BundleOptions};
 use gmsol_store::states::{
     Factor, MarketConfigKey, PriceProviderKind, UpdateTokenConfigParams,
     DEFAULT_HEARTBEAT_DURATION, DEFAULT_PRECISION,
@@ -1053,9 +1053,10 @@ async fn insert_token_configs(
 ) -> gmsol::Result<()> {
     let mut builder = BundleBuilder::from_rpc_client_with_options(
         client.store_program().rpc(),
-        false,
-        max_transaction_size,
-        None,
+        BundleOptions {
+            max_packet_size: max_transaction_size,
+            ..Default::default()
+        },
     );
 
     if set_token_map {
@@ -1132,9 +1133,10 @@ async fn create_markets(
 ) -> gmsol::Result<()> {
     let mut builder = BundleBuilder::from_rpc_client_with_options(
         client.store_program().rpc(),
-        false,
-        max_transaction_size,
-        None,
+        BundleOptions {
+            max_packet_size: max_transaction_size,
+            ..Default::default()
+        },
     );
     let token_map = client
         .authorized_token_map_address(store)
@@ -1199,9 +1201,10 @@ impl MarketConfigMap {
     ) -> gmsol::Result<()> {
         let mut builder = BundleBuilder::from_rpc_client_with_options(
             client.store_program().rpc(),
-            false,
-            max_transaction_size,
-            None,
+            BundleOptions {
+                max_packet_size: max_transaction_size,
+                ..Default::default()
+            },
         );
 
         let buffer_keypair = Keypair::new();
@@ -1274,9 +1277,10 @@ impl MarketConfigs {
     ) -> gmsol::Result<()> {
         let mut builder = BundleBuilder::from_rpc_client_with_options(
             client.store_program().rpc(),
-            false,
-            max_transaction_size,
-            None,
+            BundleOptions {
+                max_packet_size: max_transaction_size,
+                ..Default::default()
+            },
         );
 
         let mut buffers_to_close = HashSet::<Pubkey>::default();

@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use anchor_client::solana_sdk::signer::Signer;
-use gmsol_solana_utils::bundle_builder::BundleBuilder;
+use gmsol_solana_utils::bundle_builder::{BundleBuilder, BundleOptions};
 
 use super::MakeBundleBuilder;
 
@@ -37,8 +37,11 @@ where
     T: SetExecutionFee,
     T: MakeBundleBuilder<'a, C>,
 {
-    async fn build(&mut self) -> crate::Result<BundleBuilder<'a, C>> {
-        let mut tx = self.builder.build().await?;
+    async fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<'a, C>> {
+        let mut tx = self.builder.build_with_options(options.clone()).await?;
 
         if self.builder.is_execution_fee_estimation_required() {
             let lamports = tx
@@ -46,7 +49,7 @@ where
                 .await?;
             self.builder.set_execution_fee(lamports);
             tracing::info!(%lamports, "execution fee estimated");
-            tx = self.builder.build().await?;
+            tx = self.builder.build_with_options(options).await?;
         }
 
         Ok(tx)

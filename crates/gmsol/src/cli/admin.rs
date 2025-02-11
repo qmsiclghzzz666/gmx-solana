@@ -3,7 +3,7 @@ use gmsol::{
     store::{roles::RolesOps, store_ops::StoreOps},
     utils::instruction::InstructionSerialization,
 };
-use gmsol_solana_utils::bundle_builder::BundleBuilder;
+use gmsol_solana_utils::bundle_builder::{BundleBuilder, BundleOptions};
 use gmsol_store::states::RoleKey;
 use gmsol_timelock::roles as timelock_roles;
 use gmsol_treasury::roles as treasury_roles;
@@ -67,12 +67,14 @@ impl AdminArgs {
         ctx: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
+        max_transaction_size: Option<usize>,
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
         match &self.command {
             Command::InitRoles(args) => {
                 crate::utils::instruction_buffer_not_supported(ctx)?;
-                args.run(client, store_key, serialize_only).await?
+                args.run(client, store_key, serialize_only, max_transaction_size)
+                    .await?
             }
             Command::CreateStore {} => {
                 tracing::info!(
@@ -266,14 +268,17 @@ impl InitializeRoles {
         client: &GMSOLClient,
         store_key: &str,
         serialize_only: Option<InstructionSerialization>,
+        max_transaction_size: Option<usize>,
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
 
         let mut builder = BundleBuilder::from_rpc_client_with_options(
             client.store_program().rpc(),
-            !self.allow_multiple_transactions,
-            self.max_transaction_size,
-            None,
+            BundleOptions {
+                force_one_transaction: !self.allow_multiple_transactions,
+                max_packet_size: max_transaction_size,
+                ..Default::default()
+            },
         );
 
         if self.init_store {

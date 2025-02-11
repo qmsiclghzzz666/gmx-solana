@@ -1,7 +1,10 @@
 use std::{collections::HashMap, future::Future, ops::Deref};
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
-use gmsol_solana_utils::{bundle_builder::BundleBuilder, transaction_builder::TransactionBuilder};
+use gmsol_solana_utils::{
+    bundle_builder::{BundleBuilder, BundleOptions},
+    transaction_builder::TransactionBuilder,
+};
 use gmsol_store::states::{common::TokensWithFeed, PriceProviderKind};
 use time::OffsetDateTime;
 
@@ -31,22 +34,33 @@ impl<O: PullOracle, T> WithPullOracle<O, T> {
     }
 
     /// Fetch the required price updates and use them to construct transactions.
-    pub async fn new(
+    pub async fn from_consumer(
         pull_oracle: O,
         mut builder: T,
         after: Option<OffsetDateTime>,
-    ) -> crate::Result<Self>
+    ) -> crate::Result<(Self, FeedIds)>
     where
         T: PullOraclePriceConsumer,
     {
         let feed_ids = builder.feed_ids().await?;
         let price_updates = pull_oracle.fetch_price_updates(&feed_ids, after).await?;
 
-        Ok(Self::with_price_updates(
-            pull_oracle,
-            builder,
-            price_updates,
+        Ok((
+            Self::with_price_updates(pull_oracle, builder, price_updates),
+            feed_ids,
         ))
+    }
+
+    /// Fetch the required price updates and use them to construct transactions.
+    pub async fn new(
+        pull_oracle: O,
+        builder: T,
+        after: Option<OffsetDateTime>,
+    ) -> crate::Result<Self>
+    where
+        T: PullOraclePriceConsumer,
+    {
+        Ok(Self::from_consumer(pull_oracle, builder, after).await?.0)
     }
 }
 
@@ -56,17 +70,20 @@ where
     O: PostPullOraclePrices<'a, C>,
     T: PullOraclePriceConsumer + MakeBundleBuilder<'a, C>,
 {
-    async fn build(&mut self) -> crate::Result<BundleBuilder<'a, C>> {
+    async fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<'a, C>> {
         let (instructions, map) = self
             .pull_oracle
-            .fetch_price_update_instructions(&self.price_updates)
+            .fetch_price_update_instructions(&self.price_updates, options.clone())
             .await?;
 
         for (kind, map) in map {
             self.builder.process_feeds(kind, map)?;
         }
 
-        let consume = self.builder.build().await?;
+        let consume = self.builder.build_with_options(options).await?;
 
         let PriceUpdateInstructions {
             post: mut tx,
@@ -152,10 +169,10 @@ pub struct PriceUpdateInstructions<'a, C> {
 
 impl<'a, C: Deref<Target = impl Signer> + Clone> PriceUpdateInstructions<'a, C> {
     /// Create a new empty price update instructions.
-    pub fn new(client: &'a crate::Client<C>) -> Self {
+    pub fn new(client: &'a crate::Client<C>, options: BundleOptions) -> Self {
         Self {
-            post: client.bundle(),
-            close: client.bundle(),
+            post: client.bundle_with_options(options.clone()),
+            close: client.bundle_with_options(options),
         }
     }
 }
@@ -195,6 +212,7 @@ pub trait PostPullOraclePrices<'a, C>: PullOracle {
     fn fetch_price_update_instructions(
         &self,
         price_updates: &Self::PriceUpdates,
+        options: BundleOptions,
     ) -> impl Future<
         Output = crate::Result<(
             PriceUpdateInstructions<'a, C>,

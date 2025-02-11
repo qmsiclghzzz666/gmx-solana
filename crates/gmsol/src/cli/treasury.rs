@@ -16,6 +16,7 @@ use gmsol::{
     },
 };
 use gmsol_model::{BalanceExt, BaseMarket};
+use gmsol_solana_utils::bundle_builder::BundleOptions;
 use gmsol_treasury::states::treasury::TokenFlag;
 
 use crate::{
@@ -149,6 +150,7 @@ impl Args {
         ctx: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
         skip_preflight: bool,
+        max_transaction_size: Option<usize>,
     ) -> gmsol::Result<()> {
         let req = match &self.command {
             Command::InitConfig => {
@@ -291,42 +293,85 @@ impl Args {
                     chainlink::Client::from_defaults()
                 };
 
-                let txns = match chainlink.as_ref() {
+                match chainlink.as_ref() {
                     Ok(chainlink) => {
-                        let ctx = ChainlinkPullOracleFactory::new(store, 0).arced();
-                        let oracle = ctx.make_oracle(chainlink, client, false);
+                        let factory = ChainlinkPullOracleFactory::new(store, 0).arced();
+                        let oracle = factory.make_oracle(chainlink, client, true);
 
-                        WithPullOracle::new(oracle, with_pyth, None)
-                            .await?
-                            .build()
-                            .await?
+                        let (mut with_chainlink, feed_ids) =
+                            WithPullOracle::from_consumer(oracle.clone(), with_pyth, None).await?;
+
+                        let mut bundle = oracle
+                            .prepare_feeds_bundle(
+                                &feed_ids,
+                                BundleOptions {
+                                    max_packet_size: max_transaction_size,
+                                    ..Default::default()
+                                },
+                            )
+                            .await?;
+
+                        bundle.append(
+                            with_chainlink
+                                .build_with_options(BundleOptions {
+                                    max_packet_size: max_transaction_size,
+                                    ..Default::default()
+                                })
+                                .await?,
+                            false,
+                        )?;
+
+                        return crate::utils::send_or_serialize_bundle(
+                            store,
+                            bundle,
+                            ctx,
+                            serialize_only,
+                            skip_preflight,
+                            |signatures, error| {
+                                match error {
+                                    Some(err) => {
+                                        tracing::error!(%err, "success txns: {signatures:#?}");
+                                    }
+                                    None => {
+                                        tracing::info!("success txns: {signatures:#?}");
+                                    }
+                                }
+                                Ok(())
+                            },
+                        )
+                        .await;
                     }
                     Err(err) => {
                         tracing::warn!(%err, "failed to connect to the chainlink client");
 
-                        with_pyth.build().await?
-                    }
-                };
+                        let bundle = with_pyth
+                            .build_with_options(BundleOptions {
+                                max_packet_size: max_transaction_size,
+                                ..Default::default()
+                            })
+                            .await?;
 
-                return crate::utils::send_or_serialize_bundle(
-                    store,
-                    txns,
-                    ctx,
-                    serialize_only,
-                    skip_preflight,
-                    |signatures, error| {
-                        match error {
-                            Some(err) => {
-                                tracing::error!(%err, "success txns: {signatures:#?}");
-                            }
-                            None => {
-                                tracing::info!("success txns: {signatures:#?}");
-                            }
-                        }
-                        Ok(())
-                    },
-                )
-                .await;
+                        return crate::utils::send_or_serialize_bundle(
+                            store,
+                            bundle,
+                            ctx,
+                            serialize_only,
+                            skip_preflight,
+                            |signatures, error| {
+                                match error {
+                                    Some(err) => {
+                                        tracing::error!(%err, "success txns: {signatures:#?}");
+                                    }
+                                    None => {
+                                        tracing::info!("success txns: {signatures:#?}");
+                                    }
+                                }
+                                Ok(())
+                            },
+                        )
+                        .await;
+                    }
+                }
             }
             Command::SyncGtBank {
                 gt_exchange_vault,

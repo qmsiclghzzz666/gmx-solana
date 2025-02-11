@@ -17,12 +17,21 @@ pub use self::{
     },
     surround::Surround,
 };
-use gmsol_solana_utils::bundle_builder::BundleBuilder;
+
+pub use gmsol_solana_utils::{bundle_builder::BundleBuilder, bundle_builder::BundleOptions};
 
 /// Builder for [`BundleBuilder`]s.
 pub trait MakeBundleBuilder<'a, C> {
+    /// Build with options.
+    fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> impl Future<Output = crate::Result<BundleBuilder<'a, C>>>;
+
     /// Build.
-    fn build(&mut self) -> impl Future<Output = crate::Result<BundleBuilder<'a, C>>>;
+    fn build(&mut self) -> impl Future<Output = crate::Result<BundleBuilder<'a, C>>> {
+        self.build_with_options(Default::default())
+    }
 }
 
 /// Extension trait for [`MakeBundleBuilder`].

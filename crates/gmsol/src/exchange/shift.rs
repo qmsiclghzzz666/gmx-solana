@@ -5,7 +5,10 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use gmsol_solana_utils::{bundle_builder::BundleBuilder, transaction_builder::TransactionBuilder};
+use gmsol_solana_utils::{
+    bundle_builder::{BundleBuilder, BundleOptions},
+    transaction_builder::TransactionBuilder,
+};
 use gmsol_store::{
     accounts, instruction,
     instructions::ordered_tokens,
@@ -550,8 +553,11 @@ mod pyth {
 impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
     for ExecuteShiftBuilder<'a, C>
 {
-    async fn build(&mut self) -> crate::Result<BundleBuilder<'a, C>> {
-        let mut tx = self.client.bundle();
+    async fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<'a, C>> {
+        let mut tx = self.client.bundle_with_options(options);
         tx.try_push(self.build_rpc().await?)?;
         Ok(tx)
     }

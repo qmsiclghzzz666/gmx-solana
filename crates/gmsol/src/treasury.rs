@@ -6,7 +6,10 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use gmsol_solana_utils::{bundle_builder::BundleBuilder, transaction_builder::TransactionBuilder};
+use gmsol_solana_utils::{
+    bundle_builder::{BundleBuilder, BundleOptions},
+    transaction_builder::TransactionBuilder,
+};
 use gmsol_store::states::{
     common::TokensWithFeed, gt::GtExchange, Chainlink, NonceBytes, PriceProviderKind,
 };
@@ -995,7 +998,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ConfirmGtBuybackBuilder<'a, C> 
 impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
     for ConfirmGtBuybackBuilder<'a, C>
 {
-    async fn build(&mut self) -> crate::Result<BundleBuilder<'a, C>> {
+    async fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
 
         let gt_bank = self
@@ -1053,7 +1059,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
             .accounts(feeds)
             .accounts(tokens.chain(vaults).collect::<Vec<_>>());
 
-        let mut tx = self.client.bundle();
+        let mut tx = self.client.bundle_with_options(options);
         tx.try_push(rpc)?;
 
         Ok(tx)

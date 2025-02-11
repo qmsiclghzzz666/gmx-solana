@@ -20,7 +20,7 @@ use solana_sdk::{
 use anchor_lang::prelude::*;
 
 use crate::{
-    bundle_builder::{BundleBuilder, CreateBundleOptions},
+    bundle_builder::{BundleBuilder, BundleOptions, CreateBundleOptions},
     client::SendAndConfirm,
     cluster::Cluster,
     compute_budget::ComputeBudget,
@@ -177,16 +177,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     /// Convert into a [`BundleBuilder`] with the given options.
     pub fn into_bundle_with_options(
         self,
-        force_one_transaction: bool,
-        max_packet_size: Option<usize>,
-        max_instructions_for_one_tx: Option<usize>,
+        options: BundleOptions,
     ) -> crate::Result<BundleBuilder<'a, C>> {
         let mut bundle = BundleBuilder::new_with_options(CreateBundleOptions {
             cluster: self.cfg.cluster.clone(),
             commitment: *self.cfg.commitment(),
-            force_one_transaction,
-            max_packet_size,
-            max_instructions_for_one_tx,
+            options,
         });
         bundle.push(self)?;
         Ok(bundle)
@@ -194,7 +190,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
 
     /// Convert into a [`BundleBuilder`].
     pub fn into_bundle(self) -> crate::Result<BundleBuilder<'a, C>> {
-        self.into_bundle_with_options(false, None, None)
+        self.into_bundle_with_options(Default::default())
     }
 }
 

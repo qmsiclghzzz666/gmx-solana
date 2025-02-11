@@ -5,6 +5,7 @@ use std::{
 };
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
+use gmsol_solana_utils::bundle_builder::{BundleBuilder, BundleOptions};
 use gmsol_store::states::PriceProviderKind;
 use time::OffsetDateTime;
 
@@ -60,14 +61,15 @@ impl ChainlinkPullOracleFactory {
         }
     }
 
-    /// Prepare feed accounts for the given tokens and feed_ids.
-    pub async fn prepare_feeds<C: Deref<Target = impl Signer> + Clone>(
+    /// Prepare feed accounts but do not send.
+    pub async fn prepare_feeds_bundle<'a, C: Deref<Target = impl Signer> + Clone>(
         &self,
-        gmsol: &crate::Client<C>,
+        gmsol: &'a crate::Client<C>,
         feed_ids: HashMap<Pubkey, FeedId>,
-    ) -> crate::Result<()> {
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<'a, C>> {
         let provider = PriceProviderKind::ChainlinkDataStreams;
-        let mut txs = gmsol.bundle();
+        let mut txs = gmsol.bundle_with_options(options);
         let authority = gmsol.payer();
         for (token, feed_id) in feed_ids {
             let address = gmsol.find_price_feed_address(
@@ -100,6 +102,19 @@ impl ChainlinkPullOracleFactory {
             }
             self.feeds.write().unwrap().insert(feed_id, address);
         }
+
+        Ok(txs)
+    }
+
+    /// Prepare feed accounts for the given tokens and feed_ids.
+    pub async fn prepare_feeds<C: Deref<Target = impl Signer> + Clone>(
+        &self,
+        gmsol: &crate::Client<C>,
+        feed_ids: HashMap<Pubkey, FeedId>,
+    ) -> crate::Result<()> {
+        let txs = self
+            .prepare_feeds_bundle(gmsol, feed_ids, Default::default())
+            .await?;
 
         if !txs.is_empty() {
             match txs.send_all(false).await {
@@ -160,6 +175,19 @@ impl<'a, C> ChainlinkPullOracle<'a, C> {
     }
 }
 
+impl<C: Deref<Target = impl Signer> + Clone> ChainlinkPullOracle<'_, C> {
+    /// Prepare feed accounts but do not send.
+    pub async fn prepare_feeds_bundle(
+        &self,
+        feed_ids: &FeedIds,
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<C>> {
+        self.ctx
+            .prepare_feeds_bundle(self.gmsol, filter_feed_ids(feed_ids)?, options)
+            .await
+    }
+}
+
 impl<C: Deref<Target = impl Signer> + Clone> PullOracle for ChainlinkPullOracle<'_, C> {
     type PriceUpdates = HashMap<FeedId, ApiReportData>;
 
@@ -168,15 +196,7 @@ impl<C: Deref<Target = impl Signer> + Clone> PullOracle for ChainlinkPullOracle<
         feed_ids: &FeedIds,
         after: Option<OffsetDateTime>,
     ) -> crate::Result<Self::PriceUpdates> {
-        let feeds = Feeds::new(feed_ids)
-            .filter_map(|res| {
-                res.map(|config| {
-                    matches!(config.provider, PriceProviderKind::ChainlinkDataStreams)
-                        .then(|| (config.token, config.feed.to_bytes()))
-                })
-                .transpose()
-            })
-            .collect::<crate::Result<HashMap<_, _>>>()?;
+        let feeds = filter_feed_ids(feed_ids)?;
 
         let feed_ids = feeds.values().map(hex::encode).collect::<Vec<_>>();
 
@@ -219,11 +239,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
     async fn fetch_price_update_instructions(
         &self,
         price_updates: &Self::PriceUpdates,
+        options: BundleOptions,
     ) -> crate::Result<(
         PriceUpdateInstructions<'a, C>,
         HashMap<PriceProviderKind, FeedAddressMap>,
     )> {
-        let mut txs = PriceUpdateInstructions::new(self.gmsol);
+        let mut txs = PriceUpdateInstructions::new(self.gmsol, options);
         let mut map = HashMap::with_capacity(price_updates.len());
 
         let feeds = self.ctx.feeds.read().unwrap();
@@ -251,4 +272,17 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
             HashMap::from([(PriceProviderKind::ChainlinkDataStreams, map)]),
         ))
     }
+}
+
+/// Filter feed ids.
+pub fn filter_feed_ids(feed_ids: &FeedIds) -> crate::Result<HashMap<Pubkey, FeedId>> {
+    Feeds::new(feed_ids)
+        .filter_map(|res| {
+            res.map(|config| {
+                matches!(config.provider, PriceProviderKind::ChainlinkDataStreams)
+                    .then(|| (config.token, config.feed.to_bytes()))
+            })
+            .transpose()
+        })
+        .collect::<crate::Result<HashMap<_, _>>>()
 }

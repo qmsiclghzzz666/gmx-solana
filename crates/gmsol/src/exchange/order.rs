@@ -14,7 +14,8 @@ use anchor_client::{
 use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_model::action::decrease_position::DecreasePositionSwapType;
 use gmsol_solana_utils::{
-    bundle_builder::BundleBuilder, compute_budget::ComputeBudget,
+    bundle_builder::{BundleBuilder, BundleOptions},
+    compute_budget::ComputeBudget,
     transaction_builder::TransactionBuilder,
 };
 use gmsol_store::{
@@ -885,7 +886,10 @@ where
 impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
     for ExecuteOrderBuilder<'a, C>
 {
-    async fn build(&mut self) -> crate::Result<BundleBuilder<'a, C>> {
+    async fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
         let [claimable_long_token_account_for_user, claimable_short_token_account_for_user, claimable_pnl_token_account_for_holding] =
             self.claimable_accounts().await?;
@@ -1125,13 +1129,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
 
         let (pre_builder, post_builder) = builder.build(self.client);
 
-        let mut transaction_builder =
-            BundleBuilder::from_rpc_client(self.client.store_program().rpc());
-        transaction_builder
+        let mut bundle = self.client.bundle_with_options(options);
+        bundle
             .try_push(pre_builder)?
             .try_push(execute_order)?
             .try_push(post_builder)?;
-        Ok(transaction_builder)
+        Ok(bundle)
     }
 }
 

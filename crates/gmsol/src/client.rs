@@ -11,7 +11,7 @@ use anchor_client::{
 
 use gmsol_model::{price::Prices, PnlFactorKind};
 use gmsol_solana_utils::{
-    bundle_builder::{BundleBuilder, CreateBundleOptions},
+    bundle_builder::{BundleBuilder, BundleOptions, CreateBundleOptions},
     cluster::Cluster,
     program::Program,
     transaction_builder::{Config, TransactionBuilder},
@@ -231,24 +231,17 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Create a bundle builder with the given options.
-    pub fn bundle_with_options(
-        &self,
-        force_one_transaction: bool,
-        max_packet_size: Option<usize>,
-        max_instructions_for_one_tx: Option<usize>,
-    ) -> BundleBuilder<'_, C> {
+    pub fn bundle_with_options(&self, options: BundleOptions) -> BundleBuilder<'_, C> {
         BundleBuilder::new_with_options(CreateBundleOptions {
             cluster: self.cluster().clone(),
             commitment: self.commitment(),
-            force_one_transaction,
-            max_packet_size,
-            max_instructions_for_one_tx,
+            options,
         })
     }
 
     /// Create a [`BundleBuilder`]
     pub fn bundle(&self) -> BundleBuilder<C> {
-        self.bundle_with_options(false, None, None)
+        self.bundle_with_options(Default::default())
     }
 
     /// Find PDA for [`Store`](gmsol_store::states::Store) account.

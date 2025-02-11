@@ -17,6 +17,27 @@ use crate::{
 const TRANSACTION_SIZE_LIMIT: usize = PACKET_DATA_SIZE;
 const DEFAULT_MAX_INSTRUCTIONS_FOR_ONE_TX: usize = 14;
 
+/// Bundle Options.
+#[derive(Debug, Clone)]
+pub struct BundleOptions {
+    /// Whether to force one transaction.
+    pub force_one_transaction: bool,
+    /// Max packet size.
+    pub max_packet_size: Option<usize>,
+    /// Max number of instructions for one transaction.
+    pub max_instructions_for_one_tx: usize,
+}
+
+impl Default for BundleOptions {
+    fn default() -> Self {
+        Self {
+            force_one_transaction: false,
+            max_packet_size: None,
+            max_instructions_for_one_tx: DEFAULT_MAX_INSTRUCTIONS_FOR_ONE_TX,
+        }
+    }
+}
+
 /// Create Bundle Options.
 #[derive(Debug, Clone, Default)]
 pub struct CreateBundleOptions {
@@ -24,12 +45,8 @@ pub struct CreateBundleOptions {
     pub cluster: Cluster,
     /// Commitment config.
     pub commitment: CommitmentConfig,
-    /// Whether to force one transaction.
-    pub force_one_transaction: bool,
-    /// Max packet size.
-    pub max_packet_size: Option<usize>,
-    /// Max number of instructions for one transaction.
-    pub max_instructions_for_one_tx: Option<usize>,
+    /// Bundle options.
+    pub options: BundleOptions,
 }
 
 /// Send Bundle Options.
@@ -55,9 +72,7 @@ pub struct SendBundleOptions {
 pub struct BundleBuilder<'a, C> {
     client: RpcClient,
     builders: Vec<TransactionBuilder<'a, C>>,
-    force_one_transaction: bool,
-    max_packet_size: Option<usize>,
-    max_instructions_for_one_tx: usize,
+    options: BundleOptions,
 }
 
 impl<C> BundleBuilder<'_, C> {
@@ -73,39 +88,26 @@ impl<C> BundleBuilder<'_, C> {
     pub fn new_with_options(options: CreateBundleOptions) -> Self {
         let rpc = options.cluster.rpc(options.commitment);
 
-        Self::from_rpc_client_with_options(
-            rpc,
-            options.force_one_transaction,
-            options.max_packet_size,
-            options.max_instructions_for_one_tx,
-        )
+        Self::from_rpc_client_with_options(rpc, options.options)
     }
 
     /// Create a new [`BundleBuilder`] from [`RpcClient`].
     pub fn from_rpc_client(client: RpcClient) -> Self {
-        Self::from_rpc_client_with_options(client, false, None, None)
+        Self::from_rpc_client_with_options(client, Default::default())
     }
 
     /// Create a new [`BundleBuilder`] from [`RpcClient`] with the given options.
-    pub fn from_rpc_client_with_options(
-        client: RpcClient,
-        force_one_transaction: bool,
-        max_packet_size: Option<usize>,
-        max_instructions_for_one_tx: Option<usize>,
-    ) -> Self {
+    pub fn from_rpc_client_with_options(client: RpcClient, options: BundleOptions) -> Self {
         Self {
             client,
             builders: Default::default(),
-            force_one_transaction,
-            max_packet_size,
-            max_instructions_for_one_tx: max_instructions_for_one_tx
-                .unwrap_or(DEFAULT_MAX_INSTRUCTIONS_FOR_ONE_TX),
+            options,
         }
     }
 
     /// Get packet size.
     pub fn packet_size(&self) -> usize {
-        match self.max_packet_size {
+        match self.options.max_packet_size {
             Some(size) => size.min(TRANSACTION_SIZE_LIMIT),
             None => TRANSACTION_SIZE_LIMIT,
         }
@@ -128,9 +130,7 @@ impl<C> BundleBuilder<'_, C> {
         Ok(Self::new_with_options(CreateBundleOptions {
             cluster,
             commitment,
-            force_one_transaction: self.force_one_transaction,
-            max_packet_size: self.max_packet_size,
-            max_instructions_for_one_tx: Some(self.max_instructions_for_one_tx),
+            options: self.options.clone(),
         }))
     }
 }
@@ -160,7 +160,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
         }
         if self.builders.is_empty() || new_transaction {
             tracing::debug!("adding to a new tx");
-            if !self.builders.is_empty() && self.force_one_transaction {
+            if !self.builders.is_empty() && self.options.force_one_transaction {
                 return Err((txn, crate::Error::AddTransaction("cannot create more than one transaction because `force_one_transaction` is set")));
             }
             self.builders.push(txn);
@@ -182,7 +182,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
                 lookup_table_addresses.len(),
             );
             if size_after_merge <= packet_size
-                && ixs_after_merge.len() <= self.max_instructions_for_one_tx
+                && ixs_after_merge.len() <= self.options.max_instructions_for_one_tx
             {
                 tracing::debug!(size_after_merge, "adding to the last tx");
                 last.try_merge(&mut txn).map_err(|err| (txn, err))?;
@@ -191,7 +191,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
                     size_after_merge,
                     "exceed packet data size limit, adding to a new tx"
                 );
-                if self.force_one_transaction {
+                if self.options.force_one_transaction {
                     return Err((txn, crate::Error::AddTransaction("cannot create more than one transaction because `force_one_transaction` is set")));
                 }
                 self.builders.push(txn);

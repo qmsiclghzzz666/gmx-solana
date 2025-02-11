@@ -7,7 +7,10 @@ use anchor_client::solana_sdk::{
 };
 use eyre::OptionExt;
 use gmsol::{timelock::TimelockOps, utils::instruction::InstructionSerialization};
-use gmsol_solana_utils::{bundle_builder::BundleBuilder, transaction_builder::TransactionBuilder};
+use gmsol_solana_utils::{
+    bundle_builder::{BundleBuilder, BundleOptions},
+    transaction_builder::TransactionBuilder,
+};
 use prettytable::format::{FormatBuilder, TableFormat};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use url::Url;
@@ -99,7 +102,10 @@ where
     C: Clone + Deref<Target = S>,
     S: Signer,
 {
-    let bundle = rpc.into_bundle_with_options(true, None, None)?;
+    let bundle = rpc.into_bundle_with_options(BundleOptions {
+        force_one_transaction: true,
+        ..Default::default()
+    })?;
     send_or_serialize_bundle(
         store,
         bundle,
