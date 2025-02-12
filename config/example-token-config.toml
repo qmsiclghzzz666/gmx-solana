@@ -9,6 +9,7 @@ heartbeat_duration = 30
 
 [SOL.feeds]
 pyth_feed_id = "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d"
+# pyth_feed_timestamp_adjustment = 1
 
 [WSOL]
 address = "So11111111111111111111111111111111111111112"
@@ -20,4 +21,8 @@ heartbeat_duration = 30
 
 [WSOL.feeds]
 pyth_feed_id = "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d"
+# pyth_feed_timestamp_adjustment = 1
 # chainlink_feed = "CH31Xns5z3M1cTAbKW34jcxPPciazARpijcHj9rxtemt"
+# chainlink_feed_timestamp_adjustment = 1
+# chainlink_data_streams_feed_id = "0x0003b778d3f6b2ac4991302b89cb313f99a42467d6c9c5f96f57c29c0d2bc24f"
+# chainlink_data_streams_feed_timestamp_adjustment = 1
