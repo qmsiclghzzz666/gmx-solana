@@ -1,5 +1,9 @@
-use anchor_client::{anchor_lang::system_program, solana_sdk::pubkey::Pubkey};
+use anchor_client::{
+    anchor_lang::{system_program, AnchorSerialize},
+    solana_sdk::pubkey::Pubkey,
+};
 use gmsol::utils::instruction::InstructionSerialization;
+use solana_sdk::instruction::AccountMeta;
 
 use crate::{GMSOLClient, InstructionBufferCtx};
 
@@ -42,6 +46,14 @@ enum Command {
         authority: Option<Pubkey>,
         #[arg(long)]
         spill: Option<Pubkey>,
+    },
+    /// Set IDL buffer account.
+    SetIdlBuffer {
+        program_id: Pubkey,
+        #[arg(long)]
+        buffer: Pubkey,
+        #[arg(long)]
+        keep_previous_buffer: bool,
     },
 }
 
@@ -172,6 +184,59 @@ impl Args {
                     true,
                     |signature| {
                         println!("{signature}");
+                        Ok(())
+                    },
+                )
+                .await
+            }
+            Command::SetIdlBuffer {
+                program_id,
+                buffer,
+                keep_previous_buffer,
+            } => {
+                use anchor_client::anchor_lang::idl::{IdlAccount, IdlInstruction, IDL_IX_TAG};
+
+                let idl_address = IdlAccount::address(program_id);
+                let mut tx = client
+                    .store_transaction()
+                    .program(*program_id)
+                    .accounts(vec![
+                        AccountMeta::new(*buffer, false),
+                        AccountMeta::new(idl_address, false),
+                        AccountMeta::new(client.payer(), true),
+                    ])
+                    .args({
+                        let mut data = IDL_IX_TAG.to_le_bytes().to_vec();
+                        data.append(&mut IdlInstruction::SetBuffer.try_to_vec()?);
+                        data
+                    });
+
+                if !*keep_previous_buffer {
+                    tx = tx.merge(
+                        client
+                            .store_transaction()
+                            .program(*program_id)
+                            .accounts(vec![
+                                AccountMeta::new(*buffer, false),
+                                AccountMeta::new(client.payer(), true),
+                                AccountMeta::new(client.payer(), false),
+                            ])
+                            .args({
+                                let mut data = IDL_IX_TAG.to_le_bytes().to_vec();
+                                data.append(&mut IdlInstruction::Close.try_to_vec()?);
+                                data
+                            }),
+                    );
+                }
+
+                crate::utils::send_or_serialize_transaction(
+                    store,
+                    tx,
+                    instruction_buffer,
+                    serialize_only,
+                    true,
+                    |signature| {
+                        tracing::info!("{signature}");
                         Ok(())
                     },
                 )
