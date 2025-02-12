@@ -13,8 +13,18 @@ pub(super) struct Args {
 enum Command {
     /// Initialize the mock chainlink verifier.
     InitMockChainlinkVerifier,
-    /// Hex to base58
-    HexToBase58 { hex: String },
+    /// Hex to Base58
+    HexToBase58 {
+        data: String,
+        #[arg(long, short)]
+        reverse: bool,
+    },
+    /// Base64 to Base58
+    Base64ToBase58 {
+        data: String,
+        #[arg(long, short)]
+        reverse: bool,
+    },
     /// Upgrade Program with the given buffer.
     Upgrade {
         program_id: Pubkey,
@@ -79,9 +89,35 @@ impl Args {
                 )
                 .await
             }
-            Command::HexToBase58 { hex } => {
-                let data = hex::decode(hex).map_err(gmsol::Error::invalid_argument)?;
-                let data = bs58::encode(&data).into_string();
+            Command::HexToBase58 { data, reverse } => {
+                let data = if *reverse {
+                    let data = bs58::decode(data)
+                        .into_vec()
+                        .map_err(gmsol::Error::invalid_argument)?;
+                    hex::encode(data)
+                } else {
+                    let data = hex::decode(data.strip_prefix("0x").unwrap_or(data))
+                        .map_err(gmsol::Error::invalid_argument)?;
+                    bs58::encode(&data).into_string()
+                };
+                println!("{data}");
+                Ok(())
+            }
+            Command::Base64ToBase58 { data, reverse } => {
+                use base64::prelude::{Engine, BASE64_STANDARD};
+
+                let data = if *reverse {
+                    let data = bs58::decode(data)
+                        .into_vec()
+                        .map_err(gmsol::Error::invalid_argument)?;
+                    BASE64_STANDARD.encode(data)
+                } else {
+                    let data = BASE64_STANDARD
+                        .decode(data)
+                        .map_err(gmsol::Error::invalid_argument)?;
+                    bs58::encode(&data).into_string()
+                };
+
                 println!("{data}");
                 Ok(())
             }
