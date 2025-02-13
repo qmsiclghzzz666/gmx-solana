@@ -34,7 +34,11 @@ pub(crate) fn unchecked_insert_amount(
     Ok(())
 }
 
-/// CHECK: only CONFIG_KEEPER is allowed to invoke.
+/// CHECK: only CONFIG_KEEPER is allowed to invoke, except for:
+///
+/// - [`OrderFeeDiscountForReferredUser`](crate::states::FactorKey::OrderFeeDiscountForReferredUser)
+///   which can also be updated using
+///   [`insert_order_fee_discount_for_referred_user`](crate::gmsol_store::insert_order_fee_discount_for_referred_user)
 pub(crate) fn unchecked_insert_factor(
     ctx: Context<InsertConfig>,
     key: &str,
