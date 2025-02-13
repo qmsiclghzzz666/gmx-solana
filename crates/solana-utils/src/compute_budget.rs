@@ -13,7 +13,7 @@ pub struct ComputeBudget {
 impl Default for ComputeBudget {
     fn default() -> Self {
         Self {
-            min_priority_lamports: Some(Self::MIN_PRIORITY_LAMPORTS),
+            min_priority_lamports: Some(Self::DEFAULT_MIN_PRIORITY_LAMPORTS),
             limit_units: 200_000,
             price_micro_lamports: 50_000,
         }
@@ -24,7 +24,10 @@ impl ComputeBudget {
     const MICRO_LAMPORTS: u64 = 10u64.pow(6);
 
     /// Minimum priority lamports.
-    pub const MIN_PRIORITY_LAMPORTS: u64 = 10000;
+    pub const DEFAULT_MIN_PRIORITY_LAMPORTS: u64 = 10000;
+
+    /// Max compute unit.
+    pub const MAX_COMPUTE_UNIT: u32 = 1_400_000;
 
     /// Set compute units limit.
     #[inline]
@@ -71,11 +74,15 @@ impl ComputeBudget {
         if let Some(min_price) = self.min_priority_lamports.and_then(|min_lamports| {
             min_lamports
                 .checked_mul(Self::MICRO_LAMPORTS)?
-                .checked_div(self.limit_units as u64)
+                .checked_div(self.budget_units() as u64)
         }) {
             price = price.max(min_price)
         }
         price
+    }
+
+    fn budget_units(&self) -> u32 {
+        self.limit_units.min(Self::MAX_COMPUTE_UNIT)
     }
 
     /// Build compute budget instructions.
@@ -85,7 +92,7 @@ impl ComputeBudget {
     ) -> Vec<Instruction> {
         let price = self.budget_price(compute_unit_price_micro_lamports);
         vec![
-            ComputeBudgetInstruction::set_compute_unit_limit(self.limit_units),
+            ComputeBudgetInstruction::set_compute_unit_limit(self.budget_units()),
             ComputeBudgetInstruction::set_compute_unit_price(price),
         ]
     }
@@ -101,8 +108,9 @@ impl ComputeBudget {
     }
 
     /// Estimate priority fee.
-    pub fn fee(&self) -> u64 {
-        self.limit_units as u64 * self.price_micro_lamports / 1_000_000
+    pub fn fee(&self, compute_unit_price_micro_lamports: Option<u64>) -> u64 {
+        self.budget_units() as u64 * self.budget_price(compute_unit_price_micro_lamports)
+            / Self::MICRO_LAMPORTS
     }
 }
 

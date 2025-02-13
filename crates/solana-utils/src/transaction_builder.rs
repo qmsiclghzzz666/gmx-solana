@@ -586,10 +586,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
         compute_unit_price_micro_lamports: Option<u64>,
     ) -> crate::Result<u64> {
         let ixs = self.instructions_with_options(true, None);
-        let mut compute_budget = self.compute_budget;
-        if let Some(price) = compute_unit_price_micro_lamports {
-            compute_budget = compute_budget.with_price(price);
-        }
+
         let num_signers = ixs
             .iter()
             .flat_map(|ix| ix.accounts.iter())
@@ -597,7 +594,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
             .map(|meta| &meta.pubkey)
             .collect::<HashSet<_>>()
             .len() as u64;
-        let fee = num_signers * 5_000 + compute_budget.fee();
+        let fee = num_signers * 5_000 + self.compute_budget.fee(compute_unit_price_micro_lamports);
         Ok(fee)
     }
 }

@@ -99,7 +99,7 @@ struct Cli {
     #[arg(long, requires = "serialize_only")]
     payer: Option<Pubkey>,
     /// Priority fee lamports.
-    #[arg(long, value_name = "LAMPORTS", default_value_t = ComputeBudget::MIN_PRIORITY_LAMPORTS)]
+    #[arg(long, value_name = "LAMPORTS", default_value_t = ComputeBudget::DEFAULT_MIN_PRIORITY_LAMPORTS)]
     priority_lamports: u64,
     /// Commands.
     #[command(subcommand)]
