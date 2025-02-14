@@ -332,8 +332,15 @@ impl Cli {
                 args.run(&client, &store).await?
             }
             Command::Order(args) => {
-                args.run(&client, &store, instruction_buffer_ctx, self.serialize_only)
-                    .await?
+                args.run(
+                    &client,
+                    &store,
+                    instruction_buffer_ctx,
+                    self.serialize_only,
+                    self.skip_preflight,
+                    self.max_transaction_size,
+                )
+                .await?
             }
             Command::Market(args) => {
                 args.run(&client, &store, instruction_buffer_ctx, self.serialize_only)

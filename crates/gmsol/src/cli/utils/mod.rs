@@ -17,6 +17,10 @@ use url::Url;
 
 use crate::GMSOLClient;
 
+mod executor;
+
+pub(crate) use executor::Executor;
+
 pub(crate) type InstructionBufferCtx<'a> = (InstructionBuffer<'a>, &'a GMSOLClient, bool);
 
 #[derive(clap::ValueEnum, Clone, Copy, Default)]

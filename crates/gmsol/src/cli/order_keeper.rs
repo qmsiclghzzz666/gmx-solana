@@ -3,53 +3,39 @@ use std::time::Duration;
 use anchor_client::{
     solana_client::rpc_config::RpcSendTransactionConfig, solana_sdk::pubkey::Pubkey,
 };
-use futures_util::{FutureExt, TryFutureExt};
 use gmsol::{
     alt::AddressLookupTableOps,
     client::StoreFilter,
     exchange::ExchangeOps,
-    pyth::{
-        pull_oracle::utils::extract_pyth_feed_ids, EncodingType, Hermes, PythPullOracle,
-        PythPullOracleContext, PythPullOracleOps,
-    },
     store::glv::GlvOps,
     types::{
         common::ActionHeader, Deposit, DepositCreated, Order, OrderCreated, Withdrawal,
         WithdrawalCreated,
     },
-    utils::{
-        builder::{MakeBundleBuilder, SetExecutionFee},
-        instruction::InstructionSerialization,
-        ZeroCopy,
-    },
+    utils::{instruction::InstructionSerialization, ZeroCopy},
 };
 use gmsol_model::PositionState;
-use gmsol_solana_utils::{bundle_builder::SendBundleOptions, compute_budget::ComputeBudget};
-use gmsol_store::states::PriceProviderKind;
 use tokio::{sync::mpsc::UnboundedSender, time::Instant};
 
-use crate::{utils::Side, GMSOLClient, InstructionBufferCtx};
+use crate::{
+    utils::{Executor, Side},
+    GMSOLClient, InstructionBufferCtx,
+};
 
 #[derive(clap::Args, Clone)]
 pub(super) struct KeeperArgs {
-    /// Set the compute unit limit.
-    #[arg(long, short = 'u')]
-    compute_unit_limit: Option<u32>,
     /// Set the compute unit price in micro lamports.
     #[arg(long, short = 'p', default_value_t = 50_000)]
     compute_unit_price: u64,
     /// The oracle to use.
     #[arg(long, env)]
     oracle: Option<Pubkey>,
-    /// Set the execution fee to the given instead of estimating one.
-    #[arg(long)]
-    execution_fee: Option<u64>,
-    /// Set the price provider to use.
-    #[arg(long, default_value = "pyth")]
-    provider: PriceProviderKind,
-    /// Whether to use push oracle when available.
-    #[arg(long)]
-    push_oracle: bool,
+    #[cfg_attr(feature = "devnet", arg(long, default_value_t = true))]
+    #[cfg_attr(not(feature = "devnet"), arg(long, default_value_t = false))]
+    oracle_testnet: bool,
+    /// Feed index.
+    #[arg(long, default_value_t = 0)]
+    feed_index: u8,
     /// ALTs.
     #[arg(long, short = 'a')]
     alts: Vec<Pubkey>,
@@ -64,12 +50,6 @@ enum Command {
         #[arg(long, default_value_t = 2)]
         wait: u64,
     },
-    /// Execute Deposit.
-    ExecuteDeposit { deposit: Pubkey },
-    /// Execute Withdrawal.
-    ExecuteWithdrawal { withdrawal: Pubkey },
-    /// Execute Order.
-    ExecuteOrder { order: Pubkey },
     /// Liquidate a position.
     Liquidate { position: Pubkey },
     /// Auto-deleverage a position.
@@ -104,12 +84,8 @@ enum Command {
         #[arg(long)]
         keep: bool,
     },
-    /// Execute GLV Deposit.
-    ExecuteGlvDeposit { deposit: Pubkey },
-    /// Execute GLV Withdrawal.
-    ExecuteGlvWithdrawal { withdrawal: Pubkey },
-    /// Execute GLV Shift.
-    ExecuteGlvShift { shift: Pubkey },
+    /// Execute.
+    Execute { action: Action, address: Pubkey },
 }
 
 #[derive(Debug, clap::ValueEnum, Clone, Copy)]
@@ -118,24 +94,19 @@ enum Action {
     Deposit,
     /// Withdrawal.
     Withdrawal,
+    /// Shift.
+    Shift,
     /// Order.
     Order,
+    /// GLV deposit.
+    GlvDeposit,
+    /// GLV withdrawal.
+    GlvWithdrawal,
+    /// GLV shift.
+    GlvShift,
 }
 
 impl KeeperArgs {
-    fn get_compute_budget(&self) -> Option<ComputeBudget> {
-        let units = self.compute_unit_limit?;
-        Some(
-            ComputeBudget::default()
-                .with_limit(units)
-                .with_price(self.compute_unit_price),
-        )
-    }
-
-    fn use_pyth_pull_oracle(&self) -> bool {
-        !self.push_oracle && matches!(self.provider, PriceProviderKind::Pyth)
-    }
-
     fn oracle(&self) -> gmsol::Result<&Pubkey> {
         self.oracle
             .as_ref()
@@ -148,6 +119,8 @@ impl KeeperArgs {
         store: &Pubkey,
         ctx: Option<InstructionBufferCtx<'_>>,
         serialize_only: Option<InstructionSerialization>,
+        skip_preflight: bool,
+        max_transaction_size: Option<usize>,
     ) -> gmsol::Result<()> {
         if serialize_only.is_some() {
             return Err(gmsol::Error::invalid_argument(
@@ -189,8 +162,18 @@ impl KeeperArgs {
                             }
                             if *execute {
                                 Box::pin(
-                                    self.with_command(Command::ExecuteDeposit { deposit: pubkey })
-                                        .run(client, store, None, serialize_only),
+                                    self.with_command(Command::Execute {
+                                        action: Action::Deposit,
+                                        address: pubkey,
+                                    })
+                                    .run(
+                                        client,
+                                        store,
+                                        None,
+                                        serialize_only,
+                                        skip_preflight,
+                                        max_transaction_size,
+                                    ),
                                 )
                                 .await?;
                             }
@@ -216,14 +199,17 @@ impl KeeperArgs {
                             }
                             if *execute {
                                 Box::pin(
-                                    self.with_command(Command::ExecuteWithdrawal {
-                                        withdrawal: pubkey,
+                                    self.with_command(Command::Execute {
+                                        action: Action::Withdrawal,
+                                        address: pubkey,
                                     })
                                     .run(
                                         client,
                                         store,
                                         None,
                                         serialize_only,
+                                        skip_preflight,
+                                        max_transaction_size,
                                     ),
                                 )
                                 .await?;
@@ -250,281 +236,52 @@ impl KeeperArgs {
                             }
                             if *execute {
                                 Box::pin(
-                                    self.with_command(Command::ExecuteOrder { order: pubkey })
-                                        .run(client, store, None, serialize_only),
+                                    self.with_command(Command::Execute {
+                                        action: Action::Order,
+                                        address: pubkey,
+                                    })
+                                    .run(
+                                        client,
+                                        store,
+                                        None,
+                                        serialize_only,
+                                        skip_preflight,
+                                        max_transaction_size,
+                                    ),
                                 )
                                 .await?;
                             }
                         }
                     }
-                }
-            }
-            Command::ExecuteDeposit { deposit } => {
-                crate::utils::instruction_buffer_not_supported(ctx)?;
-                let mut builder = client.execute_deposit(store, self.oracle()?, deposit, true);
-                let execution_fee = builder.build().await?.estimate_execution_fee(None).await?;
-                builder.set_execution_fee(execution_fee);
-                if self.use_pyth_pull_oracle() {
-                    let hint = builder.prepare_hint().await?;
-                    let feed_ids = extract_pyth_feed_ids(&hint.feeds)?;
-                    if feed_ids.is_empty() {
-                        tracing::error!(%deposit, "empty feed ids");
+                    kind => {
+                        return Err(gmsol::Error::invalid_argument(format!(
+                            "Fetching {kind:?} is not supported currently",
+                        )));
                     }
-                    let oracle = PythPullOracle::try_new(client)?;
-                    let hermes = Hermes::default();
-                    let update = hermes
-                        .latest_price_updates(&feed_ids, Some(EncodingType::Base64))
-                        .await?;
-                    oracle
-                        .execute_with_pyth_price_updates(
-                            Some(update.binary()),
-                            &mut builder,
-                            Some(self.compute_unit_price),
-                            true,
-                            true,
-                        )
-                        .await?;
-                } else {
-                    let builder = builder.build().await?;
-                    let compute_unit_price_micro_lamports =
-                        self.get_compute_budget().map(|budget| budget.price());
-                    let signatures = builder
-                        .send_all_with_opts(SendBundleOptions {
-                            compute_unit_price_micro_lamports,
-                            ..Default::default()
-                        })
-                        .await?;
-                    tracing::info!(%deposit, "executed deposit at tx {signatures:#?}");
-                    println!("{signatures:#?}");
-                }
-            }
-            Command::ExecuteWithdrawal { withdrawal } => {
-                crate::utils::instruction_buffer_not_supported(ctx)?;
-                let mut builder =
-                    client.execute_withdrawal(store, self.oracle()?, withdrawal, true);
-                let execution_fee = self
-                    .execution_fee
-                    .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
-                    .unwrap_or_else(|| {
-                        builder
-                            .build()
-                            .and_then(|builder| async move {
-                                Ok(builder
-                                    .estimate_execution_fee(Some(self.compute_unit_price))
-                                    .await?)
-                            })
-                            .right_future()
-                    })
-                    .await?;
-                builder.set_execution_fee(execution_fee);
-                if self.use_pyth_pull_oracle() {
-                    let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
-                    let feed_ids = ctx.feed_ids();
-                    if feed_ids.is_empty() {
-                        tracing::error!(%withdrawal, "empty feed ids");
-                    }
-                    let oracle = PythPullOracle::try_new(client)?;
-                    let hermes = Hermes::default();
-                    let update = hermes
-                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
-                        .await?;
-                    let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
-                            let txns = builder
-                                .parse_with_pyth_price_updates(prices)
-                                .build()
-                                .await?;
-                            Ok(txns)
-                        })
-                        .await?;
-                    match with_prices
-                        .send_all(Some(self.compute_unit_price), true, true)
-                        .await
-                    {
-                        Ok(signatures) => {
-                            tracing::info!(%withdrawal, "executed withdrawal with txs {signatures:#?}");
-                        }
-                        Err((signatures, err)) => {
-                            tracing::error!(%err, %withdrawal, "failed to execute withdrawal, successful txs: {signatures:#?}");
-                        }
-                    }
-                } else {
-                    let builder = builder.build().await?;
-                    let compute_unit_price_micro_lamports =
-                        self.get_compute_budget().map(|budget| budget.price());
-                    let signatures = builder
-                        .send_all_with_opts(SendBundleOptions {
-                            compute_unit_price_micro_lamports,
-                            ..Default::default()
-                        })
-                        .await?;
-                    tracing::info!(%withdrawal, %execution_fee, "executed withdrawal with txs: {signatures:#?}");
-                }
-            }
-            Command::ExecuteOrder { order } => {
-                crate::utils::instruction_buffer_not_supported(ctx)?;
-                let order_account = client.order(order).await?;
-                if let Some(position) = order_account.params().position() {
-                    if let Err(gmsol::Error::NotFound) = client.position(position).await {
-                        let cancel = client
-                            .cancel_order_if_no_position(store, order, Some(position))
-                            .await?;
-                        let close = client.close_order(order)?.build().await?;
-                        let signature = cancel
-                            .merge(close)
-                            .send_with_options(
-                                false,
-                                Some(self.compute_unit_price),
-                                RpcSendTransactionConfig {
-                                    skip_preflight: true,
-                                    ..Default::default()
-                                },
-                            )
-                            .await?;
-                        tracing::info!(%order, "position does not exist, the order is cancelled");
-                        println!("{signature}");
-                        return Ok(());
-                    }
-                }
-                let mut builder = client.execute_order(store, self.oracle()?, order, true)?;
-                for alt in &self.alts {
-                    let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
-                    builder.add_alt(alt);
-                }
-                let execution_fee = self
-                    .execution_fee
-                    .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
-                    .unwrap_or_else(|| {
-                        builder
-                            .build()
-                            .and_then(|builder| async move {
-                                Ok(builder
-                                    .estimate_execution_fee(Some(self.compute_unit_price))
-                                    .await?)
-                            })
-                            .right_future()
-                    })
-                    .await?;
-                builder.set_execution_fee(execution_fee);
-                if self.use_pyth_pull_oracle() {
-                    let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
-                    let feed_ids = ctx.feed_ids();
-                    if feed_ids.is_empty() {
-                        tracing::error!(%order, "empty feed ids");
-                    }
-                    let oracle = PythPullOracle::try_new(client)?;
-                    let hermes = Hermes::default();
-                    let update = hermes
-                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
-                        .await?;
-                    let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
-                            let builder = builder
-                                .parse_with_pyth_price_updates(prices)
-                                .build()
-                                .await?;
-                            Ok(builder)
-                        })
-                        .await?;
-                    match with_prices
-                        .send_all(Some(self.compute_unit_price), true, true)
-                        .await
-                    {
-                        Ok(signatures) => {
-                            tracing::info!(%order, %execution_fee, "executed order with txs {signatures:#?}");
-                        }
-                        Err((signatures, err)) => {
-                            tracing::error!(%err, %order, "failed to execute order, successful txs: {signatures:#?}");
-                        }
-                    }
-                } else {
-                    let builder = builder.build().await?;
-                    let compute_unit_price_micro_lamports =
-                        self.get_compute_budget().map(|budget| budget.price());
-                    let signatures = builder
-                        .send_all_with_opts(SendBundleOptions {
-                            compute_unit_price_micro_lamports,
-                            ..Default::default()
-                        })
-                        .await?;
-                    tracing::info!(%order, %execution_fee, "executed order with txs: {signatures:#?}");
                 }
             }
             Command::Liquidate { position } => {
-                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let mut builder = client.liquidate(self.oracle()?, position)?;
                 for alt in &self.alts {
                     let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
                     builder.add_alt(alt);
                 }
-                let execution_fee = self
-                    .execution_fee
-                    .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
-                    .unwrap_or_else(|| {
-                        builder
-                            .build()
-                            .and_then(|builder| async move {
-                                Ok(builder
-                                    .estimate_execution_fee(Some(self.compute_unit_price))
-                                    .await?)
-                            })
-                            .right_future()
-                    })
+                Executor::new_with_envs(store, client, self.oracle_testnet, self.feed_index)?
+                    .execute(
+                        builder,
+                        ctx,
+                        serialize_only,
+                        skip_preflight,
+                        max_transaction_size,
+                        Some(self.compute_unit_price),
+                    )
                     .await?;
-                builder.set_execution_fee(execution_fee);
-                if self.use_pyth_pull_oracle() {
-                    let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
-                    let feed_ids = ctx.feed_ids();
-                    if feed_ids.is_empty() {
-                        tracing::error!(%position, "empty feed ids");
-                    }
-                    let oracle = PythPullOracle::try_new(client)?;
-                    let hermes = Hermes::default();
-                    let update = hermes
-                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
-                        .await?;
-                    let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
-                            let builder = builder
-                                .parse_with_pyth_price_updates(prices)
-                                .build()
-                                .await?;
-                            Ok(builder)
-                        })
-                        .await?;
-                    match with_prices
-                        .send_all(Some(self.compute_unit_price), true, true)
-                        .await
-                    {
-                        Ok(signatures) => {
-                            tracing::info!(%position, %execution_fee, "liquidated position with txs {signatures:#?}");
-                        }
-                        Err((signatures, err)) => {
-                            tracing::error!(%err, %position, "failed to liquidate position, successful txs: {signatures:#?}");
-                        }
-                    }
-                } else {
-                    let builder = builder.build().await?;
-                    let compute_unit_price_micro_lamports =
-                        self.get_compute_budget().map(|budget| budget.price());
-                    let signatures = builder
-                        .send_all_with_opts(SendBundleOptions {
-                            compute_unit_price_micro_lamports,
-                            ..Default::default()
-                        })
-                        .await?;
-                    tracing::info!(%position, %execution_fee, "liquidated position with txs: {signatures:#?}");
-                }
             }
             Command::Adl {
                 position,
                 size,
                 close_all,
             } => {
-                crate::utils::instruction_buffer_not_supported(ctx)?;
                 let size = match size {
                     Some(size) => *size,
                     None => {
@@ -538,117 +295,31 @@ impl KeeperArgs {
                     let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
                     builder.add_alt(alt);
                 }
-                let execution_fee = self
-                    .execution_fee
-                    .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
-                    .unwrap_or_else(|| {
-                        builder
-                            .build()
-                            .and_then(|builder| async move {
-                                Ok(builder
-                                    .estimate_execution_fee(Some(self.compute_unit_price))
-                                    .await?)
-                            })
-                            .right_future()
-                    })
+                Executor::new_with_envs(store, client, self.oracle_testnet, self.feed_index)?
+                    .execute(
+                        builder,
+                        ctx,
+                        serialize_only,
+                        skip_preflight,
+                        max_transaction_size,
+                        Some(self.compute_unit_price),
+                    )
                     .await?;
-                builder.set_execution_fee(execution_fee);
-                if self.use_pyth_pull_oracle() {
-                    let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
-                    let feed_ids = ctx.feed_ids();
-                    if feed_ids.is_empty() {
-                        tracing::error!(%position, "empty feed ids");
-                    }
-                    let oracle = PythPullOracle::try_new(client)?;
-                    let hermes = Hermes::default();
-                    let update = hermes
-                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
-                        .await?;
-                    let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
-                            let builder = builder
-                                .parse_with_pyth_price_updates(prices)
-                                .build()
-                                .await?;
-                            Ok(builder)
-                        })
-                        .await?;
-                    match with_prices
-                        .send_all(Some(self.compute_unit_price), true, true)
-                        .await
-                    {
-                        Ok(signatures) => {
-                            tracing::info!(%position, %execution_fee, "auto-deleveraged position with txs {signatures:#?}");
-                        }
-                        Err((signatures, err)) => {
-                            tracing::error!(%err, %position, "failed to auto-deleverage position, successful txs: {signatures:#?}");
-                        }
-                    }
-                } else {
-                    let builder = builder.build().await?;
-                    let compute_unit_price_micro_lamports =
-                        self.get_compute_budget().map(|budget| budget.price());
-                    let signatures = builder
-                        .send_all_with_opts(SendBundleOptions {
-                            compute_unit_price_micro_lamports,
-                            ..Default::default()
-                        })
-                        .await?;
-                    tracing::info!(%position, %execution_fee, "auto-deleveraged position with txs: {signatures:#?}");
-                }
             }
             Command::UpdateAdl { market_token, side } => {
-                crate::utils::instruction_buffer_not_supported(ctx)?;
-                let mut builder =
+                let builder =
                     client.update_adl(store, self.oracle()?, market_token, side.is_long())?;
 
-                if self.use_pyth_pull_oracle() {
-                    let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
-                    let feed_ids = ctx.feed_ids();
-                    if feed_ids.is_empty() {
-                        tracing::error!(%market_token, "empty feed ids");
-                    }
-                    let oracle = PythPullOracle::try_new(client)?;
-                    let hermes = Hermes::default();
-                    let update = hermes
-                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
-                        .await?;
-                    let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
-                            let builder = builder
-                                .parse_with_pyth_price_updates(prices)
-                                .build()
-                                .await?;
-                            Ok(Some(builder))
-                        })
-                        .await?;
-                    match with_prices
-                        .send_all(Some(self.compute_unit_price), true, true)
-                        .await
-                    {
-                        Ok(signatures) => {
-                            tracing::info!(%market_token, ?side, "updated ADL state with txs {signatures:#?}");
-                        }
-                        Err((signatures, err)) => {
-                            tracing::error!(%err, %market_token, ?side, "failed to update ADL state, successful txs: {signatures:#?}");
-                        }
-                    }
-                } else {
-                    let compute_unit_price_micro_lamports =
-                        self.get_compute_budget().map(|budget| budget.price());
-                    let signatures = builder
-                        .build()
-                        .await?
-                        .send_with_options(
-                            false,
-                            compute_unit_price_micro_lamports,
-                            Default::default(),
-                        )
-                        .await?;
-                    tracing::info!(%market_token, ?side, "updated ADL state with txs: {signatures:#?}");
-                }
+                Executor::new_with_envs(store, client, self.oracle_testnet, self.feed_index)?
+                    .execute(
+                        builder,
+                        ctx,
+                        serialize_only,
+                        skip_preflight,
+                        max_transaction_size,
+                        Some(self.compute_unit_price),
+                    )
+                    .await?;
             }
             Command::CancelOrderIfNoPosition { order, keep } => {
                 crate::utils::instruction_buffer_not_supported(ctx)?;
@@ -673,133 +344,121 @@ impl KeeperArgs {
                     .await?;
                 tracing::info!(%order, "cancelled order at {signature}");
             }
-            Command::ExecuteGlvDeposit { deposit } => {
-                crate::utils::instruction_buffer_not_supported(ctx)?;
-                let mut builder = client.execute_glv_deposit(self.oracle()?, deposit, true);
-                for alt in &self.alts {
-                    let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
-                    builder.add_alt(alt);
-                }
-                let execution_fee = builder.build().await?.estimate_execution_fee(None).await?;
-                builder.set_execution_fee(execution_fee);
-                if self.use_pyth_pull_oracle() {
-                    let hint = builder.prepare_hint().await?;
-                    let feed_ids = extract_pyth_feed_ids(&hint.feeds)?;
-                    if feed_ids.is_empty() {
-                        tracing::error!(%deposit, "empty feed ids");
+            Command::Execute { action, address } => {
+                let executor =
+                    Executor::new_with_envs(store, client, self.oracle_testnet, self.feed_index)?;
+
+                match action {
+                    Action::Deposit => {
+                        let builder = client.execute_deposit(store, self.oracle()?, address, true);
+                        executor
+                            .execute(
+                                builder,
+                                ctx,
+                                serialize_only,
+                                skip_preflight,
+                                max_transaction_size,
+                                Some(self.compute_unit_price),
+                            )
+                            .await?;
                     }
-                    let oracle = PythPullOracle::try_new(client)?;
-                    let hermes = Hermes::default();
-                    let update = hermes
-                        .latest_price_updates(&feed_ids, Some(EncodingType::Base64))
-                        .await?;
-                    oracle
-                        .execute_with_pyth_price_updates(
-                            Some(update.binary()),
-                            &mut builder,
-                            Some(self.compute_unit_price),
-                            true,
-                            true,
-                        )
-                        .await?;
-                } else {
-                    let builder = builder.build().await?;
-                    let compute_unit_price_micro_lamports =
-                        self.get_compute_budget().map(|budget| budget.price());
-                    let signatures = builder
-                        .send_all_with_opts(SendBundleOptions {
-                            compute_unit_price_micro_lamports,
-                            ..Default::default()
-                        })
-                        .await?;
-                    tracing::info!(%deposit, "executed GLV deposit at tx {signatures:#?}");
-                    println!("{signatures:#?}");
-                }
-            }
-            Command::ExecuteGlvWithdrawal { withdrawal } => {
-                crate::utils::instruction_buffer_not_supported(ctx)?;
-                let mut builder = client.execute_glv_withdrawal(self.oracle()?, withdrawal, true);
-                for alt in &self.alts {
-                    let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
-                    builder.add_alt(alt);
-                }
-                let execution_fee = builder.build().await?.estimate_execution_fee(None).await?;
-                builder.set_execution_fee(execution_fee);
-                if self.use_pyth_pull_oracle() {
-                    let hint = builder.prepare_hint().await?;
-                    let feed_ids = extract_pyth_feed_ids(&hint.feeds)?;
-                    if feed_ids.is_empty() {
-                        tracing::error!(%withdrawal, "empty feed ids");
+                    Action::Withdrawal => {
+                        let builder =
+                            client.execute_withdrawal(store, self.oracle()?, address, true);
+                        executor
+                            .execute(
+                                builder,
+                                ctx,
+                                serialize_only,
+                                skip_preflight,
+                                max_transaction_size,
+                                Some(self.compute_unit_price),
+                            )
+                            .await?;
                     }
-                    let oracle = PythPullOracle::try_new(client)?;
-                    let hermes = Hermes::default();
-                    let update = hermes
-                        .latest_price_updates(&feed_ids, Some(EncodingType::Base64))
-                        .await?;
-                    oracle
-                        .execute_with_pyth_price_updates(
-                            Some(update.binary()),
-                            &mut builder,
-                            Some(self.compute_unit_price),
-                            true,
-                            true,
-                        )
-                        .await?;
-                } else {
-                    let builder = builder.build().await?;
-                    let compute_unit_price_micro_lamports =
-                        self.get_compute_budget().map(|budget| budget.price());
-                    let signatures = builder
-                        .send_all_with_opts(SendBundleOptions {
-                            compute_unit_price_micro_lamports,
-                            ..Default::default()
-                        })
-                        .await?;
-                    tracing::info!(%withdrawal, "executed GLV withdrawal at tx {signatures:#?}");
-                    println!("{signatures:#?}");
-                }
-            }
-            Command::ExecuteGlvShift { shift } => {
-                crate::utils::instruction_buffer_not_supported(ctx)?;
-                let mut builder = client.execute_glv_shift(self.oracle()?, shift, true);
-                for alt in &self.alts {
-                    let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
-                    builder.add_alt(alt);
-                }
-                let execution_fee = builder.build().await?.estimate_execution_fee(None).await?;
-                builder.set_execution_fee(execution_fee);
-                if self.use_pyth_pull_oracle() {
-                    let hint = builder.prepare_hint().await?;
-                    let feed_ids = extract_pyth_feed_ids(&hint.feeds)?;
-                    if feed_ids.is_empty() {
-                        tracing::error!(%shift, "empty feed ids");
+                    Action::Shift => {
+                        let builder = client.execute_shift(self.oracle()?, address, true);
+                        executor
+                            .execute(
+                                builder,
+                                ctx,
+                                serialize_only,
+                                skip_preflight,
+                                max_transaction_size,
+                                Some(self.compute_unit_price),
+                            )
+                            .await?;
                     }
-                    let oracle = PythPullOracle::try_new(client)?;
-                    let hermes = Hermes::default();
-                    let update = hermes
-                        .latest_price_updates(&feed_ids, Some(EncodingType::Base64))
-                        .await?;
-                    oracle
-                        .execute_with_pyth_price_updates(
-                            Some(update.binary()),
-                            &mut builder,
-                            Some(self.compute_unit_price),
-                            true,
-                            true,
-                        )
-                        .await?;
-                } else {
-                    let builder = builder.build().await?;
-                    let compute_unit_price_micro_lamports =
-                        self.get_compute_budget().map(|budget| budget.price());
-                    let signatures = builder
-                        .send_all_with_opts(SendBundleOptions {
-                            compute_unit_price_micro_lamports,
-                            ..Default::default()
-                        })
-                        .await?;
-                    tracing::info!(%shift, "executed GLV shift at tx {signatures:#?}");
-                    println!("{signatures:#?}");
+                    Action::Order => {
+                        let mut builder =
+                            client.execute_order(store, self.oracle()?, address, true)?;
+                        for alt in &self.alts {
+                            let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
+                            builder.add_alt(alt);
+                        }
+                        executor
+                            .execute(
+                                builder,
+                                ctx,
+                                serialize_only,
+                                skip_preflight,
+                                max_transaction_size,
+                                Some(self.compute_unit_price),
+                            )
+                            .await?;
+                    }
+                    Action::GlvDeposit => {
+                        let mut builder = client.execute_glv_deposit(self.oracle()?, address, true);
+                        for alt in &self.alts {
+                            let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
+                            builder.add_alt(alt);
+                        }
+                        executor
+                            .execute(
+                                builder,
+                                ctx,
+                                serialize_only,
+                                skip_preflight,
+                                max_transaction_size,
+                                Some(self.compute_unit_price),
+                            )
+                            .await?;
+                    }
+                    Action::GlvWithdrawal => {
+                        let mut builder =
+                            client.execute_glv_withdrawal(self.oracle()?, address, true);
+                        for alt in &self.alts {
+                            let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
+                            builder.add_alt(alt);
+                        }
+                        executor
+                            .execute(
+                                builder,
+                                ctx,
+                                serialize_only,
+                                skip_preflight,
+                                max_transaction_size,
+                                Some(self.compute_unit_price),
+                            )
+                            .await?;
+                    }
+                    Action::GlvShift => {
+                        let mut builder = client.execute_glv_shift(self.oracle()?, address, true);
+                        for alt in &self.alts {
+                            let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
+                            builder.add_alt(alt);
+                        }
+                        executor
+                            .execute(
+                                builder,
+                                ctx,
+                                serialize_only,
+                                skip_preflight,
+                                max_transaction_size,
+                                Some(self.compute_unit_price),
+                            )
+                            .await?;
+                    }
                 }
             }
         }
@@ -834,8 +493,9 @@ impl KeeperArgs {
                 move |ctx, event| {
                 if event.store == store {
                     tracing::info!(slot=%ctx.slot, ?event, "received a new deposit creation event");
-                    send_command_after(&tx, event.ts, after, Command::ExecuteDeposit {
-                        deposit: event.deposit,
+                    send_command_after(&tx, event.ts, after, Command::Execute {
+                        action: Action::Deposit,
+                        address: event.deposit,
                     });
                 } else {
                     tracing::debug!(slot=%ctx.slot, ?event, "received deposit creation event from other store");
@@ -854,8 +514,9 @@ impl KeeperArgs {
                 move |ctx, event| {
                 if event.store == store {
                     tracing::info!(slot=%ctx.slot, ?event, "received a new withdrawal creation event");
-                    send_command_after(&tx, event.ts, after, Command::ExecuteWithdrawal {
-                        withdrawal: event.withdrawal,
+                    send_command_after(&tx, event.ts, after, Command::Execute {
+                        action: Action::Withdrawal,
+                        address: event.withdrawal,
                     });
                 } else {
                     tracing::debug!(slot=%ctx.slot, ?event, "received withdrawal creation event from other store");
@@ -874,8 +535,9 @@ impl KeeperArgs {
                 move |ctx, event| {
                 if event.store == store {
                     tracing::info!(slot=%ctx.slot, ?event, "received a new order creation event");
-                    send_command_after(&tx, event.ts, after, Command::ExecuteOrder {
-                        order: event.order,
+                    send_command_after(&tx, event.ts, after, Command::Execute {
+                        action: Action::Order,
+                        address: event.order,
                     });
                 } else {
                     tracing::debug!(slot=%ctx.slot, ?event, "received order creation event from other store");
@@ -891,7 +553,7 @@ impl KeeperArgs {
                 tracing::info!(?command, "received new command");
                 match self
                     .with_command(command)
-                    .run(client, &store, None, None)
+                    .run(client, &store, None, None, true, None)
                     .await
                 {
                     Ok(()) => {

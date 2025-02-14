@@ -42,9 +42,6 @@ use crate::{
 
 use super::{generate_nonce, get_ata_or_owner, ExchangeOps};
 
-#[cfg(feature = "pyth-pull-oracle")]
-use crate::pyth::pull_oracle::{ExecuteWithPythPrices, Prices, PythPullOracleContext};
-
 /// `execute_order` compute budget.
 pub const EXECUTE_ORDER_COMPUTE_BUDGET: u32 = 400_000;
 
@@ -807,13 +804,6 @@ where
         Ok(self)
     }
 
-    /// Parse feeds with the given price udpates map.
-    #[cfg(feature = "pyth-pull-oracle")]
-    pub fn parse_with_pyth_price_updates(&mut self, price_updates: Prices) -> &mut Self {
-        self.feeds_parser.with_pyth_price_updates(price_updates);
-        self
-    }
-
     /// Prepare [`ExecuteOrderHint`].
     pub async fn prepare_hint(&mut self) -> crate::Result<ExecuteOrderHint> {
         loop {
@@ -1481,31 +1471,5 @@ impl ClaimableAccountsBuilder {
             }
         }
         (pre_builder, post_builder)
-    }
-}
-
-#[cfg(feature = "pyth-pull-oracle")]
-impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
-    for ExecuteOrderBuilder<'a, C>
-{
-    fn set_execution_fee(&mut self, lamports: u64) {
-        SetExecutionFee::set_execution_fee(self, lamports);
-    }
-
-    async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
-        let hint = self.prepare_hint().await?;
-        let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
-        Ok(ctx)
-    }
-
-    async fn build_rpc_with_price_updates(
-        &mut self,
-        price_updates: Prices,
-    ) -> crate::Result<Vec<TransactionBuilder<'a, C, ()>>> {
-        let tx = self
-            .parse_with_pyth_price_updates(price_updates)
-            .build()
-            .await?;
-        Ok(tx.into_builders())
     }
 }

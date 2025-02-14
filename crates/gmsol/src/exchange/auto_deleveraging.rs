@@ -4,16 +4,24 @@ use anchor_client::{
     anchor_lang::Id,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use gmsol_solana_utils::transaction_builder::TransactionBuilder;
-use gmsol_store::states::{common::TokensWithFeed, Market, Pyth};
+use gmsol_solana_utils::{
+    bundle_builder::{BundleBuilder, BundleOptions},
+    transaction_builder::TransactionBuilder,
+};
+use gmsol_store::states::{common::TokensWithFeed, Market, PriceProviderKind, Pyth};
 
-use crate::{store::utils::FeedsParser, utils::fix_optional_account_metas};
+use crate::{
+    store::utils::FeedsParser,
+    utils::{
+        builder::{
+            FeedAddressMap, FeedIds, MakeBundleBuilder, PullOraclePriceConsumer, SetExecutionFee,
+        },
+        fix_optional_account_metas,
+    },
+};
 
 /// The compute budget for `auto_deleverage`.
 pub const ADL_COMPUTE_BUDGET: u32 = 800_000;
-
-#[cfg(feature = "pyth-pull-oracle")]
-use crate::pyth::pull_oracle::{ExecuteWithPythPrices, Prices, PythPullOracleContext};
 
 /// Update ADL state Instruction Builder.
 pub struct UpdateAdlBuilder<'a, C> {
@@ -69,15 +77,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> UpdateAdlBuilder<'a, C> {
         self
     }
 
-    /// Parse feeds with the given price udpates map.
-    #[cfg(feature = "pyth-pull-oracle")]
-    pub fn parse_with_pyth_price_updates(&mut self, price_updates: Prices) -> &mut Self {
-        self.feeds_parser.with_pyth_price_updates(price_updates);
-        self
-    }
-
     /// Build [`TransactionBuilder`] for auto-delevearaging the position.
-    pub async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
+    pub async fn build_txn(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
         let feeds = self
             .feeds_parser
@@ -155,30 +156,44 @@ impl UpdateAdlHint {
     }
 }
 
-#[cfg(feature = "pyth-pull-oracle")]
-impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
+impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
     for UpdateAdlBuilder<'a, C>
 {
-    fn should_estiamte_execution_fee(&self) -> bool {
+    async fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> crate::Result<BundleBuilder<'a, C>> {
+        let mut tx = self.client.bundle_with_options(options);
+
+        tx.try_push(self.build_txn().await?)?;
+
+        Ok(tx)
+    }
+}
+
+impl<C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer for UpdateAdlBuilder<'_, C> {
+    async fn feed_ids(&mut self) -> crate::Result<FeedIds> {
+        let hint = self.prepare_hint().await?;
+        Ok(FeedIds::new(self.store, hint.tokens_with_feed))
+    }
+
+    fn process_feeds(
+        &mut self,
+        provider: PriceProviderKind,
+        map: FeedAddressMap,
+    ) -> crate::Result<()> {
+        self.feeds_parser
+            .insert_pull_oracle_feed_parser(provider, map);
+        Ok(())
+    }
+}
+
+impl<C> SetExecutionFee for UpdateAdlBuilder<'_, C> {
+    fn is_execution_fee_estimation_required(&self) -> bool {
         false
     }
 
-    fn set_execution_fee(&mut self, _lamports: u64) {}
-
-    async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
-        let hint = self.prepare_hint().await?;
-        let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
-        Ok(ctx)
-    }
-
-    async fn build_rpc_with_price_updates(
-        &mut self,
-        price_updates: Prices,
-    ) -> crate::Result<Vec<TransactionBuilder<'a, C, ()>>> {
-        let tx = self
-            .parse_with_pyth_price_updates(price_updates)
-            .build()
-            .await?;
-        Ok(vec![tx])
+    fn set_execution_fee(&mut self, _lamports: u64) -> &mut Self {
+        self
     }
 }

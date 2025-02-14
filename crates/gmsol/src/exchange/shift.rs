@@ -32,9 +32,6 @@ use crate::{
 
 use super::ExchangeOps;
 
-#[cfg(feature = "pyth-pull-oracle")]
-use crate::pyth::pull_oracle::Prices;
-
 /// Create Shift Builder.
 pub struct CreateShiftBuilder<'a, C> {
     client: &'a crate::Client<C>,
@@ -401,13 +398,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
         self
     }
 
-    /// Parse feeds with the given price udpates map.
-    #[cfg(feature = "pyth-pull-oracle")]
-    pub fn parse_with_pyth_price_updates(&mut self, price_updates: Prices) -> &mut Self {
-        self.feeds_parser.with_pyth_price_updates(price_updates);
-        self
-    }
-
     async fn prepare_hint(&mut self) -> crate::Result<ExecuteShiftHint> {
         let hint = match &self.hint {
             Some(hint) => hint.clone(),
@@ -515,38 +505,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
         }
 
         Ok(rpc)
-    }
-}
-
-#[cfg(feature = "pyth-pull-oracle")]
-mod pyth {
-    use crate::pyth::{pull_oracle::ExecuteWithPythPrices, PythPullOracleContext};
-
-    use super::*;
-
-    impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
-        for ExecuteShiftBuilder<'a, C>
-    {
-        fn set_execution_fee(&mut self, lamports: u64) {
-            SetExecutionFee::set_execution_fee(self, lamports);
-        }
-
-        async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
-            let hint = self.prepare_hint().await?;
-            let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
-            Ok(ctx)
-        }
-
-        async fn build_rpc_with_price_updates(
-            &mut self,
-            price_updates: Prices,
-        ) -> crate::Result<Vec<TransactionBuilder<'a, C, ()>>> {
-            let rpc = self
-                .parse_with_pyth_price_updates(price_updates)
-                .build_rpc()
-                .await?;
-            Ok(vec![rpc])
-        }
     }
 }
 
