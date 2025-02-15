@@ -4,4 +4,9 @@ pub mod transaction_size;
 /// Inspect.
 pub mod inspect;
 
-pub use self::{inspect::inspect_transaction, transaction_size::transaction_size};
+/// With slot.
+pub mod with_slot;
+
+pub use self::{
+    inspect::inspect_transaction, transaction_size::transaction_size, with_slot::WithSlot,
+};

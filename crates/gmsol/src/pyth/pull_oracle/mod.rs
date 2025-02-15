@@ -168,8 +168,17 @@ where
         signatures.append(&mut close_signatures);
 
         match error {
-            None => Ok(signatures),
-            Some(err) => Err((signatures, err)),
+            None => Ok(signatures
+                .into_iter()
+                .map(|with_slot| with_slot.into_value())
+                .collect()),
+            Some(err) => Err((
+                signatures
+                    .into_iter()
+                    .map(|with_slot| with_slot.into_value())
+                    .collect(),
+                err,
+            )),
         }
     }
 }

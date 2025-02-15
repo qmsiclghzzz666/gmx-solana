@@ -25,6 +25,7 @@ use crate::{
     cluster::Cluster,
     compute_budget::ComputeBudget,
     signer::BoxClonableSigner,
+    utils::WithSlot,
 };
 
 /// Wallet Config.
@@ -511,7 +512,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
         without_compute_budget: bool,
         compute_unit_price_micro_lamports: Option<u64>,
         mut config: RpcSendTransactionConfig,
-    ) -> crate::Result<Signature> {
+    ) -> crate::Result<WithSlot<Signature>> {
         let client = self.cfg.rpc();
         let latest_hash = client.get_latest_blockhash().await.map_err(Box::new)?;
 
@@ -535,21 +536,25 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
 
     /// Build and send the transaction without preflight.
     pub async fn send_without_preflight(self) -> crate::Result<Signature> {
-        self.send_with_options(
-            false,
-            None,
-            RpcSendTransactionConfig {
-                skip_preflight: true,
-                ..Default::default()
-            },
-        )
-        .await
+        Ok(self
+            .send_with_options(
+                false,
+                None,
+                RpcSendTransactionConfig {
+                    skip_preflight: true,
+                    ..Default::default()
+                },
+            )
+            .await?
+            .into_value())
     }
 
     /// Build and send the transaction with default options.
     pub async fn send(self) -> crate::Result<Signature> {
-        self.send_with_options(false, None, Default::default())
-            .await
+        Ok(self
+            .send_with_options(false, None, Default::default())
+            .await?
+            .into_value())
     }
 
     /// Get complete lookup table.

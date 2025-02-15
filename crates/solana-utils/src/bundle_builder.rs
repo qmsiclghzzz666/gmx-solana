@@ -11,7 +11,7 @@ use crate::{
     client::SendAndConfirm,
     cluster::Cluster,
     transaction_builder::TransactionBuilder,
-    utils::{inspect_transaction, transaction_size},
+    utils::{inspect_transaction, transaction_size, WithSlot},
 };
 
 const TRANSACTION_SIZE_LIMIT: usize = PACKET_DATA_SIZE;
@@ -238,21 +238,35 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
         self,
         skip_preflight: bool,
     ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
-        self.send_all_with_opts(SendBundleOptions {
-            config: RpcSendTransactionConfig {
-                skip_preflight,
+        match self
+            .send_all_with_opts(SendBundleOptions {
+                config: RpcSendTransactionConfig {
+                    skip_preflight,
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        })
-        .await
+            })
+            .await
+        {
+            Ok(signatures) => Ok(signatures
+                .into_iter()
+                .map(|with_slot| with_slot.into_value())
+                .collect()),
+            Err((signatures, err)) => Err((
+                signatures
+                    .into_iter()
+                    .map(|with_slot| with_slot.into_value())
+                    .collect(),
+                err,
+            )),
+        }
     }
 
     /// Send all in order with the given options and returns the signatures of the success transactions.
     pub async fn send_all_with_opts(
         self,
         opts: SendBundleOptions,
-    ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
+    ) -> Result<Vec<WithSlot<Signature>>, (Vec<WithSlot<Signature>>, crate::Error)> {
         let SendBundleOptions {
             without_compute_budget,
             compute_unit_price_micro_lamports,
@@ -335,7 +349,7 @@ async fn send_all_txs(
     continue_on_error: bool,
     enable_tracing: bool,
     inspector_cluster: Option<Cluster>,
-) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
+) -> Result<Vec<WithSlot<Signature>>, (Vec<WithSlot<Signature>>, crate::Error)> {
     let txs = txs.into_iter();
     let (min, max) = txs.size_hint();
     let mut signatures = Vec::with_capacity(max.unwrap_or(min));

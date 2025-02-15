@@ -341,7 +341,8 @@ impl KeeperArgs {
                             ..Default::default()
                         },
                     )
-                    .await?;
+                    .await?
+                    .into_value();
                 tracing::info!(%order, "cancelled order at {signature}");
             }
             Command::Execute { action, address } => {

@@ -1,19 +1,25 @@
 use std::time::Duration;
 
 use solana_client::{
-    client_error::ClientError as SolanaClientError, nonblocking::rpc_client::RpcClient,
-    rpc_client::SerializableTransaction, rpc_config::RpcSendTransactionConfig,
-    rpc_request::RpcError,
+    client_error::ClientError as SolanaClientError,
+    nonblocking::rpc_client::RpcClient,
+    rpc_client::SerializableTransaction,
+    rpc_config::RpcSendTransactionConfig,
+    rpc_request::{RpcError, RpcRequest},
+    rpc_response::Response,
 };
 use solana_sdk::{commitment_config::CommitmentConfig, signature::Signature};
+use solana_transaction_status::TransactionStatus;
 use tokio::time::sleep;
+
+use crate::utils::WithSlot;
 
 pub(crate) trait SendAndConfirm {
     async fn send_and_confirm_transaction_with_config(
         &self,
         transaction: &impl SerializableTransaction,
         config: RpcSendTransactionConfig,
-    ) -> std::result::Result<Signature, SolanaClientError>;
+    ) -> std::result::Result<WithSlot<Signature>, SolanaClientError>;
 }
 
 impl SendAndConfirm for RpcClient {
@@ -21,7 +27,7 @@ impl SendAndConfirm for RpcClient {
         &self,
         transaction: &impl SerializableTransaction,
         config: RpcSendTransactionConfig,
-    ) -> std::result::Result<Signature, SolanaClientError> {
+    ) -> std::result::Result<WithSlot<Signature>, SolanaClientError> {
         const SEND_RETRIES: usize = 1;
         const GET_STATUS_RETRIES: usize = usize::MAX;
 
@@ -40,9 +46,21 @@ impl SendAndConfirm for RpcClient {
             };
 
             for status_retry in 0..GET_STATUS_RETRIES {
-                match self.get_signature_status(&signature).await? {
-                    Some(Ok(_)) => return Ok(signature),
-                    Some(Err(e)) => return Err(e.into()),
+                let result: Response<Vec<Option<TransactionStatus>>> = self
+                    .send(
+                        RpcRequest::GetSignatureStatuses,
+                        serde_json::json!([[signature.to_string()]]),
+                    )
+                    .await?;
+                let status = result.value[0]
+                    .clone()
+                    .filter(|result| result.satisfies_commitment(self.commitment()));
+
+                match status {
+                    Some(status) => match status.status {
+                        Ok(()) => return Ok(WithSlot::new(status.slot, signature)),
+                        Err(err) => return Err(err.into()),
+                    },
                     None => {
                         if !self
                             .is_blockhash_valid(&recent_blockhash, CommitmentConfig::processed())

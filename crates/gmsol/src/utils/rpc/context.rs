@@ -1,5 +1,7 @@
 use anchor_client::solana_client::rpc_response::{Response, RpcApiVersion, RpcResponseContext};
 
+pub use gmsol_solana_utils::utils::WithSlot;
+
 /// With Context.
 #[derive(Debug, Clone)]
 pub struct WithContext<T> {
@@ -66,63 +68,8 @@ impl<T> From<Response<T>> for WithContext<T> {
     }
 }
 
-/// With Slot.
-#[derive(Debug, Clone, Copy)]
-pub struct WithSlot<T> {
-    /// Slot.
-    slot: u64,
-    /// Value.
-    value: T,
-}
-
-impl<T> WithSlot<T> {
-    /// Create a new [`WithSlot`].
-    pub fn new(slot: u64, value: T) -> Self {
-        Self { slot, value }
-    }
-
-    /// Get slot.
-    pub fn slot(&self) -> u64 {
-        self.slot
-    }
-
-    /// Get value.
-    pub fn value(&self) -> &T {
-        &self.value
-    }
-
-    /// Into value.
-    pub fn into_value(self) -> T {
-        self.value
-    }
-
-    /// Apply a function on the value.
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> WithSlot<U> {
-        WithSlot {
-            slot: self.slot,
-            value: (f)(self.value),
-        }
-    }
-}
-
 impl<T> From<WithContext<T>> for WithSlot<T> {
     fn from(value: WithContext<T>) -> Self {
-        Self {
-            slot: value.context.slot,
-            value: value.value,
-        }
-    }
-}
-
-impl<T, E> WithSlot<Result<T, E>> {
-    /// Transpose.
-    pub fn transpose(self) -> Result<WithSlot<T>, E> {
-        match self.value {
-            Ok(value) => Ok(WithSlot {
-                slot: self.slot,
-                value,
-            }),
-            Err(err) => Err(err),
-        }
+        Self::new(value.slot(), value.value)
     }
 }
