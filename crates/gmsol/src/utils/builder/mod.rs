@@ -34,6 +34,22 @@ pub trait MakeBundleBuilder<'a, C> {
     }
 }
 
+impl<'a, C, T> MakeBundleBuilder<'a, C> for &mut T
+where
+    T: MakeBundleBuilder<'a, C>,
+{
+    fn build(&mut self) -> impl Future<Output = crate::Result<BundleBuilder<'a, C>>> {
+        (**self).build()
+    }
+
+    fn build_with_options(
+        &mut self,
+        options: BundleOptions,
+    ) -> impl Future<Output = crate::Result<BundleBuilder<'a, C>>> {
+        (**self).build_with_options(options)
+    }
+}
+
 /// Extension trait for [`MakeBundleBuilder`].
 pub trait MakeBundleBuilderExt<'a, C>: MakeBundleBuilder<'a, C> {
     /// Surround the current builder.

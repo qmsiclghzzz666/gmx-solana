@@ -233,3 +233,17 @@ pub trait PullOraclePriceConsumer {
         map: FeedAddressMap,
     ) -> crate::Result<()>;
 }
+
+impl<T: PullOraclePriceConsumer> PullOraclePriceConsumer for &mut T {
+    fn feed_ids(&mut self) -> impl Future<Output = crate::Result<FeedIds>> {
+        (**self).feed_ids()
+    }
+
+    fn process_feeds(
+        &mut self,
+        provider: PriceProviderKind,
+        map: FeedAddressMap,
+    ) -> crate::Result<()> {
+        (**self).process_feeds(provider, map)
+    }
+}

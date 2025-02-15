@@ -30,7 +30,7 @@ use gmsol::{
     client::SystemProgramOps,
     constants::MARKET_USD_UNIT,
     exchange::ExchangeOps,
-    pyth::{pull_oracle::ExecuteWithPythPrices, Hermes, PythPullOracle},
+    pyth::{pull_oracle::PythPullOracleWithHermes, Hermes, PythPullOracle},
     store::{
         glv::GlvOps, gt::GtOps, market::MarketOps, oracle::OracleOps, roles::RolesOps,
         store_ops::StoreOps, token_config::TokenConfigOps,
@@ -39,7 +39,10 @@ use gmsol::{
         glv::GlvMarketFlag, FactorKey, MarketConfigKey, PriceProviderKind, RoleKey,
         UpdateTokenConfigParams,
     },
-    utils::{shared_signer, SignerRef},
+    utils::{
+        builder::{MakeBundleBuilder, PullOraclePriceConsumer, WithPullOracle},
+        shared_signer, SignerRef,
+    },
     Client, ClientOptions,
 };
 use gmsol_solana_utils::bundle_builder::{BundleBuilder, SendBundleOptions};
@@ -1203,28 +1206,42 @@ impl Deployment {
         enable_tracing: bool,
     ) -> gmsol::Result<()>
     where
-        T: ExecuteWithPythPrices<'a, SignerRef>,
+        T: PullOraclePriceConsumer + MakeBundleBuilder<'a, SignerRef>,
     {
-        use gmsol::pyth::{pull_oracle::hermes::EncodingType, PythPullOracleOps};
-
-        let ctx = execute.context().await?;
-        let feed_ids = ctx.feed_ids();
-
         sleep(Duration::from_secs(2)).await;
-        let update = self
-            .hermes
-            .latest_price_updates(feed_ids, Some(EncodingType::Base64))
-            .await?;
-        self.pyth
-            .execute_with_pyth_price_updates(
-                Some(update.binary()),
-                execute,
+
+        let oracle = PythPullOracleWithHermes::from_parts(&self.client, &self.hermes, &self.pyth);
+        let res = WithPullOracle::new(oracle, execute, None)
+            .await?
+            .build()
+            .await?
+            .send_all_with_opts(SendBundleOptions {
                 compute_unit_price_micro_lamports,
-                skip_preflight,
-                enable_tracing,
-            )
-            .await?;
-        Ok(())
+                disable_error_tracing: !enable_tracing,
+                config: RpcSendTransactionConfig {
+                    skip_preflight,
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .await;
+        match res {
+            Ok(signatures) => {
+                if enable_tracing {
+                    tracing::info!("executed, txns={signatures:?}");
+                }
+
+                Ok(())
+            }
+
+            Err((signatures, err)) => {
+                if enable_tracing {
+                    tracing::error!(%err, "executed, txns={signatures:?}");
+                }
+
+                Err(err.into())
+            }
+        }
     }
 
     pub(crate) async fn prepare_market(
@@ -1265,7 +1282,7 @@ impl Deployment {
                 },
             )
             .await?;
-        tracing::info!(%deposit, %signature, "created a deposit");
+        tracing::info!(%deposit, slot=%signature.slot(), signature=%signature.value(), "created a deposit");
         let mut builder = keeper.execute_deposit(&self.store, &self.oracle(), &deposit, false);
         self.execute_with_pyth(&mut builder, None, skip_preflight, true)
             .await?;
