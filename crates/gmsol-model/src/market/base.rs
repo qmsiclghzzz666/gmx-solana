@@ -216,6 +216,20 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         }
     }
 
+    /// Get pnl factor with pool value.
+    fn pnl_factor_with_pool_value(
+        &self,
+        prices: &Prices<Self::Num>,
+        is_long: bool,
+        maximize: bool,
+    ) -> crate::Result<(Self::Signed, Self::Num)> {
+        let pool_value = self.pool_value_without_pnl_for_one_side(prices, is_long, !maximize)?;
+        let pnl = self.pnl(&prices.index_token_price, is_long, maximize)?;
+        crate::utils::div_to_factor_signed(&pnl, &pool_value)
+            .ok_or(crate::Error::Computation("calculating pnl factor"))
+            .map(|factor| (factor, pool_value))
+    }
+
     /// Get pnl factor.
     fn pnl_factor(
         &self,
@@ -223,10 +237,9 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         is_long: bool,
         maximize: bool,
     ) -> crate::Result<Self::Signed> {
-        let pool_value = self.pool_value_without_pnl_for_one_side(prices, is_long, !maximize)?;
-        let pnl = self.pnl(&prices.index_token_price, is_long, maximize)?;
-        crate::utils::div_to_factor_signed(&pnl, &pool_value)
-            .ok_or(crate::Error::Computation("calculating pnl factor"))
+        Ok(self
+            .pnl_factor_with_pool_value(prices, is_long, maximize)?
+            .0)
     }
 
     /// Validate (primary) pool amount.
@@ -250,13 +263,17 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         prices: &Prices<Self::Num>,
         kind: PnlFactorKind,
         is_long: bool,
-    ) -> crate::Result<Option<(Self::Signed, Self::Num)>> {
-        let pnl_factor = self.pnl_factor(prices, is_long, true)?;
+    ) -> crate::Result<Option<PnlFactorExceeded<Self::Num>>> {
+        let (pnl_factor, pool_value) = self.pnl_factor_with_pool_value(prices, is_long, true)?;
         let max_pnl_factor = self.pnl_factor_config(kind, is_long)?;
 
         let is_exceeded = pnl_factor.is_positive() && pnl_factor.unsigned_abs() > max_pnl_factor;
 
-        Ok(is_exceeded.then_some((pnl_factor, max_pnl_factor)))
+        Ok(is_exceeded.then(|| PnlFactorExceeded {
+            pnl_factor,
+            max_pnl_factor,
+            pool_value,
+        }))
     }
 
     /// Validate pnl factor.
@@ -451,4 +468,14 @@ pub enum PnlFactorKind {
     ForAdl,
     /// Min factor after auto-deleveraging.
     MinAfterAdl,
+}
+
+/// PnL factor exceeded.
+pub struct PnlFactorExceeded<T: Unsigned> {
+    /// Current PnL factor.
+    pub pnl_factor: T::Signed,
+    /// Max PnL factor.
+    pub max_pnl_factor: T,
+    /// Current pool value.
+    pub pool_value: T,
 }

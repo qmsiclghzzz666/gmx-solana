@@ -1439,10 +1439,11 @@ fn execute_decrease_position(
 
         // Validate that ADL is required.
         if is_adl_order {
-            let Some((pnl_factor, _)) = position
+            let Some(pnl_factor) = position
                 .market()
                 .pnl_factor_exceeded(&prices, PnlFactorKind::ForAdl, params.side()?.is_long())
                 .map_err(ModelError::from)?
+                .map(|exceeded| exceeded.pnl_factor)
             else {
                 return err!(CoreError::AdlNotRequired);
             };
