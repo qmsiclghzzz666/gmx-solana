@@ -1016,7 +1016,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         futures_util::pin_mut!(events);
         match events.next().await.transpose()? {
             Some(events) => Ok(events.into_value()),
-            None => Err(crate::Error::unknown("events not found")),
+            None => Err(crate::Error::unknown(format!(
+                "events not found, slot={before_slot}"
+            ))),
         }
     }
 
