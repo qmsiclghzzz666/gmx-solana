@@ -25,7 +25,7 @@ impl<T> WithSlot<T> {
 
     /// Into value.
     pub fn into_value(self) -> T {
-        self.value
+        self.split().1
     }
 
     /// Apply a function on the value.
@@ -34,6 +34,11 @@ impl<T> WithSlot<T> {
             slot: self.slot,
             value: (f)(self.value),
         }
+    }
+
+    /// Split.
+    pub fn split(self) -> (u64, T) {
+        (self.slot, self.value)
     }
 }
 
