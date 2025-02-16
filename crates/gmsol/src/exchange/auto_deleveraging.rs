@@ -1,14 +1,12 @@
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref};
 
-use anchor_client::{
-    anchor_lang::Id,
-    solana_sdk::{pubkey::Pubkey, signer::Signer},
-};
+use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
 use gmsol_solana_utils::{
     bundle_builder::{BundleBuilder, BundleOptions},
     transaction_builder::TransactionBuilder,
 };
-use gmsol_store::states::{common::TokensWithFeed, Market, PriceProviderKind, Pyth};
+use gmsol_store::states::{common::TokensWithFeed, Market, PriceProviderKind};
+use solana_sdk::address_lookup_table::AddressLookupTableAccount;
 
 use crate::{
     store::utils::FeedsParser,
@@ -29,10 +27,11 @@ pub struct UpdateAdlBuilder<'a, C> {
     store: Pubkey,
     market_token: Pubkey,
     oracle: Pubkey,
-    is_long: bool,
-    price_provider: Pubkey,
+    for_long: bool,
+    for_short: bool,
     hint: Option<UpdateAdlHint>,
     feeds_parser: FeedsParser,
+    alts: HashMap<Pubkey, Vec<Pubkey>>,
 }
 
 impl<'a, C: Deref<Target = impl Signer> + Clone> UpdateAdlBuilder<'a, C> {
@@ -41,18 +40,26 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> UpdateAdlBuilder<'a, C> {
         store: &Pubkey,
         oracle: &Pubkey,
         market_token: &Pubkey,
-        is_long: bool,
+        for_long: bool,
+        for_short: bool,
     ) -> crate::Result<Self> {
         Ok(Self {
             client,
             store: *store,
             market_token: *market_token,
             oracle: *oracle,
-            is_long,
-            price_provider: Pyth::id(),
+            for_long,
+            for_short,
             hint: None,
             feeds_parser: FeedsParser::default(),
+            alts: Default::default(),
         })
+    }
+
+    /// Insert an Address Lookup Table.
+    pub fn add_alt(&mut self, account: AddressLookupTableAccount) -> &mut Self {
+        self.alts.insert(account.key, account.addresses);
+        self
     }
 
     /// Prepare hint for auto-deleveraging.
@@ -71,41 +78,48 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> UpdateAdlBuilder<'a, C> {
         }
     }
 
-    /// Set price provider to the given.
-    pub fn price_provider(&mut self, program: &Pubkey) -> &mut Self {
-        self.price_provider = *program;
-        self
-    }
-
     /// Build [`TransactionBuilder`] for auto-delevearaging the position.
-    pub async fn build_txn(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
+    pub async fn build_txns(&mut self) -> crate::Result<Vec<TransactionBuilder<'a, C>>> {
         let hint = self.prepare_hint().await?;
         let feeds = self
             .feeds_parser
             .parse(hint.feeds())
             .collect::<Result<Vec<_>, _>>()?;
-        let rpc = self
-            .client
-            .store_transaction()
-            .accounts(fix_optional_account_metas(
-                gmsol_store::accounts::UpdateAdlState {
-                    authority: self.client.payer(),
-                    store: self.store,
-                    token_map: hint.token_map,
-                    oracle: self.oracle,
-                    market: self
-                        .client
-                        .find_market_address(&self.store, &self.market_token),
-                    chainlink_program: None,
-                },
-                &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
-                self.client.store_program_id(),
-            ))
-            .anchor_args(gmsol_store::instruction::UpdateAdlState {
-                is_long: self.is_long,
-            })
-            .accounts(feeds);
-        Ok(rpc)
+
+        let mut txns = vec![];
+
+        let sides = self
+            .for_long
+            .then_some(true)
+            .into_iter()
+            .chain(self.for_short.then_some(false));
+
+        for is_long in sides {
+            let rpc = self
+                .client
+                .store_transaction()
+                .accounts(fix_optional_account_metas(
+                    gmsol_store::accounts::UpdateAdlState {
+                        authority: self.client.payer(),
+                        store: self.store,
+                        token_map: hint.token_map,
+                        oracle: self.oracle,
+                        market: self
+                            .client
+                            .find_market_address(&self.store, &self.market_token),
+                        chainlink_program: None,
+                    },
+                    &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                    self.client.store_program_id(),
+                ))
+                .anchor_args(gmsol_store::instruction::UpdateAdlState { is_long })
+                .accounts(feeds.clone())
+                .lookup_tables(self.alts.clone());
+
+            txns.push(rpc);
+        }
+
+        Ok(txns)
     }
 }
 
@@ -163,11 +177,11 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeBundleBuilder<'a, C>
         &mut self,
         options: BundleOptions,
     ) -> crate::Result<BundleBuilder<'a, C>> {
-        let mut tx = self.client.bundle_with_options(options);
+        let mut bundle = self.client.bundle_with_options(options);
 
-        tx.try_push(self.build_txn().await?)?;
+        bundle.push_many(self.build_txns().await?, false)?;
 
-        Ok(tx)
+        Ok(bundle)
     }
 }
 

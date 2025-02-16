@@ -307,8 +307,13 @@ impl KeeperArgs {
                     .await?;
             }
             Command::UpdateAdl { market_token, side } => {
-                let builder =
-                    client.update_adl(store, self.oracle()?, market_token, side.is_long())?;
+                let builder = client.update_adl(
+                    store,
+                    self.oracle()?,
+                    market_token,
+                    side.is_long(),
+                    !side.is_long(),
+                )?;
 
                 Executor::new_with_envs(store, client, self.oracle_testnet, self.feed_index)?
                     .execute(

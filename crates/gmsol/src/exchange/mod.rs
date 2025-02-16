@@ -183,7 +183,8 @@ pub trait ExchangeOps<C> {
         store: &Pubkey,
         oracle: &Pubkey,
         market_token: &Pubkey,
-        is_long: bool,
+        for_long: bool,
+        for_short: bool,
     ) -> crate::Result<UpdateAdlBuilder<C>>;
 
     /// Create a market increase position order.
@@ -662,9 +663,10 @@ where
         store: &Pubkey,
         oracle: &Pubkey,
         market_token: &Pubkey,
-        is_long: bool,
+        for_long: bool,
+        for_short: bool,
     ) -> crate::Result<UpdateAdlBuilder<C>> {
-        UpdateAdlBuilder::try_new(self, store, oracle, market_token, is_long)
+        UpdateAdlBuilder::try_new(self, store, oracle, market_token, for_long, for_short)
     }
 
     fn create_shift(
