@@ -1046,14 +1046,13 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             min_context_slot: Some(slot),
             ..Default::default()
         };
-        let current = self.get_slot(Some(commitment)).await?;
-        let mut slot_reached = current >= slot;
+        let mut slot_reached = self.get_slot(Some(commitment)).await? >= slot;
         if slot_reached {
             let order = self.order_with_config(address, config.clone()).await?;
             slot = order.slot();
             let order = order.into_value();
             if order.is_none() {
-                let events = self.last_order_events(address, current, commitment).await?;
+                let events = self.last_order_events(address, slot, commitment).await?;
                 return Ok(events
                     .into_iter()
                     .filter_map(|event| {
@@ -1104,14 +1103,10 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
                 }
                 Err(_elapsed) => {
                     if slot_reached {
-                        if self
-                            .order_with_config(&address, config.clone())
-                            .await?
-                            .value()
-                            .is_none()
-                        {
+                        let res = self.order_with_config(&address, config.clone()).await?;
+                        if res.value().is_none() {
                             let events = self
-                                .last_order_events(&address, current, commitment)
+                                .last_order_events(&address, res.slot(), commitment)
                                 .await?;
                             return Ok(events
                                 .into_iter()
@@ -1125,8 +1120,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
                                 .next());
                         }
                     } else {
-                        let current = self.get_slot(Some(commitment)).await?;
-                        slot_reached = current >= slot;
+                        slot_reached = self.get_slot(Some(commitment)).await? >= slot;
                     }
                 }
             }
