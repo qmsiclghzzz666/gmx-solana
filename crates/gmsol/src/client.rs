@@ -996,8 +996,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         .await
     }
 
+    /// Get last order events.
     #[cfg(feature = "decode")]
-    async fn last_order_events(
+    pub async fn last_order_events(
         &self,
         order: &Pubkey,
         before_slot: u64,
