@@ -479,3 +479,22 @@ pub struct PnlFactorExceeded<T: Unsigned> {
     /// Current pool value.
     pub pool_value: T,
 }
+
+impl<T: Unsigned> PnlFactorExceeded<T> {
+    /// Get the exceeded pnl.
+    pub fn exceeded_pnl<const DECIMALS: u8>(&self) -> Option<T>
+    where
+        T: CheckedSub,
+        T: FixedPointOps<DECIMALS>,
+    {
+        if !self.pnl_factor.is_positive() || self.pool_value.is_zero() {
+            return None;
+        }
+
+        let pnl_factor = self.pnl_factor.unsigned_abs();
+
+        let diff_factor = pnl_factor.checked_sub(&self.max_pnl_factor)?;
+
+        crate::utils::apply_factor(&self.pool_value, &diff_factor)
+    }
+}
