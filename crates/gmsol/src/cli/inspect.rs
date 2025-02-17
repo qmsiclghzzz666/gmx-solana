@@ -51,6 +51,8 @@ enum Command {
         address: Option<Pubkey>,
         #[arg(long, short, group = "select-user")]
         owner: Option<Pubkey>,
+        #[arg(long)]
+        show_address: bool,
     },
     /// `ReferralCode` account.
     ReferralCode {
@@ -295,13 +297,20 @@ impl InspectArgs {
                     crate::utils::generate_discriminator(name, namespace.as_deref(), !*raw)
                 );
             }
-            Command::User { address, owner } => {
+            Command::User {
+                address,
+                owner,
+                show_address,
+            } => {
                 let address = address.unwrap_or_else(|| {
                     let owner = owner.unwrap_or_else(|| client.payer());
                     client.find_user_address(store, &owner)
                 });
                 let user = client.user(&address).await?;
                 println!("{user:#?}");
+                if *show_address {
+                    println!("Address: {address}");
+                }
             }
             Command::ReferralCode { address, code } => {
                 let address = if let Some(address) = address {
