@@ -116,6 +116,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         }
     }
 
+    /// Set the nonce.
+    pub fn nonce(&mut self, nonce: NonceBytes) -> &mut Self {
+        self.nonce = Some(nonce);
+        self
+    }
+
     /// Set max execution fee allowed to use.
     pub fn max_execution_fee(&mut self, lamports: u64) -> &mut Self {
         self.max_execution_lamports = lamports;

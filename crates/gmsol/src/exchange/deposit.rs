@@ -56,6 +56,12 @@ pub struct CreateDepositBuilder<'a, C> {
 }
 
 impl<C> CreateDepositBuilder<'_, C> {
+    /// Set the nonce.
+    pub fn nonce(&mut self, nonce: NonceBytes) -> &mut Self {
+        self.nonce = Some(nonce);
+        self
+    }
+
     /// Set execution fee. Defaults to min execution fee.
     pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
         self.execution_fee = fee;

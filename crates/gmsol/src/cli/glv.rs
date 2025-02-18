@@ -65,6 +65,9 @@ enum Command {
     Deposit {
         /// The address of the market token of the GLV Market to deposit into.
         market_token: Pubkey,
+        /// Nonce.
+        #[arg(long)]
+        nonce: Option<Pubkey>,
         #[arg(long, group = "deposit-receiver")]
         receiver: Option<Pubkey>,
         #[arg(long, group = "deposit-receiver", requires = "min_amount")]
@@ -112,6 +115,9 @@ enum Command {
     Withdraw {
         /// The address of the market token of the GLV Market to withdraw from.
         market_token: Pubkey,
+        /// Nonce.
+        #[arg(long)]
+        nonce: Option<Pubkey>,
         #[arg(long)]
         receiver: Option<Pubkey>,
         /// Extra execution fee allowed to use.
@@ -144,6 +150,9 @@ enum Command {
     },
     /// Create a GLV shift.
     Shift {
+        /// Nonce.
+        #[arg(long)]
+        nonce: Option<Pubkey>,
         /// From market token.
         #[arg(long, value_name = "FROM_MARKET_TOKEN")]
         from: Pubkey,
@@ -368,6 +377,7 @@ impl Args {
             }
             Command::Deposit {
                 market_token,
+                nonce,
                 receiver,
                 first_deposit,
                 extra_execution_fee,
@@ -386,6 +396,9 @@ impl Args {
             } => {
                 let glv_token = selected.address(client, store);
                 let mut builder = client.create_glv_deposit(store, &glv_token, market_token);
+                if let Some(nonce) = nonce.map(|p| p.to_bytes()) {
+                    builder.nonce(nonce);
+                }
                 if *market_token_amount != 0 {
                     builder
                         .market_token_deposit(*market_token_amount, market_token_account.as_ref());
@@ -422,6 +435,7 @@ impl Args {
             }
             Command::Withdraw {
                 market_token,
+                nonce,
                 receiver,
                 extra_execution_fee,
                 amount,
@@ -439,6 +453,9 @@ impl Args {
                     market_token,
                     *amount,
                 );
+                if let Some(nonce) = nonce.map(|p| p.to_bytes()) {
+                    builder.nonce(nonce);
+                }
                 if let Some(account) = glv_token_account {
                     builder.glv_token_source(account);
                 }
@@ -462,6 +479,7 @@ impl Args {
                 rpc
             }
             Command::Shift {
+                nonce,
                 from,
                 to,
                 amount,
@@ -475,7 +493,9 @@ impl Args {
                     to,
                     *amount,
                 );
-
+                if let Some(nonce) = nonce.map(|p| p.to_bytes()) {
+                    builder.nonce(nonce);
+                }
                 builder
                     .execution_fee(extra_execution_fee + GlvShift::MIN_EXECUTION_LAMPORTS)
                     .min_to_market_token_amount(*min_output_amount);

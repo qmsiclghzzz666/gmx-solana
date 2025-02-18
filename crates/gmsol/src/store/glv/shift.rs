@@ -71,6 +71,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvShiftBuilder<'a, C> {
         }
     }
 
+    /// Set the nonce.
+    pub fn nonce(&mut self, nonce: NonceBytes) -> &mut Self {
+        self.nonce = Some(nonce);
+        self
+    }
+
     /// Set exectuion fee allowed to use.
     pub fn execution_fee(&mut self, amount: u64) -> &mut Self {
         self.execution_fee = amount;

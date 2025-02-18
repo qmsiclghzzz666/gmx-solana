@@ -143,6 +143,12 @@ where
         }
     }
 
+    /// Set the nonce.
+    pub fn nonce(&mut self, nonce: NonceBytes) -> &mut Self {
+        self.nonce = Some(nonce);
+        self
+    }
+
     /// Set extra exectuion fee allowed to use.
     ///
     /// Defaults to `0` means only allowed to use at most `rent-exempt` amount of fee.

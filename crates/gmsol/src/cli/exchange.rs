@@ -13,6 +13,9 @@ use crate::{utils::Side, GMSOLClient};
 
 #[derive(clap::Args)]
 pub(super) struct ExchangeArgs {
+    /// Nonce.
+    #[arg(long)]
+    nonce: Option<Pubkey>,
     #[command(subcommand)]
     command: Command,
 }
@@ -367,6 +370,7 @@ fn parse_decimal(value: &str) -> Result<Decimal, clap::Error> {
 
 impl ExchangeArgs {
     pub(super) async fn run(&self, client: &GMSOLClient, store: &Pubkey) -> gmsol::Result<()> {
+        let nonce = self.nonce.map(|nonce| nonce.to_bytes());
         match &self.command {
             Command::CreateDeposit {
                 extra_execution_fee,
@@ -384,6 +388,9 @@ impl ExchangeArgs {
                 first_deposit,
             } => {
                 let mut builder = client.create_deposit(store, market_token);
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
                 if *long_token_amount != 0 {
                     builder.long_token(
                         *long_token_amount,
@@ -439,6 +446,9 @@ impl ExchangeArgs {
                 short_swap,
             } => {
                 let mut builder = client.create_withdrawal(store, market_token, *amount);
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
                 if let Some(account) = market_token_account {
                     builder.market_token_account(account);
                 }
@@ -477,7 +487,9 @@ impl ExchangeArgs {
                 extra_execution_fee,
             } => {
                 let mut builder = client.create_shift(store, from, to, *amount);
-
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
                 builder
                     .execution_fee(extra_execution_fee + Shift::MIN_EXECUTION_LAMPORTS)
                     .min_to_market_token_amount(*min_output_amount);
@@ -516,6 +528,9 @@ impl ExchangeArgs {
                     side.is_long(),
                     *size,
                 );
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
                 if let Some(token) = initial_collateral_token {
                     builder
                         .initial_collateral_token(token, initial_collateral_token_account.as_ref());
@@ -547,6 +562,9 @@ impl ExchangeArgs {
                     side.is_long(),
                     *size,
                 );
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
                 if let Some(token) = final_output_token {
                     builder.final_output_token(token);
                 }
@@ -574,6 +592,9 @@ impl ExchangeArgs {
                     *initial_swap_in_token_amount,
                     swap.iter().chain(Some(market_token)),
                 );
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
                 if let Some(account) = initial_swap_in_token_account {
                     builder.initial_collateral_token(initial_swap_in_token, Some(account));
                 }
@@ -604,6 +625,9 @@ impl ExchangeArgs {
                     collateral_side.is_long(),
                     *initial_collateral_token_amount,
                 );
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
                 if let Some(token) = initial_collateral_token {
                     builder
                         .initial_collateral_token(token, initial_collateral_token_account.as_ref());
@@ -637,6 +661,9 @@ impl ExchangeArgs {
                     collateral_side.is_long(),
                     *collateral_withdrawal_amount,
                 );
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
                 if let Some(token) = final_output_token {
                     builder.final_output_token(token);
                 }
@@ -668,6 +695,9 @@ impl ExchangeArgs {
                     collateral_side.is_long(),
                     *collateral_withdrawal_amount,
                 );
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
                 if let Some(token) = final_output_token {
                     builder.final_output_token(token);
                 }
@@ -717,6 +747,9 @@ impl ExchangeArgs {
                     *initial_swap_in_token_amount,
                     swap.iter().chain(Some(market_token)),
                 );
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
                 if let Some(account) = initial_swap_in_token_account {
                     builder.initial_collateral_token(initial_swap_in_token, Some(account));
                 }
