@@ -20,7 +20,8 @@ use crate::{
         feature::{ActionDisabledFlag, DomainDisabledFlag},
         order::Order,
         user::UserHeader,
-        Chainlink, Market, NonceBytes, Oracle, Position, Seed, Store, TokenMapHeader,
+        Chainlink, HasMarketMeta, Market, NonceBytes, Oracle, Position, Seed, Store,
+        TokenMapHeader,
     },
     utils::internal,
     validated_recent_timestamp, CoreError,
@@ -245,15 +246,16 @@ pub(crate) fn unchecked_process_position_cut<'info>(
 
     let remaining_accounts = ctx.remaining_accounts;
 
-    let tokens = accounts
-        .market
-        .load()?
-        .meta()
-        .ordered_tokens()
-        .into_iter()
-        .collect::<Vec<_>>();
+    let (tokens, is_pure_market) = {
+        let market = accounts.market.load()?;
+        let meta = market.meta();
+        (
+            meta.ordered_tokens().into_iter().collect::<Vec<_>>(),
+            meta.is_pure(),
+        )
+    };
 
-    let refund = Order::position_cut_rent()?;
+    let refund = Order::position_cut_rent(is_pure_market)?;
 
     let event_emitter = EventEmitter::new(&accounts.event_authority, ctx.bumps.event_authority);
 

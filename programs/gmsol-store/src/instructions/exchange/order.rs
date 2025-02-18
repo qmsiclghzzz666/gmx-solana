@@ -22,7 +22,8 @@ use crate::{
         order::{Order, OrderKind},
         position::PositionKind,
         user::UserHeader,
-        Market, NonceBytes, Position, RoleKey, Seed, Store, StoreWalletSigner, UpdateOrderParams,
+        HasMarketMeta, Market, NonceBytes, Position, RoleKey, Seed, Store, StoreWalletSigner,
+        UpdateOrderParams,
     },
     utils::{internal, token::is_associated_token_account_or_owner},
     CoreError,
@@ -76,12 +77,14 @@ pub(crate) fn prepare_position(
         &ctx.accounts.owner,
         collateral_token,
         &market_token,
+        meta.is_pure(),
         &store,
         ctx.accounts.system_program.to_account_info(),
     )?;
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_and_initialize_position_if_needed<'info>(
     position_loader: &AccountLoader<'info, Position>,
     bump: u8,
@@ -89,6 +92,7 @@ fn validate_and_initialize_position_if_needed<'info>(
     owner: &AccountInfo<'info>,
     collateral_token: &Pubkey,
     market_token: &Pubkey,
+    is_pure_market: bool,
     store: &Pubkey,
     system_program: AccountInfo<'info>,
 ) -> Result<()> {
@@ -132,7 +136,7 @@ fn validate_and_initialize_position_if_needed<'info>(
         TransferExecutionFeeOperation::builder()
             .payment(position_loader.to_account_info())
             .payer(owner.clone())
-            .execution_lamports(Order::position_cut_rent()?)
+            .execution_lamports(Order::position_cut_rent(is_pure_market)?)
             .system_program(system_program)
             .build()
             .execute()?;
