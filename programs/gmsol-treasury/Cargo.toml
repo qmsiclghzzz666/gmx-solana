@@ -21,7 +21,7 @@ idl-build = [
     "gmsol-utils/idl-build",
 ]
 debug = ["gmsol-store/debug", "derive_more"]
-no-mock = []
+mock = []
 multi-store = ["gmsol-store/multi-store"]
 enum-iter = []
 utils = []

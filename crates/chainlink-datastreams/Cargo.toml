@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [features]
-no-mock = []
+mock = []
 
 [dependencies]
 ruint = { workspace = true, default-features = false }

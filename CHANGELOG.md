@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- just: The `build-idls` recipient now builds IDLs that include docs.
+- just: The `build-idls` recipient now builds IDLs that include docs
+- Replaced the `no-mock` feature with `mock`, meaning the default is "no-mock"
+- The `verify` instruction of the `mock-chainlink-verifier` program now will panic if it is not built with the `mock` feature enabled
 
 ## [0.3.0] - 2025-02-18
 

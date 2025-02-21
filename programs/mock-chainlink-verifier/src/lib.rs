@@ -23,7 +23,15 @@ pub mod mock_chainlink_verifier {
             .decompress_vec(&compressed_report)
             .expect("invalid compression");
         let (_, report) = decode_full_report(&full_report).expect("invalid full report");
-        Ok(report)
+
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "mock")] {
+                Ok(report)
+            } else {
+                _ = report;
+                panic!("The `mock` feature is not enabled");
+            }
+        }
     }
 }
 

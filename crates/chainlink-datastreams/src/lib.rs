@@ -11,7 +11,7 @@ pub mod verifier;
 pub mod utils;
 
 /// Mock Program.
-#[cfg(not(feature = "no-mock"))]
+#[cfg(feature = "mock")]
 pub mod mock;
 
 pub use data_streams_report;

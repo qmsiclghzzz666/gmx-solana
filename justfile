@@ -35,10 +35,10 @@ test-crates:
   cargo test --features {{FEATURES}}
 
 test-programs *ARGS:
-  anchor test {{ARGS}} -- --features {{DEVNET_FEATURES}}
+  anchor test {{ARGS}} -- --features mock --features {{DEVNET_FEATURES}}
 
 test-programs-debug *ARGS:
-  anchor test {{ARGS}} -- --features debug-msg --features {{DEVNET_FEATURES}}
+  anchor test {{ARGS}} -- --features mock,debug-msg --features {{DEVNET_FEATURES}}
 
 build-docs *ARGS:
   cargo doc --features doc {{ARGS}}
@@ -57,13 +57,13 @@ check-verifiable:
   fi
 
 build-verifiable:
-  anchor build -v -- --features no-mock --features {{DEVNET_FEATURES}}
+  anchor build -v -- --features {{DEVNET_FEATURES}}
 
 build-verifiable-mainnet:
-  anchor build -v -- --features no-mock
+  anchor build -v
 
 build-verifiable-with-mock:
-  anchor build -v -- --features {{DEVNET_FEATURES}}
+  anchor build -v -- --features mock --features {{DEVNET_FEATURES}}
 
 check-geyser:
   @if [ -f "{{GEYSER_PLUGIN_PATH}}" ]; then \
