@@ -10,7 +10,7 @@ use gmsol::{
 
 use anchor_client::solana_sdk::pubkey::Pubkey;
 
-use crate::anchor_tests::setup::{current_deployment, Deployment};
+use crate::anchor_test::setup::{current_deployment, Deployment};
 
 #[tokio::test]
 async fn update_chainlink_price_feed() -> eyre::Result<()> {

@@ -1,7 +1,7 @@
 use gmsol::{store::user::UserOps, types::user::ReferralCode};
 use gmsol_store::CoreError;
 
-use crate::anchor_tests::setup::{current_deployment, Deployment};
+use crate::anchor_test::setup::{current_deployment, Deployment};
 
 #[tokio::test]
 async fn referral() -> eyre::Result<()> {

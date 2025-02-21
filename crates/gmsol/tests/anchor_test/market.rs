@@ -2,7 +2,7 @@ use gmsol::{
     exchange::ExchangeOps, store::market::MarketOps, types::market::config::MarketConfigFlag,
 };
 
-use crate::anchor_tests::setup::{current_deployment, Deployment};
+use crate::anchor_test::setup::{current_deployment, Deployment};
 
 #[tokio::test]
 async fn claim_fees() -> eyre::Result<()> {

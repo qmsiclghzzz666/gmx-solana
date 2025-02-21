@@ -10,12 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Created a `CHANGELOG.md` file to document project updates
+- Added an integration testing suite `integration_test` to the `gmsol` tests
 
 ### Changed
 
 - just: The `build-idls` recipient now builds IDLs that include docs
 - Replaced the `no-mock` feature with `mock`, meaning the default is "no-mock"
 - The `verify` instruction of the `mock-chainlink-verifier` program now will panic if it is not built with the `mock` feature enabled
+- Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests
 
 ## [0.3.0] - 2025-02-18
 

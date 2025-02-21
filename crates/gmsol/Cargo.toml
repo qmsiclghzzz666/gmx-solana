@@ -76,6 +76,14 @@ anchor-test = [
     "shellexpand",
 ]
 
+integration-test = [
+    "chainlink-pull-oracle",
+    "pyth-pull-oracle",
+    "switchboard-pull-oracle",
+    "tracing-subscriber",
+    "shellexpand",
+]
+
 mock = ["mock-chainlink-verifier"]
 
 devnet = [

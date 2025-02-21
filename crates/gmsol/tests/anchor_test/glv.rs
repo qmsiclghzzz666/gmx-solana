@@ -2,7 +2,7 @@ use gmsol::store::glv::GlvOps;
 use gmsol_store::CoreError;
 use tracing::Instrument;
 
-use crate::anchor_tests::setup::{current_deployment, Deployment};
+use crate::anchor_test::setup::{current_deployment, Deployment};
 
 #[tokio::test]
 async fn initialize_glv() -> eyre::Result<()> {

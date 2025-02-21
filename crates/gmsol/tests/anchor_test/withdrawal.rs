@@ -1,6 +1,6 @@
 use gmsol::exchange::ExchangeOps;
 
-use crate::anchor_tests::setup::{current_deployment, Deployment};
+use crate::anchor_test::setup::{current_deployment, Deployment};
 
 #[tokio::test]
 async fn single_token_pool_withdrawal() -> eyre::Result<()> {

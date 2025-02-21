@@ -7,7 +7,7 @@ use gmsol::{
 use gmsol_model::action::decrease_position::DecreasePositionSwapType;
 use tracing::Instrument;
 
-use crate::anchor_tests::setup::{current_deployment, Deployment};
+use crate::anchor_test::setup::{current_deployment, Deployment};
 
 #[tokio::test]
 async fn balanced_market_order() -> eyre::Result<()> {

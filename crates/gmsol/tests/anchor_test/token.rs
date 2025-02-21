@@ -1,7 +1,7 @@
 use gmsol::{constants::MARKET_USD_UNIT, exchange::ExchangeOps};
 use tracing::Instrument;
 
-use crate::anchor_tests::setup::{current_deployment, Deployment};
+use crate::anchor_test::setup::{current_deployment, Deployment};
 
 #[tokio::test]
 async fn unwrap_native_token_with_swap_path() -> eyre::Result<()> {

@@ -2,7 +2,7 @@ use gmsol::{exchange::ExchangeOps, store::market::MarketOps, types::MarketConfig
 use gmsol_store::CoreError;
 use tracing::Instrument;
 
-use crate::anchor_tests::setup::{self, Deployment};
+use crate::anchor_test::setup::{self, Deployment};
 
 #[tokio::test]
 async fn single_token_pool_deposit() -> eyre::Result<()> {

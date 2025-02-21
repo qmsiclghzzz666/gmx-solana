@@ -325,7 +325,6 @@ impl Deployment {
                 (&mut rng)
                     .sample_iter(Alphanumeric)
                     .take(16)
-                    .map(char::from)
                     .collect::<String>()
             })
             .unwrap_or_default();

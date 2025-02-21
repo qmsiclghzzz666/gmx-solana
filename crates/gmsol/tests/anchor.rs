@@ -1,2 +1,2 @@
 #[cfg(feature = "anchor-test")]
-mod anchor_tests;
+mod anchor_test;
