@@ -45,8 +45,8 @@ build-docs *ARGS:
 
 build-idls:
   mkdir -p {{IDL_OUT_DIR}}
-  anchor idl build -p gmsol_store --no-docs -t {{IDL_OUT_DIR}}/gmsol_store.ts -o {{IDL_OUT_DIR}}/gmsol_store.json
-  anchor idl build -p gmsol_treasury --no-docs -t {{IDL_OUT_DIR}}/gmsol_treasury.ts -o {{IDL_OUT_DIR}}/gmsol_treasury.json
+  anchor idl build -p gmsol_store -t {{IDL_OUT_DIR}}/gmsol_store.ts -o {{IDL_OUT_DIR}}/gmsol_store.json
+  anchor idl build -p gmsol_treasury -t {{IDL_OUT_DIR}}/gmsol_treasury.ts -o {{IDL_OUT_DIR}}/gmsol_treasury.json
 
 check-verifiable:
   @if [ -f {{STORE_PROGRAM}} ] && [ -f {{TREASURY_PROGRAM}} ] && [ -f {{TIMELOCK_PROGRAM}} ] && [ -f {{MOCK_CHAINLINK_PROGRAM}} ]; then \

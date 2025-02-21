@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Created a `CHANGELOG.md` file to document project updates
 
+### Changed
+
+- just: The `build-idls` recipient now builds IDLs that include docs.
+
 ## [0.3.0] - 2025-02-18
 
 ### Added
