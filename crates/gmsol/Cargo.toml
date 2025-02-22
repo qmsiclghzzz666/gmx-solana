@@ -77,11 +77,12 @@ anchor-test = [
 ]
 
 integration-test = [
+    "cli",
     "chainlink-pull-oracle",
     "pyth-pull-oracle",
     "switchboard-pull-oracle",
     "tracing-subscriber",
-    "shellexpand",
+    "figment",
 ]
 
 mock = ["mock-chainlink-verifier"]
@@ -96,7 +97,7 @@ devnet = [
 squads = ["squads-multisig"]
 
 [dependencies]
-gmsol-solana-utils = { workspace = true, features = ["anchor"] }
+gmsol-solana-utils = { workspace = true, features = ["anchor", "serde"] }
 gmsol-utils = { workspace = true }
 gmsol-store = { workspace = true, features = [
     "no-entrypoint",
@@ -180,6 +181,7 @@ async-tungstenite = { workspace = true, optional = true, features = [
 ] }
 solana-remote-wallet = { workspace = true, optional = true }
 dialoguer = { workspace = true, optional = true }
+figment = { workspace = true, optional = true, features = ["env", "toml"] }
 
 # Chainlink.
 sha2 = { workspace = true, optional = true }

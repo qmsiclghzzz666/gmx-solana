@@ -9,7 +9,7 @@ use url::Url;
 
 /// Cluster.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Cluster {
     /// Testnet.
     Testnet,

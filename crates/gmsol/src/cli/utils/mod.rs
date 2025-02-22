@@ -1,19 +1,17 @@
-use std::{collections::HashMap, fs, ops::Deref, path::PathBuf, rc::Rc};
+use std::ops::Deref;
 
 use anchor_client::solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signature},
     signer::Signer,
 };
-use eyre::OptionExt;
+
 use gmsol::{timelock::TimelockOps, utils::instruction::InstructionSerialization};
 use gmsol_solana_utils::{
     bundle_builder::{BundleBuilder, BundleOptions},
     transaction_builder::TransactionBuilder,
 };
 use prettytable::format::{FormatBuilder, TableFormat};
-use solana_remote_wallet::remote_wallet::RemoteWalletManager;
-use url::Url;
 
 use crate::GMSOLClient;
 
@@ -319,77 +317,6 @@ impl Side {
     }
 }
 
-/// Parse url or path.
-pub fn parse_url_or_path(source: &str) -> eyre::Result<Url> {
-    let url = match Url::parse(source) {
-        Ok(url) => url,
-        Err(_) => {
-            let path = shellexpand::tilde(source);
-            let path: PathBuf = path.parse()?;
-            let path = fs::canonicalize(path)?;
-            Url::from_file_path(&path).expect("must be valid file path")
-        }
-    };
-
-    Ok(url)
-}
-
-/// Load signer from url.
-pub fn signer_from_source(
-    source: &str,
-    confirm_key: bool,
-    keypair_name: &str,
-    wallet_manager: &mut Option<Rc<RemoteWalletManager>>,
-) -> eyre::Result<gmsol::utils::LocalSignerRef> {
-    const QUERY_KEY: &str = "key";
-
-    use anchor_client::solana_sdk::{
-        derivation_path::DerivationPath, signature::read_keypair_file,
-    };
-    use gmsol::utils::local_signer;
-    use solana_remote_wallet::{
-        locator::Locator, remote_keypair::generate_remote_keypair,
-        remote_wallet::maybe_wallet_manager,
-    };
-
-    let url = parse_url_or_path(source)?;
-
-    match url.scheme() {
-        "file" => {
-            let keypair = read_keypair_file(url.path()).map_err(|err| eyre::eyre!("{err}"))?;
-            Ok(local_signer(keypair))
-        }
-        "usb" => {
-            let manufacturer = url.host_str().ok_or_eyre("missing manufacturer")?;
-            let path = url.path();
-            let path = path.strip_prefix('/').unwrap_or(path);
-            let pubkey = (!path.is_empty()).then_some(path);
-            let locator = Locator::new_from_parts(manufacturer, pubkey)?;
-            let query = url.query_pairs().collect::<HashMap<_, _>>();
-            if query.len() > 1 {
-                eyre::bail!("invalid query string, extra fields not supported");
-            }
-            let derivation_path = query
-                .get(QUERY_KEY)
-                .map(|value| DerivationPath::from_key_str(value))
-                .transpose()?;
-            if wallet_manager.is_none() {
-                *wallet_manager = maybe_wallet_manager()?;
-            }
-            let wallet_manager = wallet_manager.as_ref().ok_or_eyre("no device found")?;
-            let keypair = generate_remote_keypair(
-                locator,
-                derivation_path.unwrap_or_default(),
-                wallet_manager,
-                confirm_key,
-                keypair_name,
-            )?;
-            Ok(local_signer(keypair))
-        }
-        scheme => Err(eyre::eyre!("unsupported scheme: {scheme}")),
-    }
-}
-
 #[derive(clap::Args, Clone)]
 pub(crate) struct SelectGtExchangeVaultByDate {
     #[arg(long, short)]
@@ -457,16 +384,4 @@ where
     let mut buffer = String::new();
     std::fs::File::open(path)?.read_to_string(&mut buffer)?;
     toml::from_str(&buffer).map_err(gmsol::Error::invalid_argument)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_url_or_path() -> eyre::Result<()> {
-        let path = "~/.config/solana/id.json";
-        assert!(parse_url_or_path(path).is_ok());
-        Ok(())
-    }
 }

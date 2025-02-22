@@ -1,6 +1,7 @@
 IDL_OUT_DIR := "idl-out"
 FEATURES := "cli,u128"
 DEVNET_FEATURES := "devnet,test-only"
+INTEGRATION_TEST_FEATURES := "integration-test"
 SCRIPTS := "./scripts"
 TARGET := "./target"
 
@@ -39,6 +40,10 @@ test-programs *ARGS:
 
 test-programs-debug *ARGS:
   anchor test {{ARGS}} -- --features mock,debug-msg --features {{DEVNET_FEATURES}}
+
+it config="scripts/resources/config/integration_test.toml":
+  GMSOL_IT={{absolute_path(config)}} \
+  cargo test --test integration --features devnet --features {{INTEGRATION_TEST_FEATURES}}
 
 build-docs *ARGS:
   cargo doc --features doc {{ARGS}}

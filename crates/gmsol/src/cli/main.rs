@@ -168,7 +168,8 @@ impl Cli {
                 eyre::bail!("Setting payer is only allowed in `serialize-only` mode");
             }
         } else {
-            let wallet = utils::signer_from_source(&self.wallet, false, "keypair", wallet_manager)?;
+            let wallet =
+                gmsol::cli::signer_from_source(&self.wallet, false, "keypair", wallet_manager)?;
 
             if let Some(role) = self.timelock.as_ref() {
                 let store = if let Some(store_address) = self.store_address {

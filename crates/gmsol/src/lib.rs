@@ -53,6 +53,10 @@ pub mod pyth;
 /// Squads integation.
 pub mod squads;
 
+#[cfg(feature = "cli")]
+/// CLI support.
+pub mod cli;
+
 /// Test Utils.
 #[cfg(test)]
 mod test;

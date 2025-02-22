@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Created a `CHANGELOG.md` file to document project updates
 - Added an integration testing suite `integration_test` to the `gmsol` tests
+- Added the `gmsol::cli` module
 
 ### Changed
 
