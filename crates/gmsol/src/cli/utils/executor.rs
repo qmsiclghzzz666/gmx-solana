@@ -3,6 +3,7 @@ use std::{ops::Deref, sync::Arc};
 use gmsol::{
     chainlink::{self, pull_oracle::ChainlinkPullOracleFactory},
     pyth::{pull_oracle::PythPullOracleWithHermes, Hermes, PythPullOracle},
+    switchboard::pull_oracle::SwitchcboardPullOracleFactory,
     utils::{
         builder::{
             EstimateFee, MakeBundleBuilder, PullOraclePriceConsumer, SetExecutionFee,
@@ -22,6 +23,7 @@ pub(crate) struct Executor<'a, C> {
     chainlink: Option<(chainlink::Client, Arc<ChainlinkPullOracleFactory>)>,
     pyth: PythPullOracle<C>,
     hermes: Hermes,
+    switchboard: Option<SwitchcboardPullOracleFactory>,
 }
 
 impl<'a, C: Deref<Target = impl Signer> + Clone> Executor<'a, C> {
@@ -48,12 +50,19 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> Executor<'a, C> {
             )
         });
 
+        let switchboard = SwitchcboardPullOracleFactory::from_env()
+            .inspect_err(
+                |err| tracing::warn!(%err, "Required envs for Switchboard is not provided"),
+            )
+            .ok();
+
         Ok(Self {
             store: *store,
             client,
             chainlink,
             pyth,
             hermes: Default::default(),
+            switchboard,
         })
     }
 
@@ -70,30 +79,63 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> Executor<'a, C> {
             max_packet_size: max_transaction_size,
             ..Default::default()
         };
+
         let pyth = PythPullOracleWithHermes::from_parts(self.client, &self.hermes, &self.pyth);
-        let with_pyth = WithPullOracle::new(pyth, consumer, None).await?;
 
         let chainlink = self
             .chainlink
             .as_ref()
             .map(|(client, factory)| factory.clone().make_oracle(client, self.client, true));
 
-        let bundle = if let Some(chainlink) = chainlink.as_ref() {
-            let (with_chainlink, feed_ids) =
-                WithPullOracle::from_consumer(chainlink.clone(), with_pyth, None).await?;
+        let switchboard = self
+            .switchboard
+            .as_ref()
+            .map(|factory| factory.make_oracle(self.client));
 
-            let mut bundle = chainlink
-                .prepare_feeds_bundle(&feed_ids, options.clone())
-                .await?;
+        let with_pyth = WithPullOracle::new(pyth, consumer, None).await?;
 
-            let mut estiamted_fee = EstimateFee::new(with_chainlink, compute_unit_price);
+        let bundle = match (chainlink.as_ref(), switchboard) {
+            (None, None) => {
+                let mut estiamted_fee = EstimateFee::new(with_pyth, compute_unit_price);
+                estiamted_fee.build_with_options(options).await?
+            }
+            (Some(chainlink), None) => {
+                let (with_chainlink, feed_ids) =
+                    WithPullOracle::from_consumer(chainlink.clone(), with_pyth, None).await?;
 
-            bundle.append(estiamted_fee.build_with_options(options).await?, false)?;
+                let mut bundle = chainlink
+                    .prepare_feeds_bundle(&feed_ids, options.clone())
+                    .await?;
 
-            bundle
-        } else {
-            let mut estiamted_fee = EstimateFee::new(with_pyth, compute_unit_price);
-            estiamted_fee.build_with_options(options).await?
+                let mut estiamted_fee = EstimateFee::new(with_chainlink, compute_unit_price);
+
+                bundle.append(estiamted_fee.build_with_options(options).await?, false)?;
+
+                bundle
+            }
+            (None, Some(switchboard)) => {
+                let with_switchboard = WithPullOracle::new(switchboard, with_pyth, None).await?;
+
+                let mut estiamted_fee = EstimateFee::new(with_switchboard, compute_unit_price);
+                estiamted_fee.build_with_options(options).await?
+            }
+            (Some(chainlink), Some(switchboard)) => {
+                let (with_chainlink, feed_ids) =
+                    WithPullOracle::from_consumer(chainlink.clone(), with_pyth, None).await?;
+
+                let with_switchboard =
+                    WithPullOracle::new(switchboard, with_chainlink, None).await?;
+
+                let mut estiamted_fee = EstimateFee::new(with_switchboard, compute_unit_price);
+
+                let mut bundle = chainlink
+                    .prepare_feeds_bundle(&feed_ids, options.clone())
+                    .await?;
+
+                bundle.append(estiamted_fee.build_with_options(options).await?, false)?;
+
+                bundle
+            }
         };
 
         super::send_or_serialize_bundle_with_default_callback(

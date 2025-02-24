@@ -8,7 +8,7 @@ use anchor_client::solana_client::nonblocking::rpc_client::RpcClient;
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
 use anchor_spl::associated_token::get_associated_token_address;
 use base64::prelude::*;
-use gmsol_solana_utils::{bundle_builder::BundleOptions, program::Program};
+use gmsol_solana_utils::bundle_builder::BundleOptions;
 use gmsol_store::states::PriceProviderKind;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
@@ -29,27 +29,73 @@ use switchboard_on_demand_client::{
 use time::OffsetDateTime;
 use tokio::{join, sync::OnceCell};
 
-/// Switchboard Pull Oracle.
-pub struct SwitchboardPullOracle<'a, C> {
-    gmsol: &'a crate::Client<C>,
-    switchboard: &'a Program<C>,
-    ctx: Arc<SbContext>,
-    client: RpcClient,
+/// Switchboard Pull Oracle Factory.
+pub struct SwitchcboardPullOracleFactory {
+    switchboard: Pubkey,
     gateway: Gateway,
     crossbar: Option<CrossbarClient>,
 }
-impl<'a, C> SwitchboardPullOracle<'a, C> {
+
+impl SwitchcboardPullOracleFactory {
+    /// Gateway Env.
+    pub const ENV_GATEWAY: &str = "SWITCHBOARD_GATEWAY";
+
+    /// Create a new factory.
+    pub fn new(gateway_url: &str) -> Self {
+        Self {
+            switchboard: Pubkey::new_from_array(SWITCHBOARD_ON_DEMAND_PROGRAM_ID.to_bytes()),
+            gateway: Gateway::new(gateway_url.to_string()),
+            crossbar: None,
+        }
+    }
+
+    /// Create from env.
+    pub fn from_env() -> crate::Result<Self> {
+        use std::env;
+
+        let gateway_url = env::var(Self::ENV_GATEWAY).map_err(|_| {
+            crate::Error::invalid_argument(format!("{} is not set", Self::ENV_GATEWAY))
+        })?;
+
+        Ok(Self::new(&gateway_url))
+    }
+
+    /// Make oracle.
+    pub fn make_oracle<'a, C: Deref<Target = impl Signer> + Clone>(
+        &'a self,
+        gmsol: &'a crate::Client<C>,
+    ) -> SwitchboardPullOracle<'a, C> {
+        SwitchboardPullOracle::from_parts(
+            gmsol,
+            self.switchboard,
+            &self.gateway,
+            self.crossbar.clone(),
+        )
+    }
+}
+
+/// Switchboard Pull Oracle.
+pub struct SwitchboardPullOracle<'a, C> {
+    gmsol: &'a crate::Client<C>,
+    switchboard: Pubkey,
+    ctx: Arc<SbContext>,
+    client: RpcClient,
+    gateway: &'a Gateway,
+    crossbar: Option<CrossbarClient>,
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> SwitchboardPullOracle<'a, C> {
     /// Create from parts.
     pub fn from_parts(
         gmsol: &'a crate::Client<C>,
-        switchboard: &'a Program<C>,
-        gateway: Gateway,
+        switchboard: Pubkey,
+        gateway: &'a Gateway,
         crossbar: Option<CrossbarClient>,
     ) -> Self {
         Self {
             gmsol,
             switchboard,
-            client: switchboard.rpc(),
+            client: gmsol.store_program().rpc(),
             ctx: SbContext::new(),
             gateway,
             crossbar,
@@ -93,6 +139,7 @@ impl<C: Deref<Target = impl Signer> + Clone> PullOracle for SwitchboardPullOracl
         let mut queue = Pubkey::default();
 
         for feed in &feeds {
+            tracing::trace!(%feed, "fetching feed data");
             let data = *self
                 .ctx
                 .pull_feed_cache
@@ -101,10 +148,12 @@ impl<C: Deref<Target = impl Signer> + Clone> PullOracle for SwitchboardPullOracl
                 .get_or_try_init(|| PullFeed::load_data(&self.client, feed))
                 .await
                 .map_err(|_| crate::Error::switchboard_error("fetching job data failed"))?;
+            tracing::trace!(%feed, ?data, "fechted feed data");
             let jobs = data
                 .fetch_jobs(&self.crossbar.clone().unwrap_or_default())
                 .await
                 .map_err(|_| crate::Error::switchboard_error("fetching job data failed"))?;
+            tracing::trace!(%feed, ?jobs, "fetched jobs");
             let encoded_jobs = encode_jobs(&jobs);
             let max_variance = data.max_variance / 1_000_000_000;
             let min_responses = data.min_responses;
@@ -132,6 +181,7 @@ impl<C: Deref<Target = impl Signer> + Clone> PullOracle for SwitchboardPullOracl
             })
             .await
             .map_err(|_| crate::Error::switchboard_error("fetching signatures failed"))?;
+        tracing::trace!("fetched price signatures: {price_signatures:#?}");
 
         let mut all_submissions: Vec<Vec<Submission>> = vec![Default::default(); feeds.len()];
         let mut oracle_keys: HashSet<Pubkey> = HashSet::new();
@@ -254,8 +304,9 @@ impl<'a, C: Clone + Deref<Target = impl Signer>> PostPullOraclePrices<'a, C>
             };
             submit_ix.accounts.extend(remaining_accounts);
             let ix = self
-                .switchboard
-                .transaction()
+                .gmsol
+                .store_transaction()
+                .program(self.switchboard)
                 .pre_instruction(submit_ix)
                 .lookup_tables(
                     luts.clone()
