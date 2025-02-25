@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk: Added the `gmsol::cli` module
 - sdk: Added `SwitchboardPullOracleFactory` structure
 - cli: Added support for Switchboard to the `order` subcommand
+- programs: Added validation for the accounts length when loading instruction from an `InstructionBuffer`
 
 ### Changed
 

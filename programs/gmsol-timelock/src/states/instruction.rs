@@ -200,6 +200,9 @@ impl<'info> InstructionLoader<'info> for AccountLoader<'info, InstructionHeader>
         let data_len = usize::from(header.data_len);
         let (data, accounts) = Ref::map_split(remaining_data, |d| d.split_at(data_len));
 
+        let expected_accounts_len = usize::from(header.num_accounts);
+        require_eq!(accounts.len(), expected_accounts_len, CoreError::Internal);
+
         Ok(InstructionRef {
             header,
             data,
