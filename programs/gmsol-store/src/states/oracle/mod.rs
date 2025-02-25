@@ -382,6 +382,7 @@ impl OraclePrice {
                 (oracle_slot, oracle_ts, price)
             }
             PriceProviderKind::Switchboard => {
+                require_keys_eq!(feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
                 Switchboard::check_and_get_price(clock, token_config, account)?
             }
         };

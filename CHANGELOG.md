@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - tests: Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests
 - sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function
 
+### Fixed
+
+- programs: Fix the missing address validation when using Switchboard feeds.
+
 ## [0.3.0] - 2025-02-18
 
 ### Added
