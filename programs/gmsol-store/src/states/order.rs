@@ -640,6 +640,9 @@ impl Order {
         }
 
         if let Some(min_output) = params.min_output {
+            if matches!(current.kind()?, OrderKind::LimitSwap) {
+                require_neq!(min_output, 0, CoreError::InvalidArgument);
+            }
             current.min_output = min_output;
         }
 
