@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function
 - programs: Restricted the creation of instruction buffers so that only the executor wallet can be signer
 - programs: Allowed withdrawals from unauthorized treasury vaults
+- programs: Changed the role authorized to invoke `sync_gt_bank` instruction to `TREASURY_WITHDRAWER`
 - Updated dependencies:
   - `switchboard-on-demand`: `v0.3.4`
 

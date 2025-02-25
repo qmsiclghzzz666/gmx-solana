@@ -188,7 +188,7 @@ pub struct SyncGtBank<'info> {
 
 /// Sync the GT bank and deposit the exceeding amount into treasury vault.
 /// # CHECK
-/// Only [`TREASURY_KEEPER`](crate::roles::TREASURY_KEEPER) can use.
+/// Only [`TREASURY_WITHDRAWER`](crate::roles::TREASURY_WITHDRAWER) can use.
 pub(crate) fn unchecked_sync_gt_bank(ctx: Context<SyncGtBank>) -> Result<()> {
     let delta = {
         let gt_bank = ctx.accounts.gt_bank.load_mut()?;
