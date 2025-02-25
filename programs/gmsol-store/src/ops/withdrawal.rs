@@ -130,18 +130,6 @@ impl CreateWithdrawalOperation<'_, '_> {
             CoreError::NotEnoughTokenAmount,
         );
 
-        require_gte!(
-            params.execution_lamports,
-            Withdrawal::MIN_EXECUTION_LAMPORTS,
-            CoreError::NotEnoughExecutionFee
-        );
-
-        require_gte!(
-            self.withdrawal.get_lamports(),
-            params.execution_lamports,
-            CoreError::NotEnoughExecutionFee
-        );
-
         Ok(())
     }
 }
