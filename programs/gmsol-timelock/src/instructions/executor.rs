@@ -30,6 +30,13 @@ pub struct InitializeExecutor<'info> {
         bump,
     )]
     pub executor: AccountLoader<'info, Executor>,
+    /// Executor wallet.
+    /// CHECK: only the bump is used.
+    #[account(
+        seeds = [Executor::WALLET_SEED, executor.key().as_ref()],
+        bump,
+    )]
+    pub wallet: UncheckedAccount<'info>,
     /// The system program.
     pub system_program: Program<'info, System>,
 }
@@ -37,6 +44,7 @@ pub struct InitializeExecutor<'info> {
 pub(crate) fn initialize_executor(ctx: Context<InitializeExecutor>, role: &str) -> Result<()> {
     ctx.accounts.executor.load_init()?.try_init(
         ctx.bumps.executor,
+        ctx.bumps.wallet,
         ctx.accounts.store.key(),
         role,
     )?;

@@ -1207,7 +1207,7 @@ impl InspectArgs {
                     };
                     tracing::info!("[{idx}] {address}: {status}");
 
-                    instructions.push(buffer.to_instruction(true));
+                    instructions.push(buffer.to_instruction(true)?);
                 }
 
                 let message = Message::new(&instructions, Some(&client.payer()));

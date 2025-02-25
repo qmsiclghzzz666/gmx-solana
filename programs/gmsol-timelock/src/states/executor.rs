@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::pubkey::PubkeyError};
 use gmsol_store::{
     states::{Seed, MAX_ROLE_NAME_LEN},
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
@@ -9,7 +9,8 @@ use gmsol_store::{
 pub struct Executor {
     version: u8,
     pub(crate) bump: u8,
-    padding: [u8; 14],
+    pub(crate) wallet_bump: u8,
+    padding: [u8; 13],
     pub(crate) store: Pubkey,
     role_name: [u8; MAX_ROLE_NAME_LEN],
     reserved: [u8; 256],
@@ -24,9 +25,16 @@ impl Executor {
         bytes_to_fixed_str(&self.role_name)
     }
 
-    pub(crate) fn try_init(&mut self, bump: u8, store: Pubkey, role_name: &str) -> Result<()> {
+    pub(crate) fn try_init(
+        &mut self,
+        bump: u8,
+        wallet_bump: u8,
+        store: Pubkey,
+        role_name: &str,
+    ) -> Result<()> {
         let role_name = fixed_str_to_bytes(role_name)?;
         self.bump = bump;
+        self.wallet_bump = wallet_bump;
         self.store = store;
         self.role_name = role_name;
         Ok(())
@@ -68,6 +76,18 @@ impl ExecutorWalletSigner {
 pub fn find_executor_wallet_pda(executor: &Pubkey, timelock_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[Executor::WALLET_SEED, executor.as_ref()],
+        timelock_program_id,
+    )
+}
+
+/// Create executor wallet PDA.
+pub fn create_executor_wallet_pda(
+    executor: &Pubkey,
+    wallet_bump: u8,
+    timelock_program_id: &Pubkey,
+) -> std::result::Result<Pubkey, PubkeyError> {
+    Pubkey::create_program_address(
+        &[Executor::WALLET_SEED, executor.as_ref(), &[wallet_bump]],
         timelock_program_id,
     )
 }

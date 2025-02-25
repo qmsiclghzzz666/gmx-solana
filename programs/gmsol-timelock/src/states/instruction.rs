@@ -10,7 +10,7 @@ use gmsol_store::{
 };
 use gmsol_utils::InitSpace;
 
-use super::find_executor_wallet_pda;
+use crate::states::create_executor_wallet_pda;
 
 const MAX_FLAGS: usize = 8;
 
@@ -19,7 +19,8 @@ const MAX_FLAGS: usize = 8;
 pub struct InstructionHeader {
     version: u8,
     flags: InstructionFlagContainer,
-    padding_0: [u8; 6],
+    wallet_bump: u8,
+    padding_0: [u8; 5],
     /// Approved ts.
     approved_at: i64,
     /// Executor.
@@ -94,6 +95,17 @@ impl InstructionHeader {
         &self.executor
     }
 
+    /// Get executor wallet.
+    pub fn wallet(&self) -> Result<Pubkey> {
+        match create_executor_wallet_pda(self.executor(), self.wallet_bump, &crate::ID) {
+            Ok(address) => Ok(address),
+            Err(err) => {
+                msg!("[Ix Buffer] failed to create wallet pda: {}", err);
+                err!(CoreError::Internal)
+            }
+        }
+    }
+
     /// Get rent receiver.
     pub fn rent_receiver(&self) -> &Pubkey {
         &self.rent_receiver
@@ -160,9 +172,11 @@ pub trait InstructionLoader<'info> {
     fn load_instruction(&self) -> Result<InstructionRef>;
 
     /// Load and initialize the instruction.
+    #[allow(clippy::too_many_arguments)]
     fn load_and_init_instruction(
         &self,
         executor: Pubkey,
+        wallet_bump: u8,
         rent_receiver: Pubkey,
         program_id: Pubkey,
         data: &[u8],
@@ -196,6 +210,7 @@ impl<'info> InstructionLoader<'info> for AccountLoader<'info, InstructionHeader>
     fn load_and_init_instruction(
         &self,
         executor: Pubkey,
+        wallet_bump: u8,
         rent_receiver: Pubkey,
         program_id: Pubkey,
         instruction_data: &[u8],
@@ -209,6 +224,7 @@ impl<'info> InstructionLoader<'info> for AccountLoader<'info, InstructionHeader>
             let data_len = instruction_data.len().try_into()?;
             let num_accounts = instruction_accounts.len().try_into()?;
             let mut header = self.load_init()?;
+            header.wallet_bump = wallet_bump;
             header.executor = executor;
             header.program_id = program_id;
             header.num_accounts = num_accounts;
@@ -240,15 +256,25 @@ impl<'info> InstructionLoader<'info> for AccountLoader<'info, InstructionHeader>
 
             data.copy_from_slice(instruction_data);
 
+            let wallet = header.wallet()?;
+
             for (idx, account) in instruction_accounts.iter().enumerate() {
                 let idx_u16: u16 = idx
                     .try_into()
                     .map_err(|_| error!(CoreError::InvalidArgument))?;
                 let dst = get_mut::<InstructionAccount>(&mut accounts, idx)
                     .ok_or_else(|| error!(CoreError::InvalidArgument))?;
-                dst.pubkey = account.key();
+
+                let address = account.key();
+                let is_signer = signers.contains(&idx_u16);
+                if is_signer {
+                    // Currently only the executor wallet is allowed to be a signer.
+                    require_keys_eq!(wallet, address, CoreError::InvalidArgument);
+                }
+
+                dst.pubkey = address;
                 dst.flags
-                    .set_flag(InstructionAccountFlag::Signer, signers.contains(&idx_u16));
+                    .set_flag(InstructionAccountFlag::Signer, is_signer);
                 dst.flags
                     .set_flag(InstructionAccountFlag::Writable, account.is_writable);
             }
@@ -275,7 +301,7 @@ pub trait InstructionAccess {
     fn accounts(&self) -> impl Iterator<Item = &InstructionAccount>;
 
     /// Convert to instruction.
-    fn to_instruction(&self, mark_executor_wallet_as_signer: bool) -> Instruction {
+    fn to_instruction(&self, mark_executor_wallet_as_signer: bool) -> Result<Instruction> {
         let mut accounts = self
             .accounts()
             .map(From::from)
@@ -284,19 +310,18 @@ pub trait InstructionAccess {
         // When performing a CPI, the PDA doesn't need to be explicitly marked as a signer,
         // so we've made it optional to reduce computational overhead.
         if mark_executor_wallet_as_signer {
-            let executor = self.header().executor;
-            let executor_wallet = find_executor_wallet_pda(&executor, &crate::ID).0;
+            let executor_wallet = self.header().wallet()?;
             accounts
                 .iter_mut()
                 .filter(|a| a.pubkey == executor_wallet)
                 .for_each(|a| a.is_signer = true);
         }
 
-        Instruction {
+        Ok(Instruction {
             program_id: self.header().program_id,
             accounts,
             data: self.data().to_vec(),
-        }
+        })
     }
 }
 

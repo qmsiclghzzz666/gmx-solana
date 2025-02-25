@@ -67,17 +67,20 @@ pub(crate) fn unchecked_create_instruction_buffer<'info>(
         CoreError::InvalidArgument
     );
 
-    {
+    let wallet_bump = {
         let executor = ctx.accounts.executor.load()?;
+        let wallet_bump = executor.wallet_bump;
         msg!(
-            "[Timelock] creating instruction buffer for program {}, with executor {}",
+            "[Timelock] creating instruction buffer for program {}, with executor `{}`",
             ctx.accounts.instruction_program.key,
             executor.role_name()?,
         );
-    }
+        wallet_bump
+    };
 
     ctx.accounts.instruction_buffer.load_and_init_instruction(
         ctx.accounts.executor.key(),
+        wallet_bump,
         ctx.accounts.authority.key(),
         ctx.accounts.instruction_program.key(),
         data,
@@ -369,12 +372,14 @@ pub struct ExecuteInstruction<'info> {
     #[account(has_one = store)]
     pub executor: AccountLoader<'info, Executor>,
     /// Executor Wallet.
+    /// CHECK: `wallet` doesn't have to be a system account, allowing
+    /// the instruction to close it.
     #[account(
         mut,
         seeds = [Executor::WALLET_SEED, executor.key().as_ref()],
-        bump,
+        bump = executor.load()?.wallet_bump,
     )]
-    pub wallet: SystemAccount<'info>,
+    pub wallet: UncheckedAccount<'info>,
     /// Rent receiver.
     /// CHECK: only used to receive funds.
     #[account(mut)]
@@ -419,10 +424,13 @@ pub(crate) fn unchecked_execute_instruction(ctx: Context<ExecuteInstruction>) ->
         CoreError::PreconditionsAreNotMet
     );
 
-    let signer = ExecutorWalletSigner::new(ctx.accounts.executor.key(), ctx.bumps.wallet);
+    let signer = ExecutorWalletSigner::new(
+        ctx.accounts.executor.key(),
+        ctx.accounts.executor.load()?.wallet_bump,
+    );
 
     invoke_signed(
-        &instruction.to_instruction(false),
+        &instruction.to_instruction(false)?,
         remaining_accounts,
         &[&signer.as_seeds()],
     )?;

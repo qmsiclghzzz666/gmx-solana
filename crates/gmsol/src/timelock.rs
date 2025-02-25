@@ -144,6 +144,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
         role: &str,
     ) -> crate::Result<TransactionBuilder<C, Pubkey>> {
         let executor = self.find_executor_address(store, role)?;
+        let wallet = self.find_executor_wallet_address(&executor);
         Ok(self
             .timelock_transaction()
             .anchor_args(instruction::InitializeExecutor {
@@ -153,6 +154,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 payer: self.payer(),
                 store: *store,
                 executor,
+                wallet,
                 system_program: system_program::ID,
             })
             .output(executor))
