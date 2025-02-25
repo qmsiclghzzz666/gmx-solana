@@ -9,25 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- docs: Created a `CHANGELOG.md` file to document project updates
-- tests: Added an integration testing suite `integration_test` to the `gmsol` tests
+- programs: Added validation for the accounts length when loading instruction from an `InstructionBuffer`
 - sdk: Added the `gmsol::cli` module
 - sdk: Added `SwitchboardPullOracleFactory` structure
 - cli: Added support for Switchboard to the `order` subcommand
-- programs: Added validation for the accounts length when loading instruction from an `InstructionBuffer`
+- tests: Added an integration testing suite `integration_test` to the `gmsol` tests
+- docs: Created a `CHANGELOG.md` file to document project updates
 
 ### Changed
 
-- just: The `build-idls` recipient now builds IDLs that include docs
 - programs: Replaced the `no-mock` feature with `mock`, meaning the default is "no-mock"
 - programs: The `verify` instruction of the `mock-chainlink-verifier` program now will panic if it is not built with the `mock` feature enabled
-- tests: Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests
-- sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function
 - programs: Restricted the creation of instruction buffers so that only the executor wallet can be signer
 - programs: Allowed withdrawals from unauthorized treasury vaults
 - programs: Changed the role authorized to invoke `sync_gt_bank` instruction to `TREASURY_WITHDRAWER`
 - programs: Changed to use the `create_idempotent` instruction instead of `create` to prepare GM vaults when initializing GLV
 - programs: Changed to use the maximized `to_market_token_value` to estimate the price impact after a GLV shift
+- sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function
+- tests: Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests
+- just: The `build-idls` recipe now builds IDLs that include docs
 - Updated dependencies:
   - `switchboard-on-demand`: `v0.3.4`
 
