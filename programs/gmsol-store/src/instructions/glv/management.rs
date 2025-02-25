@@ -138,7 +138,7 @@ impl<'info> InitializeGlv<'info> {
         market_tokens: &'info [AccountInfo<'info>],
         vaults: &'info [AccountInfo<'info>],
     ) -> Result<()> {
-        use anchor_spl::associated_token::{create, Create};
+        use anchor_spl::associated_token::{create_idempotent, Create};
 
         require_eq!(
             expected_market_tokens.len(),
@@ -168,7 +168,7 @@ impl<'info> InitializeGlv<'info> {
                 ErrorCode::AccountNotAssociatedTokenAccount
             );
 
-            create(CpiContext::new(
+            create_idempotent(CpiContext::new(
                 self.associated_token_program.to_account_info(),
                 Create {
                     payer: self.authority.to_account_info(),
