@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: The `verify` instruction of the `mock-chainlink-verifier` program now will panic if it is not built with the `mock` feature enabled
 - tests: Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests
 - sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function
+- Updated dependencies:
+  - `switchboard-on-demand`: `v0.3.4`
 
 ### Fixed
 
