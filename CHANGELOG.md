@@ -28,7 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- programs: Fix the missing address validation when using Switchboard feeds.
+- programs: Fixed the missing address validation when using Switchboard feeds
+- programs: Fixed the incorrect owner of `SbFeed` when `devnet` feature is enabled
 
 ## [0.3.0] - 2025-02-18
 
