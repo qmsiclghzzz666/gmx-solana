@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - tests: Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests
 - sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function
 - programs: Restricted the creation of instruction buffers so that only the executor wallet can be signer
+- programs: Allowed withdrawals from unauthorized treasury vaults
 - Updated dependencies:
   - `switchboard-on-demand`: `v0.3.4`
 

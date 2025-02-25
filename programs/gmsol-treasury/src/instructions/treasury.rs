@@ -484,8 +484,6 @@ pub struct WithdrawFromTreasuryVault<'info> {
     /// Config.
     #[account(
         has_one = store,
-        // Only allow withdrawing from the authroized treausry.
-        constraint = config.load()?.treasury_vault_config() == Some(&treasury_vault_config.key()) @ CoreError::InvalidArgument,
     )]
     pub config: AccountLoader<'info, Config>,
     /// Treasury Vault Config.
