@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Allowed withdrawals from unauthorized treasury vaults
 - programs: Changed the role authorized to invoke `sync_gt_bank` instruction to `TREASURY_WITHDRAWER`
 - programs: Changed to use the `create_idempotent` instruction instead of `create` to prepare GM vaults when initializing GLV
+- programs: Changed to use the maximized `to_market_token_value` to estimate the price impact after a GLV shift
 - Updated dependencies:
   - `switchboard-on-demand`: `v0.3.4`
 

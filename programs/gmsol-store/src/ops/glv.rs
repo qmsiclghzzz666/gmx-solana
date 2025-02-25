@@ -1343,7 +1343,7 @@ impl ExecuteGlvShiftOperation<'_, '_> {
                 &mut prices,
                 to_market.market(),
                 received.into(),
-                false,
+                true,
             )?;
 
             self.glv
