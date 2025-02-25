@@ -6827,7 +6827,7 @@ dependencies = [
  "serde",
  "sha2 0.10.8",
  "solana-address-lookup-table-program",
- "solana-program 2.0.14",
+ "solana-program 1.18.26",
  "spl-associated-token-account 3.0.4",
  "spl-token",
  "switchboard-common",

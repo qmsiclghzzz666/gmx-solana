@@ -1,8 +1,12 @@
+use std::ops::Deref;
+
 use crate::{states::TokenConfig, CoreError};
 use anchor_lang::prelude::*;
+use anchor_lang::Discriminator;
+use anchor_lang::ZeroCopy;
 use gmsol_utils::price::Decimal;
 use gmsol_utils::price::Price;
-use switchboard_on_demand::SbFeed;
+use switchboard_on_demand::Discriminator as _;
 
 /// The Switchboard receiver program.
 pub struct Switchboard;
@@ -19,6 +23,32 @@ impl Id for Switchboard {
     fn id() -> Pubkey {
         switchboard_on_demand::ON_DEMAND_MAINNET_PID
     }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct SbFeed {
+    feed: switchboard_on_demand::SbFeed,
+}
+
+impl Deref for SbFeed {
+    type Target = switchboard_on_demand::SbFeed;
+
+    fn deref(&self) -> &Self::Target {
+        &self.feed
+    }
+}
+
+impl ZeroCopy for SbFeed {}
+
+impl Owner for SbFeed {
+    fn owner() -> Pubkey {
+        Switchboard::id()
+    }
+}
+
+impl Discriminator for SbFeed {
+    const DISCRIMINATOR: [u8; 8] = switchboard_on_demand::SbFeed::DISCRIMINATOR;
 }
 
 impl Switchboard {
