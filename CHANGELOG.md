@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Changed the role authorized to invoke `sync_gt_bank` instruction to `TREASURY_WITHDRAWER`
 - programs: Changed to use the `create_idempotent` instruction instead of `create` to prepare GM vaults when initializing GLV
 - programs: Changed to use the maximized `to_market_token_value` to estimate the price impact after a GLV shift
+- programs: Cancelled the ADL execution fee refund to ensure the fairness of ADL
 - sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function
 - tests: Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests
 - just: The `build-idls` recipe now builds IDLs that include docs

@@ -255,7 +255,11 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         )
     };
 
-    let refund = Order::position_cut_rent(is_pure_market)?;
+    let refund = match kind {
+        PositionCutKind::Liquidate => Order::position_cut_rent(is_pure_market, true)?,
+        // For fairness, the keeper will not be refunded the execution fee for ADL.
+        PositionCutKind::AutoDeleverage(_) => Order::position_cut_rent(is_pure_market, false)?,
+    };
 
     let event_emitter = EventEmitter::new(&accounts.event_authority, ctx.bumps.event_authority);
 

@@ -136,7 +136,7 @@ fn validate_and_initialize_position_if_needed<'info>(
         TransferExecutionFeeOperation::builder()
             .payment(position_loader.to_account_info())
             .payer(owner.clone())
-            .execution_lamports(Order::position_cut_rent(is_pure_market)?)
+            .execution_lamports(Order::position_cut_rent(is_pure_market, true)?)
             .system_program(system_program)
             .build()
             .execute()?;
