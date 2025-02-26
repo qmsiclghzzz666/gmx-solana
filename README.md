@@ -29,3 +29,18 @@ Use the following command to verify the CLI is installed properly:
 ```bash
 gmsol --version
 ```
+
+### Troubleshooting
+
+#### 1. Failed to start `test-validator` on MacOS
+
+**Error Message:**
+
+```bash
+Error: failed to start validator: Failed to create ledger at test-ledger: io error: Error checking to unpack genesis archive: Archive error: extra entry found: "._genesis.bin" Regular
+```
+
+**Posssible Solution:**
+
+Check [this comment](https://github.com/solana-labs/solana/issues/35629#issuecomment-2501133871).
+
