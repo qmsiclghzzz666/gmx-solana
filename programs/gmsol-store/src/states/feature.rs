@@ -80,6 +80,18 @@ pub enum DomainDisabledFlag {
     LimitDecrease = 7,
     /// Stop-loss Decrease Order.
     StopLossDecrease = 8,
+    /// Deposit.
+    Deposit = 9,
+    /// Withdrawal.
+    Withdrawal = 10,
+    /// Shift.
+    Shift = 11,
+    /// GLV deposit.
+    GlvDeposit = 12,
+    /// GLV withdrawal.
+    GlvWithdrawal = 13,
+    /// GLV shift.
+    GlvShift = 14,
 }
 
 impl TryFrom<OrderKind> for DomainDisabledFlag {

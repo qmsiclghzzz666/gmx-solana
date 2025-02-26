@@ -19,6 +19,7 @@ use crate::{
     },
     states::{
         common::action::{Action, ActionExt},
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
         glv::{GlvWithdrawal, SplitAccountsForGlv},
         Chainlink, Glv, Market, NonceBytes, Oracle, RoleKey, Seed, Store, StoreWalletSigner,
         TokenMapHeader, TokenMapLoader,
@@ -134,7 +135,13 @@ impl<'info> internal::Create<'info, GlvWithdrawal> for CreateGlvWithdrawal<'info
     }
 
     fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
-        self.store.load()?.validate_not_restarted()?;
+        self.store
+            .load()?
+            .validate_not_restarted()?
+            .validate_feature_enabled(
+                DomainDisabledFlag::GlvWithdrawal,
+                ActionDisabledFlag::Create,
+            )?;
         Ok(())
     }
 
@@ -337,8 +344,16 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
     }
 
     fn validate(&self) -> Result<()> {
-        // Note: There’s no feature to control GLV withdrawal cancellation, so no need to check the store.
-        // self.store.load()?.validate_not_restarted()?;
+        let glv_withdrawal = self.glv_withdrawal.load()?;
+        if glv_withdrawal.header.action_state()?.is_pending() {
+            self.store
+                .load()?
+                .validate_not_restarted()?
+                .validate_feature_enabled(
+                    DomainDisabledFlag::GlvWithdrawal,
+                    ActionDisabledFlag::Cancel,
+                )?;
+        }
         Ok(())
     }
 
@@ -637,6 +652,12 @@ pub(crate) fn unchecked_execute_glv_withdrawal<'info>(
 ) -> Result<()> {
     let accounts = ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
+
+    // Validate feature enabled.
+    accounts.store.load()?.validate_feature_enabled(
+        DomainDisabledFlag::GlvWithdrawal,
+        ActionDisabledFlag::Execute,
+    )?;
 
     let splitted = {
         let glv_withdrawal = accounts.glv_withdrawal.load()?;

@@ -10,6 +10,7 @@ use crate::{
     ops::shift::{CreateShiftOperation, CreateShiftParams},
     states::{
         common::action::{Action, ActionExt},
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
         Market, NonceBytes, RoleKey, Seed, Shift, Store, StoreWalletSigner,
     },
     utils::{internal, token::is_associated_token_account},
@@ -102,7 +103,10 @@ impl<'info> internal::Create<'info, Shift> for CreateShift<'info> {
     }
 
     fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
-        self.store.load()?.validate_not_restarted()?;
+        self.store
+            .load()?
+            .validate_not_restarted()?
+            .validate_feature_enabled(DomainDisabledFlag::Shift, ActionDisabledFlag::Create)?;
         Ok(())
     }
 
@@ -259,8 +263,13 @@ impl<'info> internal::Close<'info, Shift> for CloseShift<'info> {
     }
 
     fn validate(&self) -> Result<()> {
-        // Note: There’s no feature to control shift cancellation, so no need to check the store.
-        // self.store.load()?.validate_not_restarted()?;
+        let shift = self.shift.load()?;
+        if shift.header.action_state()?.is_pending() {
+            self.store
+                .load()?
+                .validate_not_restarted()?
+                .validate_feature_enabled(DomainDisabledFlag::Shift, ActionDisabledFlag::Cancel)?;
+        }
         Ok(())
     }
 

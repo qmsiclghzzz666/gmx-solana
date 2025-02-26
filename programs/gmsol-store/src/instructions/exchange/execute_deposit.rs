@@ -11,6 +11,7 @@ use crate::{
     },
     states::{
         common::action::{ActionExt, ActionSigner},
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
         Chainlink, Deposit, Market, Oracle, Seed, Store, TokenMapHeader, TokenMapLoader,
     },
     utils::internal,
@@ -131,6 +132,12 @@ pub(crate) fn unchecked_execute_deposit<'info>(
 ) -> Result<()> {
     let accounts = ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
+
+    // Validate feature enabled.
+    accounts
+        .store
+        .load()?
+        .validate_feature_enabled(DomainDisabledFlag::Deposit, ActionDisabledFlag::Execute)?;
 
     let signer = accounts.deposit.load()?.signer();
 

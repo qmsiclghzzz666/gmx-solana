@@ -10,6 +10,7 @@ use crate::{
     ops::withdrawal::{CreateWithdrawalOperation, CreateWithdrawalParams},
     states::{
         common::action::{Action, ActionExt},
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
         withdrawal::Withdrawal,
         Market, NonceBytes, RoleKey, Seed, Store, StoreWalletSigner,
     },
@@ -110,7 +111,10 @@ impl<'info> internal::Create<'info, Withdrawal> for CreateWithdrawal<'info> {
     }
 
     fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
-        self.store.load()?.validate_not_restarted()?;
+        self.store
+            .load()?
+            .validate_not_restarted()?
+            .validate_feature_enabled(DomainDisabledFlag::Withdrawal, ActionDisabledFlag::Create)?;
         Ok(())
     }
 
@@ -293,8 +297,16 @@ impl<'info> internal::Close<'info, Withdrawal> for CloseWithdrawal<'info> {
     }
 
     fn validate(&self) -> Result<()> {
-        // Note: There’s no feature to control withdrawal cancellation, so no need to check the store.
-        // self.store.load()?.validate_not_restarted()?;
+        let withdrawal = self.withdrawal.load()?;
+        if withdrawal.header.action_state()?.is_pending() {
+            self.store
+                .load()?
+                .validate_not_restarted()?
+                .validate_feature_enabled(
+                    DomainDisabledFlag::Withdrawal,
+                    ActionDisabledFlag::Cancel,
+                )?;
+        }
         Ok(())
     }
 

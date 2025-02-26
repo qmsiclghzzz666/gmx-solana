@@ -16,6 +16,7 @@ use crate::{
     ordered_tokens,
     states::{
         common::action::{Action, ActionExt},
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
         glv::{GlvMarketFlag, GlvShift},
         Chainlink, Glv, Market, NonceBytes, Oracle, RoleKey, Seed, Store, StoreWalletSigner,
         TokenMapHeader,
@@ -111,7 +112,10 @@ impl<'info> internal::Create<'info, GlvShift> for CreateGlvShift<'info> {
     }
 
     fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
-        self.store.load()?.validate_not_restarted()?;
+        self.store
+            .load()?
+            .validate_not_restarted()?
+            .validate_feature_enabled(DomainDisabledFlag::GlvShift, ActionDisabledFlag::Create)?;
         let glv = self.glv.load()?;
         let market_token = self.to_market_token.key();
         let is_deposit_allowed = glv
@@ -240,8 +244,16 @@ impl<'info> internal::Close<'info, GlvShift> for CloseGlvShift<'info> {
     }
 
     fn validate(&self) -> Result<()> {
-        // Note: There’s no feature to control GLV shift cancellation, so no need to check the store.
-        // self.store.load()?.validate_not_restarted()?;
+        let glv_shift = self.glv_shift.load()?;
+        if glv_shift.header().action_state()?.is_pending() {
+            self.store
+                .load()?
+                .validate_not_restarted()?
+                .validate_feature_enabled(
+                    DomainDisabledFlag::GlvShift,
+                    ActionDisabledFlag::Cancel,
+                )?;
+        }
         Ok(())
     }
 
@@ -379,6 +391,12 @@ pub fn unchecked_execute_glv_shift<'info>(
 ) -> Result<()> {
     let accounts = ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
+
+    // Validate feature enabled.
+    accounts
+        .store
+        .load()?
+        .validate_feature_enabled(DomainDisabledFlag::GlvShift, ActionDisabledFlag::Execute)?;
 
     let executed = accounts.perform_execution(
         remaining_accounts,

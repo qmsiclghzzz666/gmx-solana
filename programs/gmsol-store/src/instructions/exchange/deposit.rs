@@ -10,6 +10,7 @@ use crate::{
     ops::deposit::{CreateDepositOperation, CreateDepositParams},
     states::{
         common::action::{Action, ActionExt},
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
         Deposit, Market, NonceBytes, RoleKey, Seed, Store, StoreWalletSigner,
     },
     utils::{
@@ -117,7 +118,10 @@ impl<'info> internal::Create<'info, Deposit> for CreateDeposit<'info> {
     }
 
     fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
-        self.store.load()?.validate_not_restarted()?;
+        self.store
+            .load()?
+            .validate_not_restarted()?
+            .validate_feature_enabled(DomainDisabledFlag::Deposit, ActionDisabledFlag::Create)?;
         Ok(())
     }
 
@@ -346,8 +350,16 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
     }
 
     fn validate(&self) -> Result<()> {
-        // Note: There’s no feature to control deposit cancellation, so no need to check the store.
-        // self.store.load()?.validate_not_restarted()?;
+        let deposit = self.deposit.load()?;
+        if deposit.header.action_state()?.is_pending() {
+            self.store
+                .load()?
+                .validate_not_restarted()?
+                .validate_feature_enabled(
+                    DomainDisabledFlag::Deposit,
+                    ActionDisabledFlag::Cancel,
+                )?;
+        }
         Ok(())
     }
 

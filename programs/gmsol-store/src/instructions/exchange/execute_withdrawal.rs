@@ -10,6 +10,7 @@ use crate::{
     },
     states::{
         common::action::{ActionExt, ActionSigner},
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
         withdrawal::Withdrawal,
         Chainlink, Market, Oracle, Store, TokenMapHeader, TokenMapLoader,
     },
@@ -140,6 +141,13 @@ pub(crate) fn unchecked_execute_withdrawal<'info>(
 ) -> Result<()> {
     let accounts = ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
+
+    // Validate feature enabled.
+    accounts
+        .store
+        .load()?
+        .validate_feature_enabled(DomainDisabledFlag::Withdrawal, ActionDisabledFlag::Execute)?;
+
     let signer = accounts.withdrawal.load()?.signer();
 
     let event_authority = accounts.event_authority.clone();

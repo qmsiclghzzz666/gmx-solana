@@ -17,6 +17,7 @@ use crate::{
     },
     states::{
         common::action::{Action, ActionExt, ActionSigner},
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
         glv::{GlvMarketFlag, SplitAccountsForGlv},
         Chainlink, Glv, GlvDeposit, Market, NonceBytes, Oracle, RoleKey, Seed, Store,
         StoreWalletSigner, TokenMapHeader, TokenMapLoader,
@@ -138,7 +139,10 @@ impl<'info> internal::Create<'info, GlvDeposit> for CreateGlvDeposit<'info> {
     }
 
     fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
-        self.store.load()?.validate_not_restarted()?;
+        self.store
+            .load()?
+            .validate_not_restarted()?
+            .validate_feature_enabled(DomainDisabledFlag::GlvDeposit, ActionDisabledFlag::Create)?;
         let market_token = self.market_token.key();
         let is_deposit_allowed = self
             .glv
@@ -411,8 +415,16 @@ impl<'info> internal::Close<'info, GlvDeposit> for CloseGlvDeposit<'info> {
     }
 
     fn validate(&self) -> Result<()> {
-        // Note: There’s no feature to control GLV deposit cancellation, so no need to check the store.
-        // self.store.load()?.validate_not_restarted()?;
+        let glv_deposit = self.glv_deposit.load()?;
+        if glv_deposit.header.action_state()?.is_pending() {
+            self.store
+                .load()?
+                .validate_not_restarted()?
+                .validate_feature_enabled(
+                    DomainDisabledFlag::GlvDeposit,
+                    ActionDisabledFlag::Cancel,
+                )?;
+        }
         Ok(())
     }
 
@@ -705,6 +717,12 @@ pub(crate) fn unchecked_execute_glv_deposit<'info>(
 ) -> Result<()> {
     let accounts = ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
+
+    // Validate feature enabled.
+    accounts
+        .store
+        .load()?
+        .validate_feature_enabled(DomainDisabledFlag::GlvDeposit, ActionDisabledFlag::Execute)?;
 
     let SplitAccountsForGlv {
         markets,

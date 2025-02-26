@@ -8,6 +8,7 @@ use crate::{
     ops::{execution_fee::PayExecutionFeeOperation, shift::ExecuteShiftOperation},
     states::{
         common::action::{ActionExt, ActionSigner},
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
         Chainlink, HasMarketMeta, Market, Oracle, Shift, Store, TokenMapHeader,
     },
     utils::internal,
@@ -113,6 +114,13 @@ pub fn unchecked_execute_shift<'info>(
 ) -> Result<()> {
     let accounts = ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
+
+    // Validate feature enabled.
+    accounts
+        .store
+        .load()?
+        .validate_feature_enabled(DomainDisabledFlag::Shift, ActionDisabledFlag::Execute)?;
+
     let signer = accounts.shift.load()?.signer();
 
     accounts.transfer_from_market_tokens_in(&signer)?;
