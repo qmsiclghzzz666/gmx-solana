@@ -304,7 +304,7 @@ pub(crate) fn unchecked_execute_increase_or_swap_order<'info>(
     accounts
         .store
         .load()?
-        .validate_feature_enabled(kind.try_into()?, ActionDisabledFlag::ExecuteOrder)?;
+        .validate_feature_enabled(kind.try_into()?, ActionDisabledFlag::Execute)?;
 
     let remaining_accounts = ctx.remaining_accounts;
     let signer = accounts.order.load()?.signer();
@@ -738,7 +738,7 @@ pub(crate) fn unchecked_execute_decrease_order<'info>(
     accounts
         .store
         .load()?
-        .validate_feature_enabled(kind.try_into()?, ActionDisabledFlag::ExecuteOrder)?;
+        .validate_feature_enabled(kind.try_into()?, ActionDisabledFlag::Execute)?;
 
     let event_authority = accounts.event_authority.clone();
     let event_emitter = EventEmitter::new(&event_authority, ctx.bumps.event_authority);

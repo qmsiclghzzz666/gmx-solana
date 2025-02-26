@@ -115,14 +115,14 @@ pub enum ActionDisabledFlag {
     /// Default Action.
     #[default]
     Default = 0,
-    /// Create Order.
-    CreateOrder = 1,
-    /// Update Order.
-    UpdateOrder = 2,
-    /// Execute Order.
-    ExecuteOrder = 3,
-    /// Cancel Order.
-    CancelOrder = 4,
+    /// Create.
+    Create = 1,
+    /// Update.
+    Update = 2,
+    /// Execute.
+    Execute = 3,
+    /// Cancel.
+    Cancel = 4,
 }
 
 /// Display feature.

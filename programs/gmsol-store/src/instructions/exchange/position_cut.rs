@@ -240,8 +240,8 @@ pub(crate) fn unchecked_process_position_cut<'info>(
             PositionCutKind::Liquidate => DomainDisabledFlag::Liquidation,
             PositionCutKind::AutoDeleverage(_) => DomainDisabledFlag::AutoDeleveraging,
         };
-        store.validate_feature_enabled(domain, ActionDisabledFlag::CreateOrder)?;
-        store.validate_feature_enabled(domain, ActionDisabledFlag::ExecuteOrder)?;
+        store.validate_feature_enabled(domain, ActionDisabledFlag::Create)?;
+        store.validate_feature_enabled(domain, ActionDisabledFlag::Execute)?;
     }
 
     let remaining_accounts = ctx.remaining_accounts;
