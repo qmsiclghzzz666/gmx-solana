@@ -530,8 +530,9 @@ pub struct Amounts {
     pub(crate) request_expiration: Amount,
     pub(crate) oracle_max_age: Amount,
     pub(crate) oracle_max_timestamp_range: Amount,
+    pub(crate) oracle_max_future_timestamp_excess: Amount,
     #[cfg_attr(feature = "debug", debug(skip))]
-    reserved: [Amount; 128],
+    reserved: [Amount; 127],
 }
 
 /// Amount keys.
@@ -543,16 +544,18 @@ pub struct Amounts {
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[cfg_attr(feature = "clap", clap(rename_all = "snake_case"))]
 pub enum AmountKey {
-    /// Claimable time window.
+    /// Claimable time window (seconds).
     ClaimableTimeWindow,
-    /// Recent time window.
+    /// Recent time window (seconds).
     RecentTimeWindow,
-    /// Request expiration.
+    /// Request expiration (seconds).
     RequestExpiration,
-    /// Oracle max age.
+    /// Oracle max age (seconds).
     OracleMaxAge,
-    /// Oracle max timestamp range.
+    /// Oracle max timestamp range (seconds).
     OracleMaxTimestampRange,
+    /// Max timestamp excess for oracle timestamp (seconds).
+    OracleMaxFutureTimestampExcess,
 }
 
 impl Amounts {
@@ -562,6 +565,8 @@ impl Amounts {
         self.request_expiration = constants::DEFAULT_REQUEST_EXPIRATION;
         self.oracle_max_age = constants::DEFAULT_ORACLE_MAX_AGE;
         self.oracle_max_timestamp_range = constants::DEFAULT_ORACLE_MAX_TIMESTAMP_RANGE;
+        self.oracle_max_future_timestamp_excess =
+            constants::DEFAULT_ORACLE_MAX_FUTURE_TIMESTAMP_EXCESS;
     }
 
     /// Get.
@@ -572,6 +577,7 @@ impl Amounts {
             AmountKey::RequestExpiration => &self.request_expiration,
             AmountKey::OracleMaxAge => &self.oracle_max_age,
             AmountKey::OracleMaxTimestampRange => &self.oracle_max_timestamp_range,
+            AmountKey::OracleMaxFutureTimestampExcess => &self.oracle_max_future_timestamp_excess,
         }
     }
 
@@ -583,6 +589,9 @@ impl Amounts {
             AmountKey::RequestExpiration => &mut self.request_expiration,
             AmountKey::OracleMaxAge => &mut self.oracle_max_age,
             AmountKey::OracleMaxTimestampRange => &mut self.oracle_max_timestamp_range,
+            AmountKey::OracleMaxFutureTimestampExcess => {
+                &mut self.oracle_max_future_timestamp_excess
+            }
         }
     }
 }

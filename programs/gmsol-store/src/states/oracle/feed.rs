@@ -57,7 +57,7 @@ impl PriceFeed {
         Ok(())
     }
 
-    pub(crate) fn update(&mut self, price: &PriceFeedPrice) -> Result<()> {
+    pub(crate) fn update(&mut self, price: &PriceFeedPrice, max_future_excess: u64) -> Result<()> {
         let clock = Clock::get()?;
         let slot = clock.slot;
         let current_ts = clock.unix_timestamp;
@@ -75,6 +75,11 @@ impl PriceFeed {
         );
 
         require_gte!(price.ts, self.price.ts, CoreError::InvalidArgument);
+        require_gte!(
+            current_ts.saturating_add_unsigned(max_future_excess),
+            price.ts,
+            CoreError::InvalidArgument
+        );
         require_gte!(price.max_price, price.min_price, CoreError::InvalidArgument);
         require_gte!(price.max_price, price.price, CoreError::InvalidArgument);
         require_gte!(price.price, price.min_price, CoreError::InvalidArgument);

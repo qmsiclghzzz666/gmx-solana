@@ -3572,6 +3572,8 @@ pub enum CoreError {
     /// Max price age exceeded.
     #[msg("max price age exceeded")]
     MaxPriceAgeExceeded,
+    /// Max prcie's timestamp exceeded.
+    MaxPriceTimestampExceeded,
     /// Negative price.
     #[msg("negative price is not supported")]
     NegativePriceIsNotSupported,

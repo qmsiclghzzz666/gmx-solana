@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - programs: Added validation for the accounts length when loading instruction from an `InstructionBuffer`
+- programs: Added validation for future oracle timestamps using the new `oracle_max_future_timestamp_excess` amount config.
 - sdk: Added the `gmsol::cli` module
 - sdk: Added `SwitchboardPullOracleFactory` structure
 - cli: Added support for Switchboard to the `order` subcommand

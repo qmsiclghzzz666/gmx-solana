@@ -16,6 +16,7 @@ pub struct PriceValidator {
     clock: Clock,
     max_age: Amount,
     max_oracle_timestamp_range: Amount,
+    max_future_timestamp_excess: Amount,
     min_oracle_ts: i64,
     max_oracle_ts: i64,
     min_oracle_slot: Option<u64>,
@@ -42,9 +43,15 @@ impl PriceValidator {
         let expiration_ts = ts
             .checked_add_unsigned(self.max_age)
             .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
-        if expiration_ts < self.clock.unix_timestamp {
-            return err!(CoreError::MaxPriceAgeExceeded);
-        }
+
+        let current_ts = self.clock.unix_timestamp;
+
+        require_gte!(expiration_ts, current_ts, CoreError::MaxPriceAgeExceeded);
+        require_gte!(
+            current_ts.saturating_add_unsigned(self.max_future_timestamp_excess),
+            oracle_ts,
+            CoreError::MaxPriceTimestampExceeded
+        );
 
         // Note: we may add ref price validation here in the future.
 
@@ -94,11 +101,13 @@ impl<'a> TryFrom<&'a Store> for PriceValidator {
         // TODO: enable validation with ref price.
         let _max_ref_price_deviation_factor = config.factor.oracle_ref_price_deviation;
         let max_oracle_timestamp_range = config.amount.oracle_max_timestamp_range;
+        let max_future_timestamp_excess = config.amount.oracle_max_future_timestamp_excess;
         Ok(Self {
             clock: Clock::get()?,
             max_age,
             // max_ref_price_deviation_factor,
             max_oracle_timestamp_range,
+            max_future_timestamp_excess,
             min_oracle_ts: i64::MAX,
             max_oracle_ts: i64::MIN,
             min_oracle_slot: None,

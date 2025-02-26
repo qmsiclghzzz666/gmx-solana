@@ -59,6 +59,9 @@ pub const DEFAULT_ORACLE_MAX_AGE: Amount = 3600;
 /// Default oracle max timestamp range.
 pub const DEFAULT_ORACLE_MAX_TIMESTAMP_RANGE: Amount = 300;
 
+/// Default oracle max future timestamp excess (in seconds).
+pub const DEFAULT_ORACLE_MAX_FUTURE_TIMESTAMP_EXCESS: Amount = 0;
+
 /// Default oracle ref price deviation.
 pub const DEFAULT_ORACLE_REF_PRICE_DEVIATION: Factor = 1_000_000_000_000_000;
 

@@ -33,7 +33,7 @@ devnet = []
 test-only = []
 
 [dependencies]
-bytemuck = { workspace = true }
+bytemuck = { workspace = true, features = ["min_const_generics"] }
 anchor-lang = { workspace = true, features = ["init-if-needed", "event-cpi"] }
 gmsol-model = { workspace = true, features = ["u128", "solana", "strum"] }
 gmsol-utils = { workspace = true }
