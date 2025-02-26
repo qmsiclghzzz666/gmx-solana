@@ -1028,7 +1028,6 @@ impl ExecuteOrderOperation<'_, '_> {
                     .update_with_transfer_out(&transfer_out)?;
 
                 if gt_minting_enabled {
-                    // FIXME: should we ignore the error to prevent the order being cancelled?
                     self.order.load_mut()?.unchecked_process_gt(
                         &mut *self.store.load_mut()?,
                         &mut *self.user.load_mut()?,
@@ -1266,7 +1265,6 @@ impl ValidateOracleTime for ExecuteOrderOperation<'_, '_> {
                 order.header().updated_at_slot,
             )
         };
-        // FIXME: should we validate the slot for liquidation and ADL?
         let after = match kind {
             OrderKind::Liquidation | OrderKind::AutoDeleveraging => None,
             _ => Some(updated_at_slot),

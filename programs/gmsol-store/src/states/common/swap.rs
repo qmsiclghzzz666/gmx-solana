@@ -233,7 +233,6 @@ impl SwapParams {
         let is_current_market = *first_market_token == self.current_market_token;
         let target = Market::find_market_address(store, first_market_token, &crate::ID).0;
 
-        // FIXME: Should we skip the search if the first market is current market.
         match remaining_accounts.iter().find(|info| *info.key == target) {
             Some(info) => Ok(Some(info)),
             None if is_current_market => Ok(None),
@@ -274,7 +273,6 @@ impl SwapParams {
         let is_current_market = *last_market_token == self.current_market_token;
         let target = Market::find_market_address(store, last_market_token, &crate::ID).0;
 
-        // FIXME: Should we skip the search if the last market is current market.
         match remaining_accounts.iter().find(|info| *info.key == target) {
             Some(info) => Ok(Some(info)),
             None if is_current_market => Ok(None),

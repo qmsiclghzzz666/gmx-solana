@@ -7,7 +7,7 @@ macro_rules! flags {
     ($flags:ty, $max_flags:expr, $flag_value: ty, $flag_index:ty) => {
         $crate::paste::paste! {
             type [<$flags Map>] = $crate::bitmaps::Bitmap<$max_flags>;
-            // FIXME: Replace `$flag_value` with the following type alias:
+            // Note: The `$flag_value` can be replaced with the following type alias:
             //
             // type [<$flags Value>] = <$crate::bitmaps::BitsImpl<$max_flags> as $crate::bitmaps::Bits>::Store;
             //

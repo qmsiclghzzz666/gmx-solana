@@ -959,7 +959,7 @@ impl ValidateOracleTime for ExecuteGlvWithdrawalOperation<'_, '_> {
 /// Get total GLV value.
 ///
 /// # CHECK
-/// TODO: basically one must make sure that `glv_markets` and
+/// Basically one must make sure that `glv_markets` and
 /// `glv_market_tokens` are aligned.
 ///
 /// # Errors

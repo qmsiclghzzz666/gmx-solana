@@ -197,7 +197,7 @@ impl<'info> ExecuteWithdrawal<'info> {
         throw_on_execution_error: bool,
         event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<Option<(u64, u64)>> {
-        // FIXME: We only need the tokens here, the feeds are not necessary.
+        // Note: We only need the tokens here, the feeds are not necessary.
         let feeds = self
             .withdrawal
             .load()?

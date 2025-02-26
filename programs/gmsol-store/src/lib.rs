@@ -2042,7 +2042,7 @@ pub mod gmsol_store {
     ///   - Uninitialized, or
     ///   - Already initialized with the `authority` as the authority and the `store` as
     ///     the store
-    // FIXME: There is a false positive lint for the doc link of `event`.
+    // Note: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     pub fn prepare_trade_event_buffer(
         ctx: Context<PrepareTradeEventBuffer>,
@@ -2123,7 +2123,7 @@ pub mod gmsol_store {
     ///   details.
     /// - The feature for executing this order type must be enabled in the `store`.
     /// - If `throw_on_execution_error` is true, any execution failure will throw an error
-    // FIXME: There is a false positive lint for the doc link of `event`.
+    // Note: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_increase_or_swap_order<'info>(
@@ -2180,7 +2180,7 @@ pub mod gmsol_store {
     ///   details.
     /// - The feature for executing decrease orders must be enabled in the `store`.
     /// - If `throw_on_execution_error` is true, any execution failure will throw an error.
-    // FIXME: There is a false positive lint for the doc link of `event`.
+    // Note: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_decrease_order<'info>(
@@ -2248,7 +2248,7 @@ pub mod gmsol_store {
     ///   - Provided in order matching the market's sorted token list
     /// - The liquidation feature must be enabled in the `store`.
     /// - Oracle prices must be valid and complete.
-    // FIXME: There is a false positive lint for the doc link of `event`.
+    // Note: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn liquidate<'info>(
@@ -2336,7 +2336,7 @@ pub mod gmsol_store {
     /// - The ADL feature must be enabled in the `store`.
     /// - Oracle prices must be valid and complete.
     /// - Execution must complete successfully.
-    // FIXME: There is a false positive lint for the doc link of `event`.
+    // Note: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn auto_deleverage<'info>(

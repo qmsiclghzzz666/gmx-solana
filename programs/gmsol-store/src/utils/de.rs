@@ -40,7 +40,7 @@ where
     if data.len() < end {
         return err!(ErrorCode::AccountDidNotDeserialize);
     }
-    // FIXME: We use vec to fix the alignment issue, maybe there is a better way.
+    // Note: We use vec to fix the alignment issue, maybe there is a better way.
     let mut data_without_discriminator = Cow::Borrowed(&data[8..end]);
     Ok(
         *bytemuck::try_from_bytes(data_without_discriminator.to_mut())

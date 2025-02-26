@@ -278,7 +278,6 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
                     from_market
                         .record_transferred_out_by_token(&token_in, &token_in_amount)
                         .map_err(ModelError::from)?;
-                    // FIXME: is this validation needed?
                     from_market
                         .validate_market_balance_for_the_given_token(&token_in, 0)
                         .map_err(ModelError::from)?;

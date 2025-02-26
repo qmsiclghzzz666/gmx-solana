@@ -112,10 +112,10 @@ impl TradeEvent {
             meta.market_meta().short_token_mint
         };
 
-        // FIXME: should we provide a correct bump here?
         position
             .try_init(
                 kind,
+                // Note: there's no need to provide a correct bump here for now.
                 0,
                 self.store,
                 &self.user,
@@ -208,8 +208,8 @@ gmsol_utils::flags!(TradeFlag, 8, u8);
 #[derive(BorshSerialize, BorshDeserialize, InitSpace)]
 pub struct TradeData {
     /// Trade flag.
-    // FIXME: Use the type alias `TradeFlag` instead of the concrete type.
-    // However, this causes the IDL build to fail in `anchor v0.30.1`.
+    // Note: The concrete type can be replaced with the type alias `TradeFlag`.
+    // However, this will cause the IDL build to fail in `anchor v0.30.1`.
     flags: u8,
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 7],

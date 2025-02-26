@@ -438,7 +438,7 @@ impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
         throw_on_execution_error: bool,
         event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<(RemovePosition, Box<TransferOut>, ShouldSendTradeEvent)> {
-        // FIXME: We only need the tokens here, the feeds are not necessary.
+        // Note: We only need the tokens here, the feeds are not necessary.
         let feeds = self
             .order
             .load()?
@@ -787,7 +787,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
         throw_on_execution_error: bool,
         event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<(RemovePosition, Box<TransferOut>, ShouldSendTradeEvent)> {
-        // FIXME: We only need the tokens here, the feeds are not necessary.
+        // Note: We only need the tokens here, the feeds are not necessary.
         let feeds = self
             .order
             .load()?

@@ -393,7 +393,7 @@ fn do_push_token_map<'info>(
     enable: bool,
     new: bool,
 ) -> Result<()> {
-    // FIXME: We have to do the realloc manually because the current implementation of
+    // Note: We have to do the realloc manually because the current implementation of
     // the `realloc` constraint group will throw an error on the following statement:
     // `realloc = 8 + token_map.load()?.space_after_push()?`.
     // The cause of the error is that the generated code directly inserts the above statement

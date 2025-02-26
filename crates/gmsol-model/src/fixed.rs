@@ -28,7 +28,7 @@ impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u64 {
         let unit = <Self as FixedPointOps<DECIMALS>>::UNIT;
         if *exponent % unit == 0 {
             let exp = exponent / unit;
-            // FIXME: use a better algorithm.
+            // Note: there is a better algorithm.
             let mut ans = Fixed::<Self, DECIMALS>::one();
             let base = Fixed::<Self, DECIMALS>::from_inner(*self);
             for _ in 0..exp {
@@ -65,7 +65,7 @@ impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u128 {
         let unit = <Self as FixedPointOps<DECIMALS>>::UNIT;
         if *exponent % unit == 0 {
             let exp = exponent / unit;
-            // FIXME: use a better algorithm.
+            // Note: there is a better algorithm.
             let mut ans = Fixed::<Self, DECIMALS>::one();
             let base = Fixed::<Self, DECIMALS>::from_inner(*self);
             for _ in 0..exp {
