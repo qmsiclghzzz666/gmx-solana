@@ -1190,8 +1190,15 @@ impl ValidateOracleTime for ExecuteOrderOperation<'_, '_> {
         };
 
         match kind {
-            OrderKind::MarketSwap | OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
-                Ok(Some(updated_at))
+            OrderKind::MarketSwap | OrderKind::MarketIncrease => Ok(Some(updated_at)),
+            OrderKind::MarketDecrease => {
+                let position = self
+                    .position
+                    .as_ref()
+                    .ok_or(CoreError::PositionIsRequired)?
+                    .load()
+                    .map_err(|_| CoreError::LoadAccountError)?;
+                Ok(Some(updated_at.max(position.state.increased_at)))
             }
             OrderKind::LimitSwap | OrderKind::LimitIncrease => {
                 Ok(Some(updated_at.max(valid_from_ts)))
