@@ -149,8 +149,8 @@ pub struct PrepareGtExchangeVault<'info> {
         seeds = [
             GtExchangeVault::SEED,
             store.key().as_ref(),
-            &time_window_index.to_be_bytes(),
-            &store.load()?.gt().exchange_time_window().to_be_bytes(),
+            &time_window_index.to_le_bytes(),
+            &store.load()?.gt().exchange_time_window().to_le_bytes(),
         ],
         bump,
     )]
@@ -233,8 +233,8 @@ pub struct RequestGtExchange<'info> {
         seeds = [
             GtExchangeVault::SEED,
             store.key().as_ref(),
-            &vault.load()?.time_window_index().to_be_bytes(),
-            &vault.load()?.time_window_u32().to_be_bytes(),
+            &vault.load()?.time_window_index().to_le_bytes(),
+            &vault.load()?.time_window_u32().to_le_bytes(),
         ],
         bump = vault.load()?.bump,
     )]
@@ -329,8 +329,8 @@ pub struct ConfirmGtExchangeVault<'info> {
         seeds = [
             GtExchangeVault::SEED,
             store.key().as_ref(),
-            &vault.load()?.time_window_index().to_be_bytes(),
-            &vault.load()?.time_window_u32().to_be_bytes(),
+            &vault.load()?.time_window_index().to_le_bytes(),
+            &vault.load()?.time_window_u32().to_le_bytes(),
         ],
         bump = vault.load()?.bump,
     )]

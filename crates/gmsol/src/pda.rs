@@ -252,8 +252,8 @@ pub fn find_gt_exchange_vault_pda(
         &[
             GtExchangeVault::SEED,
             store.as_ref(),
-            &time_window_index.to_be_bytes(),
-            &time_window.to_be_bytes(),
+            &time_window_index.to_le_bytes(),
+            &time_window.to_le_bytes(),
         ],
         store_program_id,
     )

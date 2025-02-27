@@ -319,8 +319,8 @@ pub struct DepositToTreasuryVault<'info> {
         seeds = [
             GtExchangeVault::SEED,
             store.key().as_ref(),
-            &gt_exchange_vault.load()?.time_window_index().to_be_bytes(),
-            &gt_exchange_vault.load()?.time_window_u32().to_be_bytes(),
+            &gt_exchange_vault.load()?.time_window_index().to_le_bytes(),
+            &gt_exchange_vault.load()?.time_window_u32().to_le_bytes(),
         ],
         bump = gt_exchange_vault.load()?.bump,
         seeds::program = gmsol_store::ID,

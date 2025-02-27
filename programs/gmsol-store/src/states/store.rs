@@ -298,7 +298,7 @@ impl Store {
     /// Get claimable time key for the given timestamp.
     pub fn claimable_time_key(&self, timestamp: i64) -> Result<[u8; 8]> {
         let index = self.claimable_time_window_index(timestamp)?;
-        Ok(index.to_be_bytes())
+        Ok(index.to_le_bytes())
     }
 
     /// Get holding address.
