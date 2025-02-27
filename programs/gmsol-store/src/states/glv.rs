@@ -1088,7 +1088,7 @@ pub struct GlvShift {
 }
 
 impl Action for GlvShift {
-    const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+    const MIN_EXECUTION_LAMPORTS: u64 = 0;
 
     fn header(&self) -> &ActionHeader {
         &self.shift.header
