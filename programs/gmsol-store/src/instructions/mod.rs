@@ -34,9 +34,9 @@ pub mod feature;
 /// Instructions for GLV.
 pub mod glv;
 
-/// Instructions for bug fixes.
-#[cfg(not(feature = "no-bug-fix"))]
-pub mod bug_fix;
+/// Instructions for migrations.
+#[cfg(not(feature = "migration"))]
+pub mod migration;
 
 pub use config::*;
 pub use exchange::*;

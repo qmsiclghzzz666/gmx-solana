@@ -61,14 +61,14 @@ check-verifiable:
     exit 1; \
   fi
 
-build-verifiable:
-  anchor build -v -- --features {{DEVNET_FEATURES}}
+build-verifiable *ARGS:
+  anchor build -v -- --features {{DEVNET_FEATURES}} {{ARGS}}
 
-build-verifiable-mainnet:
-  anchor build -v
+build-verifiable-mainnet *ARGS:
+  anchor build -v -- {{ARGS}}
 
-build-verifiable-with-mock:
-  anchor build -v -- --features mock --features {{DEVNET_FEATURES}}
+build-verifiable-with-mock *ARGS:
+  anchor build -v -- --features mock --features {{DEVNET_FEATURES}} {{ARGS}}
 
 check-geyser:
   @if [ -f "{{GEYSER_PLUGIN_PATH}}" ]; then \

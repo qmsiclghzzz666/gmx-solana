@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `UpdateOrder` -> `Update`
   - `ExecuteOrder` -> `Execute`
   - `CancelOrder` -> `Cancel`
+- programs: Replaced the `no-bug-fix` feature with the `migration` feature
 - sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function
 - sdk: Changed to use `Gateway::fetch_signatures_multi` to fetch price signatures for Switchboard pull oracle implementation
 - tests: Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests

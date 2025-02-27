@@ -22,6 +22,7 @@ multi-store = ["gmsol-store/multi-store"]
 utils = ["bytes", "gmsol-store/utils"]
 devnet = ["gmsol-store/devnet"]
 test-only = ["gmsol-store/test-only"]
+migration = ["gmsol-store/migration"]
 
 [dependencies]
 anchor-lang = { workspace = true }

@@ -20,6 +20,7 @@ mock = []
 multi-store = []
 devnet = []
 test-only = []
+migration = []
 
 [dependencies]
 anchor-lang = { workspace = true }

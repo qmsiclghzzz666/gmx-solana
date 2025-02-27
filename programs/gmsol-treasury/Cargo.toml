@@ -27,6 +27,7 @@ enum-iter = []
 utils = []
 devnet = ["gmsol-store/devnet"]
 test-only = ["gmsol-store/test-only"]
+migration = ["gmsol-store/migration"]
 
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
