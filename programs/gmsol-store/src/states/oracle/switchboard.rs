@@ -67,7 +67,7 @@ impl Switchboard {
             CoreError::PriceFeedNotUpdated
         );
         Ok((
-            feed.result.slot,
+            feed.result_land_slot(),
             feed.result_ts(),
             Self::price_from(&feed, token_config)?,
         ))
