@@ -359,7 +359,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         &self,
         store: &Pubkey,
         authority: &Pubkey,
-        index: u8,
+        index: u16,
     ) -> Pubkey {
         crate::pda::find_trade_event_buffer_pda(store, authority, index, self.store_program_id()).0
     }
@@ -375,7 +375,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Find GLV token address.
-    pub fn find_glv_token_address(&self, store: &Pubkey, index: u8) -> Pubkey {
+    pub fn find_glv_token_address(&self, store: &Pubkey, index: u16) -> Pubkey {
         types::Glv::find_glv_token_pda(store, index, self.store_program_id()).0
     }
 
@@ -430,7 +430,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         &self,
         store: &Pubkey,
         authority: &Pubkey,
-        index: u8,
+        index: u16,
         provider: PriceProviderKind,
         token: &Pubkey,
     ) -> Pubkey {
@@ -451,7 +451,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Find treasury vault config address.
-    pub fn find_treasury_vault_config_address(&self, config: &Pubkey, index: u8) -> Pubkey {
+    pub fn find_treasury_vault_config_address(&self, config: &Pubkey, index: u16) -> Pubkey {
         crate::pda::find_treasury_vault_config_pda(config, index, self.treasury_program_id()).0
     }
 

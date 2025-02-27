@@ -1171,7 +1171,7 @@ pub mod gmsol_store {
     #[access_control(internal::Authenticate::only_price_keeper(&ctx))]
     pub fn initialize_price_feed(
         ctx: Context<InitializePriceFeed>,
-        index: u8,
+        index: u16,
         provider: u8,
         token: Pubkey,
         feed_id: Pubkey,
@@ -2046,7 +2046,7 @@ pub mod gmsol_store {
     #[allow(rustdoc::broken_intra_doc_links)]
     pub fn prepare_trade_event_buffer(
         ctx: Context<PrepareTradeEventBuffer>,
-        index: u8,
+        index: u16,
     ) -> Result<()> {
         instructions::prepare_trade_event_buffer(ctx, index)
     }
@@ -2805,7 +2805,7 @@ pub mod gmsol_store {
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_glv<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitializeGlv<'info>>,
-        index: u8,
+        index: u16,
         length: u16,
     ) -> Result<()> {
         instructions::unchecked_initialize_glv(ctx, index, length as usize)

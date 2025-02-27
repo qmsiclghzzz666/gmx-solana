@@ -181,7 +181,7 @@ pub fn find_claimable_account_pda(
 pub fn find_trade_event_buffer_pda(
     store: &Pubkey,
     authority: &Pubkey,
-    index: u8,
+    index: u16,
     store_program_id: &Pubkey,
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
@@ -189,7 +189,7 @@ pub fn find_trade_event_buffer_pda(
             TradeData::SEED,
             store.as_ref(),
             authority.as_ref(),
-            &[index],
+            &index.to_le_bytes(),
         ],
         store_program_id,
     )
@@ -275,7 +275,7 @@ pub fn find_gt_exchange_pda(
 pub fn find_price_feed_pda(
     store: &Pubkey,
     authority: &Pubkey,
-    index: u8,
+    index: u16,
     provider: PriceProviderKind,
     token: &Pubkey,
     store_program_id: &Pubkey,
@@ -285,7 +285,7 @@ pub fn find_price_feed_pda(
             PriceFeed::SEED,
             store.as_ref(),
             authority.as_ref(),
-            &[index],
+            &index.to_le_bytes(),
             &[u8::from(provider)],
             token.as_ref(),
         ],
@@ -301,11 +301,15 @@ pub fn find_treasury_config_pda(store: &Pubkey, treasury_program_id: &Pubkey) ->
 /// Find the PDA for a treasury vault config.
 pub fn find_treasury_vault_config_pda(
     config: &Pubkey,
-    index: u8,
+    index: u16,
     treasury_program_id: &Pubkey,
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[TreasuryVaultConfig::SEED, config.as_ref(), &[index]],
+        &[
+            TreasuryVaultConfig::SEED,
+            config.as_ref(),
+            &index.to_le_bytes(),
+        ],
         treasury_program_id,
     )
 }
