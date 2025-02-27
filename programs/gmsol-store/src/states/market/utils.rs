@@ -172,7 +172,7 @@ impl<
 /// Trait for defining operations related to auto-deleveraging.
 pub trait Adl {
     /// Validate if the ADL can be executed.
-    fn validate_adl(&self, oracle: &Oracle, is_long: bool) -> CoreResult<()>;
+    fn validate_adl(&self, oracle: &Oracle, is_long: bool, max_staleness: u64) -> CoreResult<()>;
 
     /// Latest ADL time.
     fn latest_adl_time(&self, is_long: bool) -> CoreResult<i64>;
@@ -190,11 +190,15 @@ impl Adl for Market {
         self.clock(clock).ok_or(CoreError::NotFound)
     }
 
-    fn validate_adl(&self, oracle: &Oracle, is_long: bool) -> CoreResult<()> {
+    fn validate_adl(&self, oracle: &Oracle, is_long: bool, max_staleness: u64) -> CoreResult<()> {
         if !self.is_adl_enabled(is_long) {
             return Err(CoreError::AdlNotEnabled);
         }
-        if oracle.max_oracle_ts() < self.latest_adl_time(is_long)? {
+        if oracle
+            .max_oracle_ts()
+            .saturating_add_unsigned(max_staleness)
+            < self.latest_adl_time(is_long)?
+        {
             return Err(CoreError::OracleTimestampsAreSmallerThanRequired);
         }
         Ok(())

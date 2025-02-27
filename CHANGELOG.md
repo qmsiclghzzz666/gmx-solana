@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Added validation for future oracle timestamps using the new `oracle_max_future_timestamp_excess` amount config
 - programs: Added validation for `MarketDecrease` orders to ensure the oracle prices are updated after the position's last increase ts, similar to `LimitDecrease` orders
 - programs: Added features to control the enablement of instructions for (GLV) deposit, (GLV) withdrawal, and (GLV) shift
+- programs: Added a new config `adl_prices_max_staleness`, allowing the oracle prices to be stale relative to the ADL last update time by this amount
 - sdk: Added the `gmsol::cli` module
 - sdk: Added `SwitchboardPullOracleFactory` structure
 - cli: Added support for Switchboard to the `order` subcommand

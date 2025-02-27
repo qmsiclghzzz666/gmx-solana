@@ -62,6 +62,9 @@ pub const DEFAULT_ORACLE_MAX_TIMESTAMP_RANGE: Amount = 300;
 /// Default oracle max future timestamp excess (in seconds).
 pub const DEFAULT_ORACLE_MAX_FUTURE_TIMESTAMP_EXCESS: Amount = 0;
 
+/// Default max ADL prices staleness (in seconds).
+pub const DEFAULT_ADL_PRICES_MAX_STALENESS: Amount = 0;
+
 /// Default oracle ref price deviation.
 pub const DEFAULT_ORACLE_REF_PRICE_DEVIATION: Factor = 1_000_000_000_000_000;
 

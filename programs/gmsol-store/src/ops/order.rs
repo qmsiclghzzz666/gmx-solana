@@ -25,7 +25,7 @@ use crate::{
         order::{Order, OrderKind, OrderParams, TokenAccounts, TransferOut},
         position::PositionKind,
         user::UserHeader,
-        HasMarketMeta, Market, NonceBytes, Oracle, Position, Store, ValidateOracleTime,
+        AmountKey, HasMarketMeta, Market, NonceBytes, Oracle, Position, Store, ValidateOracleTime,
     },
     CoreError, ModelError,
 };
@@ -1114,10 +1114,15 @@ impl ExecuteOrderOperation<'_, '_> {
         #[allow(clippy::single_match)]
         match kind {
             OrderKind::AutoDeleveraging => {
+                let max_staleness = *self
+                    .store
+                    .load()
+                    .map_err(|_| CoreError::LoadAccountError)?
+                    .get_amount_by_key(AmountKey::AdlPricesMaxStaleness);
                 self.market
                     .load()
                     .map_err(|_| CoreError::LoadAccountError)?
-                    .validate_adl(self.oracle, is_long)?;
+                    .validate_adl(self.oracle, is_long, max_staleness)?;
             }
             _ => {}
         }

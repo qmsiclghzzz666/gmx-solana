@@ -531,8 +531,9 @@ pub struct Amounts {
     pub(crate) oracle_max_age: Amount,
     pub(crate) oracle_max_timestamp_range: Amount,
     pub(crate) oracle_max_future_timestamp_excess: Amount,
+    pub(crate) adl_prices_max_staleness: Amount,
     #[cfg_attr(feature = "debug", debug(skip))]
-    reserved: [Amount; 127],
+    reserved: [Amount; 126],
 }
 
 /// Amount keys.
@@ -556,6 +557,8 @@ pub enum AmountKey {
     OracleMaxTimestampRange,
     /// Max timestamp excess for oracle timestamp (seconds).
     OracleMaxFutureTimestampExcess,
+    /// Max ADL prices staleness (seconds).
+    AdlPricesMaxStaleness,
 }
 
 impl Amounts {
@@ -567,6 +570,7 @@ impl Amounts {
         self.oracle_max_timestamp_range = constants::DEFAULT_ORACLE_MAX_TIMESTAMP_RANGE;
         self.oracle_max_future_timestamp_excess =
             constants::DEFAULT_ORACLE_MAX_FUTURE_TIMESTAMP_EXCESS;
+        self.adl_prices_max_staleness = constants::DEFAULT_ADL_PRICES_MAX_STALENESS;
     }
 
     /// Get.
@@ -578,6 +582,7 @@ impl Amounts {
             AmountKey::OracleMaxAge => &self.oracle_max_age,
             AmountKey::OracleMaxTimestampRange => &self.oracle_max_timestamp_range,
             AmountKey::OracleMaxFutureTimestampExcess => &self.oracle_max_future_timestamp_excess,
+            AmountKey::AdlPricesMaxStaleness => &self.adl_prices_max_staleness,
         }
     }
 
@@ -592,6 +597,7 @@ impl Amounts {
             AmountKey::OracleMaxFutureTimestampExcess => {
                 &mut self.oracle_max_future_timestamp_excess
             }
+            AmountKey::AdlPricesMaxStaleness => &mut self.adl_prices_max_staleness,
         }
     }
 }
