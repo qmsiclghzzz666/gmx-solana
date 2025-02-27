@@ -60,15 +60,15 @@ impl Switchboard {
     ) -> Result<(u64, i64, Price)> {
         let feed = AccountLoader::<SbFeed>::try_from(feed)?;
         let feed = feed.load()?;
-        let (min_result_ts, _) = feed.current_result_ts_range();
+        let result_ts = feed.result_ts();
         require_gte!(
-            min_result_ts.saturating_add(token_config.heartbeat_duration().into()),
+            result_ts.saturating_add(token_config.heartbeat_duration().into()),
             clock.unix_timestamp,
             CoreError::PriceFeedNotUpdated
         );
         Ok((
             feed.result_land_slot(),
-            feed.result_ts(),
+            result_ts,
             Self::price_from(&feed, token_config)?,
         ))
     }
