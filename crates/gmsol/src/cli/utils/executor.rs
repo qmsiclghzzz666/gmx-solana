@@ -27,11 +27,12 @@ pub(crate) struct Executor<'a, C> {
 }
 
 impl<'a, C: Deref<Target = impl Signer> + Clone> Executor<'a, C> {
-    pub(crate) fn new_with_envs(
+    pub(crate) async fn new_with_envs(
         store: &Pubkey,
         client: &'a gmsol::Client<C>,
         testnet: bool,
         feed_index: u8,
+        use_switchboard: bool,
     ) -> gmsol::Result<Self> {
         let pyth = PythPullOracle::try_new(client)?;
         let chainlink = if testnet {
@@ -50,11 +51,19 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> Executor<'a, C> {
             )
         });
 
-        let switchboard = SwitchcboardPullOracleFactory::from_env()
-            .inspect_err(
-                |err| tracing::warn!(%err, "Required envs for Switchboard is not provided"),
-            )
-            .ok();
+        let switchboard = if use_switchboard {
+            match SwitchcboardPullOracleFactory::from_env() {
+                Ok(switchboard) => Some(switchboard),
+                Err(_) => Some(
+                    SwitchcboardPullOracleFactory::from_default_queue(
+                        &client.store_program().rpc(),
+                    )
+                    .await?,
+                ),
+            }
+        } else {
+            None
+        };
 
         Ok(Self {
             store: *store,

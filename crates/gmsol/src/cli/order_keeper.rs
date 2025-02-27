@@ -12,7 +12,7 @@ use gmsol::{
         common::ActionHeader, Deposit, DepositCreated, Order, OrderCreated, Withdrawal,
         WithdrawalCreated,
     },
-    utils::{instruction::InstructionSerialization, ZeroCopy},
+    utils::{instruction::InstructionSerialization, LocalSignerRef, ZeroCopy},
 };
 use gmsol_model::PositionState;
 use tokio::{sync::mpsc::UnboundedSender, time::Instant};
@@ -33,6 +33,9 @@ pub(super) struct KeeperArgs {
     #[cfg_attr(feature = "devnet", arg(long, default_value_t = true))]
     #[cfg_attr(not(feature = "devnet"), arg(long, default_value_t = false))]
     oracle_testnet: bool,
+    /// Whether to disable Switchboard support.
+    #[arg(long)]
+    disable_switchboard: bool,
     /// Feed index.
     #[arg(long, default_value_t = 0)]
     feed_index: u8,
@@ -111,6 +114,21 @@ impl KeeperArgs {
         self.oracle
             .as_ref()
             .ok_or_else(|| gmsol::Error::invalid_argument("oracle is not provided"))
+    }
+
+    async fn executor<'a>(
+        &'a self,
+        client: &'a GMSOLClient,
+        store: &Pubkey,
+    ) -> gmsol::Result<Executor<'a, LocalSignerRef>> {
+        Executor::new_with_envs(
+            store,
+            client,
+            self.oracle_testnet,
+            self.feed_index,
+            !self.disable_switchboard,
+        )
+        .await
     }
 
     pub(super) async fn run(
@@ -266,7 +284,8 @@ impl KeeperArgs {
                     let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
                     builder.add_alt(alt);
                 }
-                Executor::new_with_envs(store, client, self.oracle_testnet, self.feed_index)?
+                self.executor(client, store)
+                    .await?
                     .execute(
                         builder,
                         ctx,
@@ -295,7 +314,8 @@ impl KeeperArgs {
                     let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
                     builder.add_alt(alt);
                 }
-                Executor::new_with_envs(store, client, self.oracle_testnet, self.feed_index)?
+                self.executor(client, store)
+                    .await?
                     .execute(
                         builder,
                         ctx,
@@ -315,7 +335,8 @@ impl KeeperArgs {
                     !side.is_long(),
                 )?;
 
-                Executor::new_with_envs(store, client, self.oracle_testnet, self.feed_index)?
+                self.executor(client, store)
+                    .await?
                     .execute(
                         builder,
                         ctx,
@@ -351,8 +372,7 @@ impl KeeperArgs {
                 tracing::info!(%order, "cancelled order at {signature}");
             }
             Command::Execute { action, address } => {
-                let executor =
-                    Executor::new_with_envs(store, client, self.oracle_testnet, self.feed_index)?;
+                let executor = self.executor(client, store).await?;
 
                 match action {
                     Action::Deposit => {

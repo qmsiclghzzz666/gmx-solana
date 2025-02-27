@@ -10,9 +10,15 @@ use anchor_spl::associated_token::get_associated_token_address;
 use base64::prelude::*;
 use gmsol_solana_utils::bundle_builder::BundleOptions;
 use gmsol_store::states::PriceProviderKind;
+use rand::Rng;
 use solana_sdk::{instruction::AccountMeta, system_program};
 use spl_token::{native_mint::ID as NATIVE_MINT, ID as SPL_TOKEN_PROGRAM_ID};
-use std::{collections::HashMap, num::NonZeroUsize, ops::Deref, sync::Arc};
+use std::{
+    collections::HashMap,
+    num::NonZeroUsize,
+    ops::Deref,
+    sync::{Arc, LazyLock},
+};
 use switchboard_on_demand_client::{
     fetch_and_cache_luts, oracle_job::OracleJob, prost::Message, CrossbarClient, FeedConfig,
     FetchSignaturesMultiParams, Gateway, MultiSubmission, OracleAccountData, PullFeed,
@@ -24,10 +30,23 @@ use tokio::{join, sync::OnceCell};
 
 const DEFAULT_BATCH_SIZE: usize = 5;
 
+cfg_if::cfg_if! {
+    if #[cfg(feature = "devnet")] {
+        /// Switchboard Default Queue.
+        static QUEUE: LazyLock<Pubkey> =
+        LazyLock::new(|| "EYiAmGSdsQTuCw413V5BzaruWuCCSDgTPtBGvLkXHbe7".parse().unwrap());
+    } else {
+        /// Switchboard Default Queue.
+        static QUEUE: LazyLock<Pubkey> =
+        LazyLock::new(|| "A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w".parse().unwrap());
+    }
+}
+
 /// Switchboard Pull Oracle Factory.
+#[derive(Debug)]
 pub struct SwitchcboardPullOracleFactory {
     switchboard: Pubkey,
-    gateway: Gateway,
+    gateways: Vec<Gateway>,
     crossbar: Option<CrossbarClient>,
 }
 
@@ -35,13 +54,21 @@ impl SwitchcboardPullOracleFactory {
     /// Gateway Env.
     pub const ENV_GATEWAY: &str = "SWITCHBOARD_GATEWAY";
 
-    /// Create a new factory.
-    pub fn new(gateway_url: &str) -> Self {
-        Self {
-            switchboard: Pubkey::new_from_array(SWITCHBOARD_ON_DEMAND_PROGRAM_ID.to_bytes()),
-            gateway: Gateway::new(gateway_url.to_string()),
-            crossbar: None,
+    /// Create with gateways.
+    pub fn from_gateways(gateways: Vec<Gateway>) -> crate::Result<Self> {
+        if gateways.is_empty() {
+            return Err(crate::Error::switchboard_error("empty gateway list"));
         }
+        Ok(Self {
+            switchboard: Pubkey::new_from_array(SWITCHBOARD_ON_DEMAND_PROGRAM_ID.to_bytes()),
+            gateways,
+            crossbar: None,
+        })
+    }
+
+    /// Create a new factory from the given gateway url.
+    pub fn new(gateway_url: &str) -> Self {
+        Self::from_gateways(vec![Gateway::new(gateway_url.to_string())]).expect("must success")
     }
 
     /// Create from env.
@@ -55,17 +82,63 @@ impl SwitchcboardPullOracleFactory {
         Ok(Self::new(&gateway_url))
     }
 
-    /// Make oracle.
+    /// Create from default queue.
+    pub async fn from_default_queue(client: &RpcClient) -> crate::Result<Self> {
+        Self::from_queue(client, &QUEUE).await
+    }
+
+    /// Create from queue.
+    pub async fn from_queue(client: &RpcClient, queue: &Pubkey) -> crate::Result<Self> {
+        let queue = QueueAccountData::load(client, queue).await.map_err(|err| {
+            crate::Error::switchboard_error(format!("loading queue data error: {err}"))
+        })?;
+        let gateways = queue.fetch_gateways(client).await.map_err(|err| {
+            crate::Error::switchboard_error(format!("fetching gateways error: {err}"))
+        })?;
+        tracing::debug!("loaded {} gateways", gateways.len());
+
+        Self::from_gateways(gateways)
+    }
+
+    /// Get the total number of the gateways.
+    pub fn num_gateways(&self) -> usize {
+        self.gateways.len()
+    }
+
+    /// Make an oracle with the gateway index.
+    pub fn make_oracle_with_gateway_index<'a, C: Deref<Target = impl Signer> + Clone>(
+        &'a self,
+        gmsol: &'a crate::Client<C>,
+        gateway_index: usize,
+    ) -> Option<SwitchboardPullOracle<'a, C>> {
+        let gateway = self.gateways.get(gateway_index)?;
+        tracing::debug!("using gateway: {gateway:?}");
+        Some(SwitchboardPullOracle::from_parts(
+            gmsol,
+            self.switchboard,
+            gateway,
+            self.crossbar.clone(),
+        ))
+    }
+
+    /// Make an oracle with the given rng.
+    pub fn make_oracle_with_rng<'a, C: Deref<Target = impl Signer> + Clone>(
+        &'a self,
+        gmsol: &'a crate::Client<C>,
+        rng: &mut impl Rng,
+    ) -> SwitchboardPullOracle<'a, C> {
+        let index = rng.gen_range(0, self.num_gateways());
+        self.make_oracle_with_gateway_index(gmsol, index)
+            .expect("must success")
+    }
+
+    /// Make an oracle.
     pub fn make_oracle<'a, C: Deref<Target = impl Signer> + Clone>(
         &'a self,
         gmsol: &'a crate::Client<C>,
     ) -> SwitchboardPullOracle<'a, C> {
-        SwitchboardPullOracle::from_parts(
-            gmsol,
-            self.switchboard,
-            &self.gateway,
-            self.crossbar.clone(),
-        )
+        let mut rng = rand::thread_rng();
+        self.make_oracle_with_rng(gmsol, &mut rng)
     }
 }
 
