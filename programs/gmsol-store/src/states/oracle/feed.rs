@@ -208,8 +208,10 @@ impl PriceFeedPrice {
     }
 
     /// Create from chainlink price report.
-    pub fn from_chainlink_report(report: &chainlink_datastreams::report::Report) -> Result<Self> {
-        use chainlink_datastreams::report::Report;
+    pub fn from_chainlink_report(
+        report: &gmsol_chainlink_datastreams::report::Report,
+    ) -> Result<Self> {
+        use gmsol_chainlink_datastreams::report::Report;
         use gmsol_utils::price::{find_divisor_decimals, TEN, U192};
 
         let price = report

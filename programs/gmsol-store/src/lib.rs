@@ -1202,7 +1202,7 @@ pub mod gmsol_store {
     /// - The [`price_feed`](UpdatePriceFeedWithChainlink::price_feed) must be initialized, owned by
     ///   the store, and authorized for the `authority`.
     /// - The [`chainlink`](UpdatePriceFeedWithChainlink::chainlink) program ID must be trusted in the
-    ///   definition of the [`ChainlinkDataStreamsInterface`](chainlink_datastreams::interface::ChainlinkDataStreamsInterface).
+    ///   definition of the [`ChainlinkDataStreamsInterface`](gmsol_chainlink_datastreams::interface::ChainlinkDataStreamsInterface).
     /// - The price feed must be configured to use [`ChainlinkDataStreams`](PriceProviderKind::ChainlinkDataStreams)
     ///   as its provider.
     /// - The `signed_report` must be:

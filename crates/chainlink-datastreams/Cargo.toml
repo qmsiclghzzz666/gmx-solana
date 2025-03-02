@@ -1,7 +1,11 @@
 [package]
-name = "chainlink-datastreams"
+name = "gmsol-chainlink-datastreams"
 version.workspace = true
 edition.workspace = true
+license-file.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/gmsol-chainlink-datastreams"
+readme.workspace = true
 
 [features]
 mock = []
@@ -9,7 +13,7 @@ mock = []
 [dependencies]
 ruint = { workspace = true, default-features = false }
 hex = { workspace = true }
-mock-chainlink-verifier = { workspace = true, features = ["cpi"] }
+gmsol-mock-chainlink-verifier = { workspace = true, features = ["cpi"] }
 anchor-lang = { workspace = true }
 thiserror = { workspace = true }
 snap = { workspace = true }

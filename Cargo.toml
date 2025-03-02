@@ -5,6 +5,9 @@ members = ["crates/*", "programs/*"]
 [workspace.package]
 version = "0.4.0"
 edition = "2021"
+license-file = "LICENSE"
+repository = "https://github.com/gmsol-labs/gmx-solana"
+readme = "README.md"
 
 [workspace.dependencies]
 anchor-client = "0.30.1"
@@ -102,13 +105,13 @@ path = "programs/gmsol-treasury"
 [workspace.dependencies.gmsol-timelock]
 path = "programs/gmsol-timelock"
 
-[workspace.dependencies.mock-chainlink-verifier]
+[workspace.dependencies.gmsol-mock-chainlink-verifier]
 path = "programs/mock-chainlink-verifier"
 
 [workspace.dependencies.gmsol-decode]
 path = "crates/gmsol-decode"
 
-[workspace.dependencies.chainlink-datastreams]
+[workspace.dependencies.gmsol-chainlink-datastreams]
 path = "crates/chainlink-datastreams"
 
 [workspace.dependencies.data-streams-report]

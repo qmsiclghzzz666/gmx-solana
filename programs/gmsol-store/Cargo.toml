@@ -2,6 +2,10 @@
 name = "gmsol-store"
 version.workspace = true
 edition.workspace = true
+license-file.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/gmsol-store"
+readme.workspace = true
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -27,7 +31,7 @@ utils = ["bytes", "bs58"]
 serde = ["dep:serde", "serde_with", "serde_bytes"]
 enum-iter = []
 migration = []
-mock = ["chainlink-datastreams/mock"]
+mock = ["gmsol-chainlink-datastreams/mock"]
 multi-store = []
 devnet = []
 test-only = []
@@ -59,7 +63,7 @@ bytes = { workspace = true, optional = true }
 typed-builder = { workspace = true }
 bs58 = { workspace = true, optional = true }
 derive_more = { workspace = true, optional = true }
-chainlink-datastreams = { workspace = true }
+gmsol-chainlink-datastreams = { workspace = true }
 rust_decimal = { workspace = true }
 switchboard-on-demand = { workspace = true }
 cfg-if = { workspace = true }

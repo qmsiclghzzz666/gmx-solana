@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use chainlink_datastreams::interface::ChainlinkDataStreamsInterface;
+use gmsol_chainlink_datastreams::interface::ChainlinkDataStreamsInterface;
 use gmsol_utils::InitSpace;
 
 use crate::{
@@ -134,7 +134,7 @@ impl<'info> internal::Authentication<'info> for UpdatePriceFeedWithChainlink<'in
 
 impl UpdatePriceFeedWithChainlink<'_> {
     fn decode_and_validate_report(&self, compressed_full_report: &[u8]) -> Result<PriceFeedPrice> {
-        use chainlink_datastreams::report::decode_compressed_full_report;
+        use gmsol_chainlink_datastreams::report::decode_compressed_full_report;
 
         let report = decode_compressed_full_report(compressed_full_report).map_err(|err| {
             msg!("[Decode Error] {}", err);
@@ -151,7 +151,7 @@ impl UpdatePriceFeedWithChainlink<'_> {
     }
 
     fn verify_report(&self, signed_report: Vec<u8>) -> Result<()> {
-        use chainlink_datastreams::interface::{verify, VerifyContext};
+        use gmsol_chainlink_datastreams::interface::{verify, VerifyContext};
 
         let ctx = CpiContext::new(
             self.chainlink.to_account_info(),

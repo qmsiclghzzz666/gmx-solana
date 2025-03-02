@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - model: Separated `BorrowingFeeMarketMut` trait from the `PerpMarketMut` trait.
 - sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function.
 - tests: Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests.
+- Renamed the `mock-chainlink-verifier` crate to `gmsol-mock-chainlink-verifier`.
+- Renamed the `chainlink-datastreams` crate to `gmsol-chainlink-datastreams`.
 - Updated dependencies:
   - `switchboard-on-demand`: `v0.3.4`
 

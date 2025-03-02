@@ -32,7 +32,7 @@ pub trait OracleOps<C> {
     ) -> (TransactionBuilder<C>, Pubkey);
 
     /// Update price feed with chainlink.
-    #[cfg(feature = "chainlink-datastreams")]
+    #[cfg(feature = "gmsol-chainlink-datastreams")]
     fn update_price_feed_with_chainlink(
         &self,
         store: &Pubkey,
@@ -116,7 +116,7 @@ where
         (rpc, price_feed)
     }
 
-    #[cfg(feature = "chainlink-datastreams")]
+    #[cfg(feature = "gmsol-chainlink-datastreams")]
     fn update_price_feed_with_chainlink(
         &self,
         store: &Pubkey,
@@ -125,7 +125,7 @@ where
         access_controller: &Pubkey,
         signed_report: &[u8],
     ) -> crate::Result<TransactionBuilder<C>> {
-        use chainlink_datastreams::utils::{
+        use gmsol_chainlink_datastreams::utils::{
             find_config_account_pda, find_verifier_account_pda, Compressor,
         };
 

@@ -1110,7 +1110,7 @@ where
     M: gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }, Num = u128, Signed = i128>,
     M: HasMarketMeta,
 {
-    use gmsol_model::{utils, LiquidityMarketExt, PnlFactorKind};
+    use gmsol_model::{utils, LiquidityMarketExt};
 
     let prices = oracle.market_prices(market).expect("must exist");
 

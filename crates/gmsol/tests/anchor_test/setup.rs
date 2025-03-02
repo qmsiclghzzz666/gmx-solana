@@ -374,7 +374,7 @@ impl Deployment {
         if std::env::var(ENV_GMSOL_NO_MOCK).is_ok() {
             let access_controller = std::env::var(ENV_CHAINLINK_ACCESS_CONTROLLER)?;
             self.chainlink_access_controller = access_controller.parse()?;
-            self.chainlink_verifier_program = chainlink_datastreams::verifier::ID;
+            self.chainlink_verifier_program = gmsol_chainlink_datastreams::verifier::ID;
 
             return Ok(());
         }

@@ -1,7 +1,7 @@
 use std::{fmt, ops::Deref, sync::Arc};
 
-use chainlink_datastreams::report::{decode, decode_full_report, Report};
 use futures_util::{Stream, StreamExt, TryStreamExt};
+use gmsol_chainlink_datastreams::report::{decode, decode_full_report, Report};
 use reqwest::{IntoUrl, Url};
 use reqwest_websocket::{Message, RequestBuilderExt};
 use serde::{Deserialize, Serialize};

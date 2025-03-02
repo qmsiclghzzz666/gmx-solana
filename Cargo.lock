@@ -1281,20 +1281,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
-name = "chainlink-datastreams"
-version = "0.4.0"
-dependencies = [
- "anchor-lang 0.30.1",
- "data-streams-report",
- "hex",
- "mock-chainlink-verifier",
- "num-bigint 0.4.6",
- "ruint",
- "snap",
- "thiserror",
-]
-
-[[package]]
 name = "chainlink_solana"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2301,7 +2287,6 @@ dependencies = [
  "bytemuck",
  "byteorder",
  "cfg-if",
- "chainlink-datastreams",
  "clap 4.5.20",
  "dialoguer 0.11.0",
  "either",
@@ -2310,7 +2295,9 @@ dependencies = [
  "eyre",
  "figment",
  "futures-util",
+ "gmsol-chainlink-datastreams",
  "gmsol-decode",
+ "gmsol-mock-chainlink-verifier",
  "gmsol-model",
  "gmsol-solana-utils",
  "gmsol-store",
@@ -2322,7 +2309,6 @@ dependencies = [
  "hmac 0.12.1",
  "humantime",
  "indexmap 2.6.0",
- "mock-chainlink-verifier",
  "num-format",
  "pin-project-lite",
  "poem",
@@ -2364,6 +2350,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "gmsol-chainlink-datastreams"
+version = "0.4.0"
+dependencies = [
+ "anchor-lang 0.30.1",
+ "data-streams-report",
+ "gmsol-mock-chainlink-verifier",
+ "hex",
+ "num-bigint 0.4.6",
+ "ruint",
+ "snap",
+ "thiserror",
+]
+
+[[package]]
 name = "gmsol-decode"
 version = "0.4.0"
 dependencies = [
@@ -2377,6 +2377,16 @@ dependencies = [
  "solana-transaction-status",
  "thiserror",
  "tracing",
+]
+
+[[package]]
+name = "gmsol-mock-chainlink-verifier"
+version = "0.4.0"
+dependencies = [
+ "anchor-lang 0.30.1",
+ "cfg-if",
+ "data-streams-report",
+ "snap",
 ]
 
 [[package]]
@@ -2427,10 +2437,10 @@ dependencies = [
  "bytemuck",
  "bytes",
  "cfg-if",
- "chainlink-datastreams",
  "chainlink_solana",
  "clap 4.5.20",
  "derive_more",
+ "gmsol-chainlink-datastreams",
  "gmsol-model",
  "gmsol-utils",
  "indexmap 2.6.0",
@@ -3447,16 +3457,6 @@ dependencies = [
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "mock-chainlink-verifier"
-version = "0.4.0"
-dependencies = [
- "anchor-lang 0.30.1",
- "cfg-if",
- "data-streams-report",
- "snap",
 ]
 
 [[package]]

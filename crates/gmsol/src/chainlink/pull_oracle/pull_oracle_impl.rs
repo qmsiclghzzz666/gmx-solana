@@ -30,7 +30,7 @@ pub struct ChainlinkPullOracleFactory {
 impl ChainlinkPullOracleFactory {
     /// Create a new [`ChainlinkPullOracleFactory`] with default program ID and access controller address.
     pub fn new(store: &Pubkey, feed_index: u16) -> Self {
-        use chainlink_datastreams::verifier;
+        use gmsol_chainlink_datastreams::verifier;
 
         Self::with_program_id_and_access_controller(
             store,
