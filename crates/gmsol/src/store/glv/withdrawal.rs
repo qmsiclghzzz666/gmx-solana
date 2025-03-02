@@ -17,7 +17,7 @@ use gmsol_store::{
     accounts, instruction,
     ops::glv::CreateGlvWithdrawalParams,
     states::{
-        common::{action::Action, swap::SwapParams, TokensWithFeed},
+        common::{action::Action, swap::SwapActionParams, TokensWithFeed},
         glv::GlvWithdrawal,
         Glv, HasMarketMeta, NonceBytes, PriceProviderKind, TokenMapAccess,
     },
@@ -511,7 +511,7 @@ pub struct ExecuteGlvWithdrawalHint {
     close: CloseGlvWithdrawalHint,
     token_map: Pubkey,
     glv_market_tokens: BTreeSet<Pubkey>,
-    swap: SwapParams,
+    swap: SwapActionParams,
     /// Feeds.
     pub feeds: TokensWithFeed,
 }

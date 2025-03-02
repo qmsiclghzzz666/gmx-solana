@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Changed the index type for `Glv` to `u16`.
 - programs: Changed the index type for `TreasuryVaultConfig` to `u16`.
 - programs: Replaced `ReferralCode` with `ReferralCodeV2`.
+- programs: Renamed the following structures to resolve IDL conflicts:
+
+  - `SwapParams` -> `SwapActionParams`
+  - `{Action}Params` -> `{Action}ActionParams` (e.g., `DepositParams` -> `DepositActionParams`)
+  - `TokenAccounts` -> `{Action}TokenAccounts` (e.g., `DepositTokenAccounts`)
+  - `GtState` (in `states::user`) -> `UserGtState`
+
 - model: Separated `BorrowingFeeMarketMut` trait from the `PerpMarketMut` trait.
 - sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function.
 - tests: Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests.

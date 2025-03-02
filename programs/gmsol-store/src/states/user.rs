@@ -27,7 +27,7 @@ pub struct UserHeader {
     /// Referral.
     pub(crate) referral: Referral,
     /// GT State.
-    pub(crate) gt: GtState,
+    pub(crate) gt: UserGtState,
     #[cfg_attr(feature = "debug", debug(skip))]
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 128],
@@ -157,7 +157,7 @@ impl UserHeader {
     }
 
     /// Get GT state.
-    pub fn gt(&self) -> &GtState {
+    pub fn gt(&self) -> &UserGtState {
         &self.gt
     }
 }
@@ -315,7 +315,7 @@ impl Seed for ReferralCodeV2 {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GtState {
+pub struct UserGtState {
     pub(crate) rank: u8,
     padding_0: [u8; 7],
     pub(crate) last_minted_at: i64,
@@ -330,7 +330,7 @@ pub struct GtState {
     reserved: [u8; 64],
 }
 
-impl GtState {
+impl UserGtState {
     /// Get total paid fee value.
     pub fn paid_fee_value(&self) -> u128 {
         self.paid_fee_value

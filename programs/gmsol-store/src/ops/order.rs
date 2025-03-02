@@ -23,7 +23,7 @@ use crate::{
             },
             utils::{Adl, ValidateMarketBalances},
         },
-        order::{Order, OrderKind, OrderParams, TokenAccounts, TransferOut},
+        order::{Order, OrderActionParams, OrderKind, OrderTokenAccounts, TransferOut},
         position::PositionKind,
         user::UserHeader,
         AmountKey, HasMarketMeta, Market, NonceBytes, Oracle, Position, Store, ValidateOracleTime,
@@ -155,8 +155,8 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
         &self,
         f: impl FnOnce(
             &CreateOrderParams,
-            &mut TokenAccounts,
-            &mut OrderParams,
+            &mut OrderTokenAccounts,
+            &mut OrderActionParams,
         ) -> Result<(Pubkey, Pubkey)>,
     ) -> Result<()> {
         let id = self.market.load_mut()?.indexer_mut().next_order_id()?;

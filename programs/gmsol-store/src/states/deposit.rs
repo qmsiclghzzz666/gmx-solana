@@ -6,7 +6,7 @@ use crate::{events::DepositRemoved, states::MarketConfigKey, CoreError};
 use super::{
     common::{
         action::{Action, ActionHeader, Closable},
-        swap::SwapParams,
+        swap::SwapActionParams,
         token::TokenAndAccount,
     },
     Market, Seed,
@@ -20,11 +20,11 @@ pub struct Deposit {
     /// Header.
     pub(crate) header: ActionHeader,
     /// Token accounts.
-    pub(crate) tokens: TokenAccounts,
+    pub(crate) tokens: DepositTokenAccounts,
     /// Deposit params.
-    pub(crate) params: DepositParams,
+    pub(crate) params: DepositActionParams,
     /// Swap params.
-    pub(crate) swap: SwapParams,
+    pub(crate) swap: SwapActionParams,
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 4],
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
@@ -67,12 +67,12 @@ impl Deposit {
     }
 
     /// Get tokens.
-    pub fn tokens(&self) -> &TokenAccounts {
+    pub fn tokens(&self) -> &DepositTokenAccounts {
         &self.tokens
     }
 
     /// Get swap params.
-    pub fn swap(&self) -> &SwapParams {
+    pub fn swap(&self) -> &SwapActionParams {
         &self.swap
     }
 
@@ -122,7 +122,7 @@ impl Action for Deposit {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TokenAccounts {
+pub struct DepositTokenAccounts {
     /// Initial long token accounts.
     pub initial_long_token: TokenAndAccount,
     /// Initial short token accounts.
@@ -134,7 +134,7 @@ pub struct TokenAccounts {
     reserved: [u8; 128],
 }
 
-impl TokenAccounts {
+impl DepositTokenAccounts {
     /// Get market token.
     pub fn market_token(&self) -> Pubkey {
         self.market_token.token().expect("must exist")
@@ -150,7 +150,7 @@ impl TokenAccounts {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DepositParams {
+pub struct DepositActionParams {
     /// The amount of initial long tokens to deposit.
     pub(crate) initial_long_token_amount: u64,
     /// The amount of initial short tokens to deposit.
@@ -162,7 +162,7 @@ pub struct DepositParams {
     reserved: [u8; 64],
 }
 
-impl Default for DepositParams {
+impl Default for DepositActionParams {
     fn default() -> Self {
         Self {
             initial_long_token_amount: 0,
@@ -173,7 +173,7 @@ impl Default for DepositParams {
     }
 }
 
-impl DepositParams {
+impl DepositActionParams {
     pub(crate) fn validate_market_token_amount(&self, minted: u64) -> Result<()> {
         require_gte!(
             minted,

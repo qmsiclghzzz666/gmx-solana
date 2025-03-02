@@ -14,7 +14,7 @@ use gmsol_store::{
     accounts, instruction,
     ops::deposit::CreateDepositParams,
     states::{
-        common::{action::Action, swap::SwapParams, TokensWithFeed},
+        common::{action::Action, swap::SwapActionParams, TokensWithFeed},
         Deposit, NonceBytes, PriceProviderKind, TokenMapAccess,
     },
 };
@@ -493,7 +493,7 @@ pub struct ExecuteDepositHint {
     market_token_mint: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    swap: SwapParams,
+    swap: SwapActionParams,
     initial_long_token_escrow: Option<Pubkey>,
     initial_short_token_escrow: Option<Pubkey>,
     initial_long_token: Option<Pubkey>,

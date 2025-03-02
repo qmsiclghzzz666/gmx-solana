@@ -17,7 +17,7 @@ const MAX_TOKENS: usize = 2 * MAX_STEPS + 2 + 3;
 #[derive(Default)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SwapParams {
+pub struct SwapActionParams {
     /// The length of primary swap path.
     primary_length: u8,
     /// The length of secondary swap path.
@@ -32,7 +32,7 @@ pub struct SwapParams {
     tokens: [Pubkey; MAX_TOKENS],
 }
 
-impl SwapParams {
+impl SwapActionParams {
     /// Max total length of swap paths.
     pub const MAX_TOTAL_LENGTH: usize = MAX_STEPS;
 
@@ -361,5 +361,5 @@ fn validate_path<'info>(
 /// Has swap parameters.
 pub trait HasSwapParams {
     /// Get the swap params.
-    fn swap(&self) -> &SwapParams;
+    fn swap(&self) -> &SwapActionParams;
 }

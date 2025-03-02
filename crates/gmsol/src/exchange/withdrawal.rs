@@ -14,7 +14,7 @@ use gmsol_store::{
     accounts, instruction,
     ops::withdrawal::CreateWithdrawalParams,
     states::{
-        common::{action::Action, swap::SwapParams, TokensWithFeed},
+        common::{action::Action, swap::SwapActionParams, TokensWithFeed},
         withdrawal::Withdrawal,
         NonceBytes, PriceProviderKind, Pyth, TokenMapAccess,
     },
@@ -475,7 +475,7 @@ pub struct ExecuteWithdrawalHint {
     final_short_token: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    swap: SwapParams,
+    swap: SwapActionParams,
     should_unwrap_native_token: bool,
 }
 

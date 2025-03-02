@@ -18,9 +18,9 @@ pub struct Shift {
     /// Action header.
     pub(crate) header: ActionHeader,
     /// Token accounts.
-    pub(crate) tokens: TokenAccounts,
+    pub(crate) tokens: ShiftTokenAccounts,
     /// Shift params.
-    pub(crate) params: ShiftParams,
+    pub(crate) params: ShiftActionParams,
     #[cfg_attr(feature = "debug", debug(skip))]
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     reserved: [u8; 128],
@@ -60,7 +60,7 @@ impl gmsol_utils::InitSpace for Shift {
 
 impl Shift {
     /// Get token infos.
-    pub fn tokens(&self) -> &TokenAccounts {
+    pub fn tokens(&self) -> &ShiftTokenAccounts {
         &self.tokens
     }
 }
@@ -68,7 +68,7 @@ impl Shift {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TokenAccounts {
+pub struct ShiftTokenAccounts {
     pub(crate) from_market_token: TokenAndAccount,
     pub(crate) to_market_token: TokenAndAccount,
     pub(crate) long_token: Pubkey,
@@ -78,7 +78,7 @@ pub struct TokenAccounts {
     reserved: [u8; 128],
 }
 
-impl TokenAccounts {
+impl ShiftTokenAccounts {
     /// Get from market token.
     pub fn from_market_token(&self) -> Pubkey {
         self.from_market_token.token().expect("must exist")
@@ -113,7 +113,7 @@ impl TokenAccounts {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ShiftParams {
+pub struct ShiftActionParams {
     pub(crate) from_market_token_amount: u64,
     pub(crate) min_to_market_token_amount: u64,
     #[cfg_attr(feature = "debug", debug(skip))]
@@ -121,7 +121,7 @@ pub struct ShiftParams {
     reserved: [u8; 64],
 }
 
-impl ShiftParams {
+impl ShiftActionParams {
     /// Get from market token amount.
     pub fn from_market_token_amount(&self) -> u64 {
         self.from_market_token_amount

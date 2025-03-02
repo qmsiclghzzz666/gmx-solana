@@ -6,8 +6,8 @@ use crate::{
     constants,
     events::{BorrowingFeesUpdated, EventEmitter, SwapExecuted},
     states::{
-        common::swap::SwapParams, market::utils::ValidateMarketBalances, HasMarketMeta, Market,
-        Oracle,
+        common::swap::SwapActionParams, market::utils::ValidateMarketBalances, HasMarketMeta,
+        Market, Oracle,
     },
     CoreError, ModelError,
 };
@@ -65,7 +65,7 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
         &mut self,
         mut direction: SwapDirection<M>,
         oracle: &Oracle,
-        params: &SwapParams,
+        params: &SwapActionParams,
         expected_token_outs: (Pubkey, Pubkey),
         token_ins: (Option<Pubkey>, Option<Pubkey>),
         token_in_amounts: (u64, u64),

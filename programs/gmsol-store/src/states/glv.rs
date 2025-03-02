@@ -17,10 +17,10 @@ use crate::{
 use super::{
     common::{
         action::{Action, ActionHeader, Closable},
-        swap::{unpack_markets, HasSwapParams, SwapParams},
+        swap::{unpack_markets, HasSwapParams, SwapActionParams},
         token::{TokenAndAccount, TokensCollector},
     },
-    deposit::DepositParams,
+    deposit::DepositActionParams,
     shift, Seed, Shift, TokenMapAccess,
 };
 
@@ -714,9 +714,9 @@ pub struct GlvDeposit {
     /// Token accounts.
     pub(crate) tokens: GlvDepositTokenAccounts,
     /// Params.
-    pub(crate) params: GlvDepositParams,
+    pub(crate) params: GlvDepositActionParams,
     /// Swap params.
-    pub(crate) swap: SwapParams,
+    pub(crate) swap: SwapActionParams,
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 4],
     #[cfg_attr(feature = "debug", debug(skip))]
@@ -844,7 +844,7 @@ impl GlvDeposit {
 }
 
 impl HasSwapParams for GlvDeposit {
-    fn swap(&self) -> &SwapParams {
+    fn swap(&self) -> &SwapActionParams {
         &self.swap
     }
 }
@@ -901,9 +901,9 @@ impl GlvDepositTokenAccounts {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GlvDepositParams {
+pub struct GlvDepositActionParams {
     /// Deposit params.
-    pub(crate) deposit: DepositParams,
+    pub(crate) deposit: DepositActionParams,
     /// The amount of market tokens to deposit.
     pub(crate) market_token_amount: u64,
     /// The minimum acceptable amount of glv tokens to receive.
@@ -923,9 +923,9 @@ pub struct GlvWithdrawal {
     /// Token accounts.
     pub(crate) tokens: GlvWithdrawalTokenAccounts,
     /// Params.
-    pub(crate) params: GlvWithdrawalParams,
+    pub(crate) params: GlvWithdrawalActionParams,
     /// Swap params.
-    pub(crate) swap: SwapParams,
+    pub(crate) swap: SwapActionParams,
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 4],
     #[cfg_attr(feature = "debug", debug(skip))]
@@ -940,7 +940,7 @@ impl GlvWithdrawal {
     }
 
     /// Get swap params.
-    pub fn swap(&self) -> &SwapParams {
+    pub fn swap(&self) -> &SwapActionParams {
         &self.swap
     }
 }
@@ -979,7 +979,7 @@ impl gmsol_utils::InitSpace for GlvWithdrawal {
 }
 
 impl HasSwapParams for GlvWithdrawal {
-    fn swap(&self) -> &SwapParams {
+    fn swap(&self) -> &SwapActionParams {
         &self.swap
     }
 }
@@ -1064,7 +1064,7 @@ impl GlvWithdrawalTokenAccounts {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GlvWithdrawalParams {
+pub struct GlvWithdrawalActionParams {
     /// The amount of GLV tokens to burn.
     pub(crate) glv_token_amount: u64,
     /// The minimum acceptable amount of final long tokens to receive.
@@ -1128,7 +1128,7 @@ impl GlvShift {
     }
 
     /// Get token infos.
-    pub fn tokens(&self) -> &shift::TokenAccounts {
+    pub fn tokens(&self) -> &shift::ShiftTokenAccounts {
         self.shift.tokens()
     }
 

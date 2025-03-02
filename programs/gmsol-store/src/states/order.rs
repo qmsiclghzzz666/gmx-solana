@@ -15,7 +15,7 @@ use crate::{
 use super::{
     common::{
         action::{Action, ActionHeader, ActionSigner, Closable},
-        swap::SwapParams,
+        swap::SwapActionParams,
         token::TokenAndAccount,
     },
     user::UserHeader,
@@ -358,13 +358,13 @@ pub struct Order {
     /// Market token.
     pub(crate) market_token: Pubkey,
     /// Token accounts.
-    pub(crate) tokens: TokenAccounts,
+    pub(crate) tokens: OrderTokenAccounts,
     /// Swap params.
-    pub(crate) swap: SwapParams,
+    pub(crate) swap: SwapActionParams,
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_0: [u8; 4],
     /// Order params.
-    pub(crate) params: OrderParams,
+    pub(crate) params: OrderActionParams,
     pub(crate) gt_reward: u64,
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 8],
@@ -553,12 +553,12 @@ impl Order {
     }
 
     /// Get order params.
-    pub fn params(&self) -> &OrderParams {
+    pub fn params(&self) -> &OrderActionParams {
         &self.params
     }
 
     /// Get swap params.
-    pub fn swap(&self) -> &SwapParams {
+    pub fn swap(&self) -> &SwapActionParams {
         &self.swap
     }
 
@@ -568,7 +568,7 @@ impl Order {
     }
 
     /// Get token accounts.
-    pub fn tokens(&self) -> &TokenAccounts {
+    pub fn tokens(&self) -> &OrderTokenAccounts {
         &self.tokens
     }
 
@@ -664,7 +664,7 @@ impl Order {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TokenAccounts {
+pub struct OrderTokenAccounts {
     /// Initial collateral.
     pub(crate) initial_collateral: TokenAndAccount,
     /// Final output token.
@@ -678,7 +678,7 @@ pub struct TokenAccounts {
     reserved: [u8; 128],
 }
 
-impl TokenAccounts {
+impl OrderTokenAccounts {
     /// Get initial collateral token info.
     ///
     /// Only available for increase and swap orders.
@@ -712,7 +712,7 @@ impl TokenAccounts {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OrderParams {
+pub struct OrderActionParams {
     /// Kind.
     kind: u8,
     /// Order side.
@@ -745,7 +745,7 @@ pub struct OrderParams {
     reserved: [u8; 64],
 }
 
-impl OrderParams {
+impl OrderActionParams {
     const DEFAULT_VALID_FROM_TS: i64 = 0;
 
     pub(crate) fn init_swap(

@@ -9,8 +9,8 @@ use typed_builder::TypedBuilder;
 use crate::{
     events::{DepositExecuted, EventEmitter, MarketFeesUpdated, WithdrawalExecuted},
     states::{
-        common::swap::SwapParams,
-        deposit::DepositParams,
+        common::swap::SwapActionParams,
+        deposit::DepositActionParams,
         market::{
             revertible::{
                 liquidity_market::RevertibleLiquidityMarket,
@@ -21,8 +21,8 @@ use crate::{
             utils::ValidateMarketBalances,
             HasMarketMeta,
         },
-        withdrawal::WithdrawalParams,
-        Deposit, Market, Oracle, ShiftParams, Store,
+        withdrawal::WithdrawalActionParams,
+        Deposit, Market, Oracle, ShiftActionParams, Store,
     },
     CoreError, ModelError,
 };
@@ -130,7 +130,7 @@ pub struct RevertibleLiquidityMarketOperation<'a, 'info> {
     market: &'a AccountLoader<'info, Market>,
     market_token_mint: &'a mut Account<'info, Mint>,
     token_program: AccountInfo<'info>,
-    swap: Option<&'a SwapParams>,
+    swap: Option<&'a SwapActionParams>,
     swap_markets: Vec<AccountLoader<'info, Market>>,
     event_emitter: EventEmitter<'a, 'info>,
 }
@@ -142,7 +142,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
         market: &'a AccountLoader<'info, Market>,
         market_token_mint: &'a mut Account<'info, Mint>,
         token_program: AccountInfo<'info>,
-        swap: Option<&'a SwapParams>,
+        swap: Option<&'a SwapActionParams>,
         remaining_accounts: &'info [AccountInfo<'info>],
         event_emitter: EventEmitter<'a, 'info>,
     ) -> Result<Self> {
@@ -194,7 +194,7 @@ impl<'info> RevertibleLiquidityMarketOperation<'_, 'info> {
 pub(crate) struct Execute<'a, 'info, T = ()> {
     pub(crate) output: T,
     oracle: &'a Oracle,
-    swap: Option<&'a SwapParams>,
+    swap: Option<&'a SwapActionParams>,
     market: RevertibleLiquidityMarket<'a, 'info>,
     swap_markets: SwapMarkets<'a, 'info>,
     event_emitter: EventEmitter<'a, 'info>,
@@ -275,7 +275,11 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         Ok(())
     }
 
-    fn validate_first_deposit(&self, receiver: &Pubkey, params: &DepositParams) -> Result<()> {
+    fn validate_first_deposit(
+        &self,
+        receiver: &Pubkey,
+        params: &DepositActionParams,
+    ) -> Result<()> {
         if self.market().market_token().supply == 0 {
             Deposit::validate_first_deposit(
                 receiver,
@@ -300,7 +304,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         mut self,
         receiver: &Pubkey,
         market_token_receiver: &'a AccountInfo<'info>,
-        params: &DepositParams,
+        params: &DepositActionParams,
         initial_tokens: (Option<Pubkey>, Option<Pubkey>),
         swap_pricing_kind: Option<SwapPricingKind>,
     ) -> Result<Execute<'a, 'info, u64>> {
@@ -384,7 +388,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
     pub(crate) fn unchecked_withdraw(
         mut self,
         market_token_vault: &'a AccountInfo<'info>,
-        params: &WithdrawalParams,
+        params: &WithdrawalActionParams,
         final_tokens: (Pubkey, Pubkey),
         swap_pricing_kind: Option<SwapPricingKind>,
     ) -> Result<Execute<'a, 'info, (u64, u64)>> {
@@ -486,7 +490,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         self,
         mut to_market: Self,
         receiver: &Pubkey,
-        params: &ShiftParams,
+        params: &ShiftActionParams,
         from_market_token_vault: &'a AccountInfo<'info>,
         to_market_token_account: &'a AccountInfo<'info>,
     ) -> Result<(Self, Self, u64)> {
@@ -496,7 +500,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         // Perform the shift-withdrawal.
         let (mut from_market, (long_amount, short_amount)) = {
             let (op, output) = self.take_output(());
-            let mut withdrawal_params = WithdrawalParams::default();
+            let mut withdrawal_params = WithdrawalActionParams::default();
             withdrawal_params.market_token_amount = params.from_market_token_amount;
             op.unchecked_withdraw(
                 from_market_token_vault,
@@ -532,7 +536,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         // Perform the shift-deposit.
         let (to_market, received) = {
             let (op, output) = to_market.take_output(());
-            let mut deposit_params = DepositParams::default();
+            let mut deposit_params = DepositActionParams::default();
             deposit_params.initial_long_token_amount = long_amount;
             deposit_params.initial_short_token_amount = short_amount;
             deposit_params.min_market_token_amount = params.min_to_market_token_amount;

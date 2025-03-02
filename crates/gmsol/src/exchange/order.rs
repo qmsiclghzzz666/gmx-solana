@@ -22,7 +22,7 @@ use gmsol_store::{
     accounts, instruction,
     ops::order::CreateOrderParams,
     states::{
-        common::{action::Action, swap::SwapParams, TokensWithFeed},
+        common::{action::Action, swap::SwapActionParams, TokensWithFeed},
         order::{Order, OrderKind},
         position::PositionKind,
         user::UserHeader,
@@ -648,7 +648,7 @@ pub struct ExecuteOrderHint {
     pnl_token: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    swap: SwapParams,
+    swap: SwapActionParams,
     should_unwrap_native_token: bool,
 }
 

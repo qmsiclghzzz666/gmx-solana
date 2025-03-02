@@ -5,7 +5,7 @@ use crate::{events::WithdrawalRemoved, CoreError};
 use super::{
     common::{
         action::{Action, ActionHeader, Closable},
-        swap::SwapParams,
+        swap::SwapActionParams,
         token::TokenAndAccount,
     },
     Seed,
@@ -19,11 +19,11 @@ pub struct Withdrawal {
     /// Action header.
     pub(crate) header: ActionHeader,
     /// Token accounts.
-    pub(crate) tokens: TokenAccounts,
+    pub(crate) tokens: WithdrawalTokenAccounts,
     /// Withdrawal params.
-    pub(crate) params: WithdrawalParams,
+    pub(crate) params: WithdrawalActionParams,
     /// Swap params.
-    pub(crate) swap: SwapParams,
+    pub(crate) swap: SwapActionParams,
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 4],
     #[cfg_attr(feature = "debug", debug(skip))]
@@ -33,12 +33,12 @@ pub struct Withdrawal {
 
 impl Withdrawal {
     /// Get tokens and accounts.
-    pub fn tokens(&self) -> &TokenAccounts {
+    pub fn tokens(&self) -> &WithdrawalTokenAccounts {
         &self.tokens
     }
 
     /// Get the swap params.
-    pub fn swap(&self) -> &SwapParams {
+    pub fn swap(&self) -> &SwapActionParams {
         &self.swap
     }
 }
@@ -80,7 +80,7 @@ impl Closable for Withdrawal {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TokenAccounts {
+pub struct WithdrawalTokenAccounts {
     /// Final long token accounts.
     pub(crate) final_long_token: TokenAndAccount,
     /// Final short token accounts.
@@ -92,7 +92,7 @@ pub struct TokenAccounts {
     reserved: [u8; 128],
 }
 
-impl TokenAccounts {
+impl WithdrawalTokenAccounts {
     /// Get market token.
     pub fn market_token(&self) -> Pubkey {
         self.market_token.token().expect("must exist")
@@ -128,7 +128,7 @@ impl TokenAccounts {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct WithdrawalParams {
+pub struct WithdrawalActionParams {
     /// Market token amount to burn.
     pub market_token_amount: u64,
     /// The minimum acceptable amount of final long tokens to receive.
@@ -140,7 +140,7 @@ pub struct WithdrawalParams {
     reserved: [u8; 64],
 }
 
-impl Default for WithdrawalParams {
+impl Default for WithdrawalActionParams {
     fn default() -> Self {
         Self {
             reserved: [0; 64],
@@ -151,7 +151,7 @@ impl Default for WithdrawalParams {
     }
 }
 
-impl WithdrawalParams {
+impl WithdrawalActionParams {
     pub(crate) fn validate_output_amounts(
         &self,
         long_amount: u64,

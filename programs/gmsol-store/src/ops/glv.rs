@@ -15,7 +15,7 @@ use crate::{
         common::action::{Action, ActionExt, ActionParams, ActionSigner},
         glv::{GlvShift, GlvWithdrawal},
         market::revertible::Revertible,
-        withdrawal::WithdrawalParams,
+        withdrawal::WithdrawalActionParams,
         Glv, GlvDeposit, HasMarketMeta, Market, NonceBytes, Oracle, Shift, Store,
         ValidateOracleTime,
     },
@@ -848,7 +848,7 @@ impl ExecuteGlvWithdrawalOperation<'_, '_> {
             );
 
             let executed = {
-                let mut params = WithdrawalParams::default();
+                let mut params = WithdrawalActionParams::default();
                 params.market_token_amount = market_token_amount;
                 params.min_long_token_amount = withdrawal.params.min_final_long_token_amount;
                 params.min_short_token_amount = withdrawal.params.min_final_short_token_amount;

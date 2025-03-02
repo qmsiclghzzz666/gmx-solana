@@ -19,7 +19,7 @@ use gmsol_store::{
     states::{
         common::{
             action::Action,
-            swap::{HasSwapParams, SwapParams},
+            swap::{HasSwapParams, SwapActionParams},
             TokensWithFeed,
         },
         Glv, GlvDeposit, HasMarketMeta, NonceBytes, PriceProviderKind, TokenMapAccess,
@@ -595,7 +595,7 @@ pub struct ExecuteGlvDepositHint {
     initial_long_token_escrow: Option<Pubkey>,
     initial_short_token_escrow: Option<Pubkey>,
     glv_token_escrow: Pubkey,
-    swap: SwapParams,
+    swap: SwapActionParams,
     /// Feeds.
     pub feeds: TokensWithFeed,
     should_unwrap_native_token: bool,
