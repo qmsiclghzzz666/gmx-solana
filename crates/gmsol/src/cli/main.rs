@@ -390,6 +390,7 @@ impl Cli {
                 args.run(&client, &store, instruction_buffer_ctx, self.serialize_only)
                     .await?
             }
+            #[cfg(feature = "migration")]
             Command::Migrate(args) => {
                 args.run(
                     &client,
