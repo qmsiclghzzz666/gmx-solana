@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Fixed incorrect slot used as the publishing slot for a Switchboard feed price. Now the `SbFeed::result_land_slot()` is used instead.
 - programs: Fixed heartbeat validation for Switchboard to be based on `SbFeed::result_ts()`.
 - programs: Fixed the issue of not updating the borrowing states of markets in the swap path.
+- programs: Fixed the issue of max PnL not being validated when depositing GM tokens(market tokens) directly into GLV.
 
 ## [0.3.0] - 2025-02-18
 

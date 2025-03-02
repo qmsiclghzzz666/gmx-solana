@@ -5,7 +5,7 @@ use anchor_spl::{
     token::{transfer_checked, Mint, TokenAccount, TransferChecked},
     token_interface,
 };
-use gmsol_model::price::Prices;
+use gmsol_model::{price::Prices, BaseMarketExt, PnlFactorKind};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -353,6 +353,20 @@ impl ExecuteGlvDepositOperation<'_, '_> {
             )?;
 
             let mut op = market.op()?;
+
+            if market_token_amount != 0 {
+                // The Max PnL validation here helps prevent a malicious user from using GLV
+                // to "withdraw" from a high-risk market, something that would normally be
+                // blocked in other paths (like withdrawals or shift-withdrawal).
+                let prices = self.oracle.market_prices(op.market())?;
+                op.market()
+                    .validate_max_pnl(
+                        &prices,
+                        PnlFactorKind::MaxAfterWithdrawal,
+                        PnlFactorKind::MaxAfterWithdrawal,
+                    )
+                    .map_err(ModelError::from)?;
+            }
 
             if deposit.is_market_deposit_required() {
                 let executed = op.unchecked_deposit(
@@ -1064,7 +1078,7 @@ fn get_glv_value_for_market<M>(
 where
     M: gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }, Num = u128, Signed = i128>,
 {
-    use gmsol_model::{utils, LiquidityMarketExt, PnlFactorKind};
+    use gmsol_model::{utils, LiquidityMarketExt};
 
     let value = market
         .pool_value(prices, PnlFactorKind::MaxAfterDeposit, maximize)
