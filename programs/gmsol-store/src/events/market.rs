@@ -94,6 +94,75 @@ impl BorrowingFeesUpdated {
     }
 }
 
+/// A pool for market.
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace)]
+pub struct EventPool {
+    /// Whether the pool only contains one kind of token,
+    /// i.e. a pure pool.
+    /// For a pure pool, only the `long_token_amount` field is used.
+    pub is_pure: u8,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "debug", debug(skip))]
+    pub(crate) padding: [u8; 15],
+    /// Long token amount.
+    pub long_token_amount: u128,
+    /// Short token amount.
+    pub short_token_amount: u128,
+}
+
+static_assertions::const_assert_eq!(EventPool::INIT_SPACE, Pool::INIT_SPACE);
+
+/// Market clocks.
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace)]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EventClocks {
+    #[cfg_attr(feature = "debug", debug(skip))]
+    pub(crate) padding: [u8; 8],
+    /// Revision.
+    pub rev: u64,
+    /// Price impact distribution clock.
+    pub price_impact_distribution: i64,
+    /// Borrowing clock.
+    pub borrowing: i64,
+    /// Funding clock.
+    pub funding: i64,
+    /// ADL updated clock for long.
+    pub adl_for_long: i64,
+    /// ADL updated clock for short.
+    pub adl_for_short: i64,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    pub(crate) reserved: [i64; 3],
+}
+
+static_assertions::const_assert_eq!(EventClocks::INIT_SPACE, Clocks::INIT_SPACE);
+
+/// Market State.
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace)]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EventOtherState {
+    #[cfg_attr(feature = "debug", debug(skip))]
+    pub(crate) padding: [u8; 16],
+    /// Revision.
+    pub rev: u64,
+    /// Trade count.
+    pub trade_count: u64,
+    /// Long token balance.
+    pub long_token_balance: u64,
+    /// Short token balance.
+    pub short_token_balance: u64,
+    /// Funding factor per second.
+    pub funding_factor_per_second: i128,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    pub(crate) reserved: [u8; 256],
+}
+
+static_assertions::const_assert_eq!(EventOtherState::INIT_SPACE, OtherState::INIT_SPACE);
+
 /// Market State Updated Event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -105,11 +174,11 @@ pub struct MarketStateUpdated {
     /// Updated pool kinds.
     pool_kinds: Vec<PoolKind>,
     /// Updated pools.
-    pools: Vec<Pool>,
+    pools: Vec<EventPool>,
     /// Clocks.
-    clocks: Vec<Clocks>,
+    clocks: Vec<EventClocks>,
     /// Other states.
-    other: Vec<OtherState>,
+    other: Vec<EventOtherState>,
 }
 
 impl MarketStateUpdated {
@@ -130,17 +199,17 @@ impl MarketStateUpdated {
     }
 
     /// Get updated pools.
-    pub fn pools(&self) -> impl Iterator<Item = (PoolKind, &Pool)> {
+    pub fn pools(&self) -> impl Iterator<Item = (PoolKind, &EventPool)> {
         self.pool_kinds.iter().copied().zip(self.pools.iter())
     }
 
     /// Get updated clocks.
-    pub fn clocks(&self) -> Option<&Clocks> {
+    pub fn clocks(&self) -> Option<&EventClocks> {
         self.clocks.first()
     }
 
     /// Get updated other state.
-    pub fn other(&self) -> Option<&OtherState> {
+    pub fn other(&self) -> Option<&EventOtherState> {
         self.other.first()
     }
 }

@@ -255,3 +255,37 @@ impl Pools {
         Some(pool)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::events::EventPool;
+
+    #[test]
+    fn test_event_pool() {
+        let pool = Pool {
+            is_pure: PURE_VALUE,
+            padding: Default::default(),
+            long_token_amount: u128::MAX,
+            short_token_amount: u128::MAX,
+        };
+
+        let event_pool = EventPool {
+            is_pure: pool.is_pure,
+            padding: pool.padding,
+            long_token_amount: pool.long_token_amount,
+            short_token_amount: pool.short_token_amount,
+        };
+
+        let mut data = Vec::with_capacity(Pool::INIT_SPACE);
+        pool.serialize(&mut data)
+            .expect("failed to serialize `Pool`");
+
+        let mut event_data = Vec::with_capacity(Pool::INIT_SPACE);
+        event_pool
+            .serialize(&mut event_data)
+            .expect("failed to serialize `EventPool`");
+
+        assert_eq!(data, event_data);
+    }
+}

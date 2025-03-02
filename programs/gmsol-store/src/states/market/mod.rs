@@ -738,3 +738,81 @@ impl Indexer {
         Ok(next_id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::events::{EventClocks, EventOtherState};
+
+    #[test]
+    fn test_event_clocks() {
+        let clocks = Clocks {
+            padding: Default::default(),
+            rev: u64::MAX,
+            price_impact_distribution: i64::MAX,
+            borrowing: i64::MAX,
+            funding: i64::MAX,
+            adl_for_long: i64::MAX,
+            adl_for_short: i64::MAX,
+            reserved: Default::default(),
+        };
+
+        let event_clocks = EventClocks {
+            padding: clocks.padding,
+            rev: clocks.rev,
+            price_impact_distribution: clocks.price_impact_distribution,
+            borrowing: clocks.borrowing,
+            funding: clocks.funding,
+            adl_for_long: clocks.adl_for_long,
+            adl_for_short: clocks.adl_for_short,
+            reserved: clocks.reserved,
+        };
+
+        let mut data = Vec::with_capacity(Pool::INIT_SPACE);
+        clocks
+            .serialize(&mut data)
+            .expect("failed to serialize `Clocks`");
+
+        let mut event_data = Vec::with_capacity(Pool::INIT_SPACE);
+        event_clocks
+            .serialize(&mut event_data)
+            .expect("failed to serialize `EventClocks`");
+
+        assert_eq!(data, event_data);
+    }
+
+    #[test]
+    fn test_event_other_state() {
+        let clocks = OtherState {
+            padding: Default::default(),
+            rev: u64::MAX,
+            trade_count: u64::MAX,
+            long_token_balance: u64::MAX,
+            short_token_balance: u64::MAX,
+            funding_factor_per_second: i128::MAX,
+            reserved: [0; 256],
+        };
+
+        let event_clocks = EventOtherState {
+            padding: clocks.padding,
+            rev: clocks.rev,
+            trade_count: clocks.trade_count,
+            long_token_balance: clocks.long_token_balance,
+            short_token_balance: clocks.short_token_balance,
+            funding_factor_per_second: clocks.funding_factor_per_second,
+            reserved: clocks.reserved,
+        };
+
+        let mut data = Vec::with_capacity(Pool::INIT_SPACE);
+        clocks
+            .serialize(&mut data)
+            .expect("failed to serialize `OtherState`");
+
+        let mut event_data = Vec::with_capacity(Pool::INIT_SPACE);
+        event_clocks
+            .serialize(&mut event_data)
+            .expect("failed to serialize `EventOtherState`");
+
+        assert_eq!(data, event_data);
+    }
+}
