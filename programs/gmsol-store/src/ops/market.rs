@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use gmsol_model::{
-    price::Prices, Bank, LiquidityMarketMutExt, MarketAction, PerpMarketMutExt,
-    PositionImpactMarketMutExt,
+    price::Prices, Bank, BorrowingFeeMarketMutExt, LiquidityMarketMutExt, MarketAction,
+    PerpMarketMutExt, PositionImpactMarketMutExt,
 };
 use typed_builder::TypedBuilder;
 

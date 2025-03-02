@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Changed the index type for `Glv` to `u16`.
 - programs: Changed the index type for `TreasuryVaultConfig` to `u16`.
 - programs: Replaced `ReferralCode` with `ReferralCodeV2`.
+- model: Separated `BorrowingFeeMarketMut` trait from the `PerpMarketMut` trait.
 - sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function.
 - tests: Renamed `anchor_tests` testing suite to `anchor_test` in the `gmsol` tests.
 - Updated dependencies:
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Added `accept_referral_code` instruction to complete the referral code transfer.
 - programs: Added `cancel_referral_code_transfer` instruction to cancel a referral code transfer.
 - programs: Added `migrate_referral_code` instruction for `ReferralCode` account migration.
+- programs: Added a new `BorrowingFeesUpdated` CPI event.
 - sdk: Added the `gmsol::cli` module.
 - sdk: Added `SwitchboardPullOracleFactory` structure.
 - sdk: Added support for `accept_referral_code` and `cancel_referral_code_transfer` instructions.
@@ -67,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Fixed inconsistent market token balance validation for `GlvDepositOperation`.
 - programs: Fixed incorrect slot used as the publishing slot for a Switchboard feed price. Now the `SbFeed::result_land_slot()` is used instead.
 - programs: Fixed heartbeat validation for Switchboard to be based on `SbFeed::result_ts()`.
+- programs: Fixed the issue of not updating the borrowing states of markets in the swap path.
 
 ## [0.3.0] - 2025-02-18
 

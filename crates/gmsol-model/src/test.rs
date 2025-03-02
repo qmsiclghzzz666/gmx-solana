@@ -11,8 +11,8 @@ use crate::{
     clock::ClockKind,
     fixed::FixedPointOps,
     market::{
-        BaseMarket, LiquidityMarket, LiquidityMarketMut, PerpMarket, PnlFactorKind,
-        PositionImpactMarket, SwapMarket,
+        BaseMarket, BorrowingFeeMarketMut, LiquidityMarket, LiquidityMarketMut, PerpMarket,
+        PnlFactorKind, PositionImpactMarket, SwapMarket,
     },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::{
@@ -678,6 +678,20 @@ where
     }
 }
 
+impl<T, const DECIMALS: u8> BorrowingFeeMarketMut<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        Ok(&mut self.borrowing_factor)
+    }
+
+    fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::Borrowing)
+    }
+}
+
 impl<T, const DECIMALS: u8> PerpMarket<DECIMALS> for TestMarket<T, DECIMALS>
 where
     T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
@@ -759,10 +773,6 @@ where
         }
     }
 
-    fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
-        Ok(&mut self.borrowing_factor)
-    }
-
     fn funding_amount_per_size_pool_mut(
         &mut self,
         is_long: bool,
@@ -795,10 +805,6 @@ where
 
     fn total_borrowing_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
         Ok(&mut self.total_borrowing)
-    }
-
-    fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64> {
-        self.just_passed_in_seconds(ClockKind::Borrowing)
     }
 
     fn just_passed_in_seconds_for_funding(&mut self) -> crate::Result<u64> {

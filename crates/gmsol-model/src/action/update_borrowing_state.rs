@@ -1,8 +1,8 @@
 use crate::{
-    market::{BaseMarket, BorrowingFeeMarketExt},
+    market::{BaseMarket, BorrowingFeeMarketExt, BorrowingFeeMarketMut},
     num::Unsigned,
     price::Prices,
-    PerpMarketMut, PoolExt,
+    PoolExt,
 };
 
 use super::MarketAction;
@@ -14,7 +14,7 @@ pub struct UpdateBorrowingState<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
     prices: Prices<M::Num>,
 }
 
-impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateBorrowingState<M, DECIMALS> {
+impl<M: BorrowingFeeMarketMut<DECIMALS>, const DECIMALS: u8> UpdateBorrowingState<M, DECIMALS> {
     /// Create a new [`UpdateBorrowingState`] action.
     pub fn try_new(market: M, prices: &Prices<M::Num>) -> crate::Result<Self> {
         prices.validate()?;
@@ -39,7 +39,7 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateBorrowingState<M, DEC
     }
 }
 
-impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> MarketAction
+impl<M: BorrowingFeeMarketMut<DECIMALS>, const DECIMALS: u8> MarketAction
     for UpdateBorrowingState<M, DECIMALS>
 {
     type Report = UpdateBorrowingReport<M::Num>;

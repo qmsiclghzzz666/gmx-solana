@@ -1,6 +1,7 @@
 use num_traits::{CheckedAdd, CheckedSub, Zero};
 
 use crate::{
+    action::update_borrowing_state::UpdateBorrowingState,
     params::fee::{BorrowingFeeKinkModelParams, BorrowingFeeParams},
     price::Prices,
     Balance, BalanceExt, BaseMarket, BaseMarketExt,
@@ -164,5 +165,47 @@ pub trait BorrowingFeeMarketExt<const DECIMALS: u8>: BorrowingFeeMarket<DECIMALS
 
 impl<M: BorrowingFeeMarket<DECIMALS> + ?Sized, const DECIMALS: u8> BorrowingFeeMarketExt<DECIMALS>
     for M
+{
+}
+
+/// A market that can update the borrowing fees.
+pub trait BorrowingFeeMarketMut<const DECIMALS: u8>: BorrowingFeeMarket<DECIMALS> {
+    /// Get the just passed time in seconds for the given kind of clock.
+    fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64>;
+
+    /// Get borrowing factor pool mutably.
+    /// # Requirements
+    /// - This method must return `Ok` if [`BorrowingFeeMarket::borrowing_factor_pool`] does.
+    fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
+}
+
+impl<M: BorrowingFeeMarketMut<DECIMALS>, const DECIMALS: u8> BorrowingFeeMarketMut<DECIMALS>
+    for &mut M
+{
+    fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64> {
+        (**self).just_passed_in_seconds_for_borrowing()
+    }
+
+    fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        (**self).borrowing_factor_pool_mut()
+    }
+}
+
+/// Extension trait for [`BorrowingFeeMarketMut`].
+pub trait BorrowingFeeMarketMutExt<const DECIMALS: u8>: BorrowingFeeMarketMut<DECIMALS> {
+    /// Create a [`UpdateBorrowingState`] action.
+    fn update_borrowing(
+        &mut self,
+        prices: &Prices<Self::Num>,
+    ) -> crate::Result<UpdateBorrowingState<&mut Self, DECIMALS>>
+    where
+        Self: Sized,
+    {
+        UpdateBorrowingState::try_new(self, prices)
+    }
+}
+
+impl<M: BorrowingFeeMarketMut<DECIMALS> + ?Sized, const DECIMALS: u8>
+    BorrowingFeeMarketMutExt<DECIMALS> for M
 {
 }

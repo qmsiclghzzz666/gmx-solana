@@ -311,6 +311,18 @@ impl gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }>
     }
 }
 
+impl gmsol_model::BorrowingFeeMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket<'_, '_>
+{
+    fn just_passed_in_seconds_for_borrowing(&mut self) -> gmsol_model::Result<u64> {
+        self.base.just_passed_in_seconds_for_borrowing()
+    }
+
+    fn borrowing_factor_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.base.borrowing_factor_pool_mut()
+    }
+}
+
 impl gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }>
     for RevertibleLiquidityMarket<'_, '_>
 {

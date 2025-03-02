@@ -513,11 +513,19 @@ impl gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarke
     }
 }
 
-impl gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'_, '_> {
+impl gmsol_model::BorrowingFeeMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket<'_, '_>
+{
     fn just_passed_in_seconds_for_borrowing(&mut self) -> gmsol_model::Result<u64> {
         AsClockMut::from(&mut self.clocks_mut().borrowing).just_passed_in_seconds()
     }
 
+    fn borrowing_factor_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(PoolKind::BorrowingFactor)
+    }
+}
+
+impl gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'_, '_> {
     fn just_passed_in_seconds_for_funding(&mut self) -> gmsol_model::Result<u64> {
         AsClockMut::from(&mut self.clocks_mut().funding).just_passed_in_seconds()
     }
@@ -543,10 +551,6 @@ impl gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMa
         } else {
             PoolKind::OpenInterestInTokensForShort
         })
-    }
-
-    fn borrowing_factor_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
-        self.pool_mut(PoolKind::BorrowingFactor)
     }
 
     fn funding_amount_per_size_pool_mut(

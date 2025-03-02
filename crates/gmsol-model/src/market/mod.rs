@@ -20,7 +20,9 @@ pub(crate) mod utils;
 
 pub use self::{
     base::{BaseMarket, BaseMarketExt, BaseMarketMut, BaseMarketMutExt, PnlFactorKind},
-    borrowing::{BorrowingFeeMarket, BorrowingFeeMarketExt},
+    borrowing::{
+        BorrowingFeeMarket, BorrowingFeeMarketExt, BorrowingFeeMarketMut, BorrowingFeeMarketMutExt,
+    },
     liquidity::{LiquidityMarket, LiquidityMarketExt, LiquidityMarketMut, LiquidityMarketMutExt},
     perp::{PerpMarket, PerpMarketExt, PerpMarketMut, PerpMarketMutExt},
     position_impact::{

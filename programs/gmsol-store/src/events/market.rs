@@ -61,6 +61,39 @@ impl MarketFeesUpdated {
     }
 }
 
+/// Market borrowing fees updated event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct BorrowingFeesUpdated {
+    /// Revision.
+    pub rev: u64,
+    /// Market token.
+    pub market_token: Pubkey,
+    /// Update borrowing state report.
+    pub update_borrowing_state: UpdateBorrowingReport<u128>,
+}
+
+impl gmsol_utils::InitSpace for BorrowingFeesUpdated {
+    const INIT_SPACE: usize = 8 + 32 + UpdateBorrowingReport::<u128>::INIT_SPACE;
+}
+
+impl Event for BorrowingFeesUpdated {}
+
+impl BorrowingFeesUpdated {
+    /// Create from report.
+    pub fn from_report(
+        rev: u64,
+        market_token: Pubkey,
+        update_borrowing_state: UpdateBorrowingReport<u128>,
+    ) -> Self {
+        Self {
+            rev,
+            market_token,
+            update_borrowing_state,
+        }
+    }
+}
+
 /// Market State Updated Event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]

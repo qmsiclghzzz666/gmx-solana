@@ -1,7 +1,5 @@
 use crate::{
-    action::{
-        update_borrowing_state::UpdateBorrowingState, update_funding_state::UpdateFundingState,
-    },
+    action::update_funding_state::UpdateFundingState,
     num::Unsigned,
     params::{
         fee::{FundingFeeParams, LiquidationFeeParams},
@@ -54,9 +52,6 @@ pub trait PerpMarketMut<const DECIMALS: u8>:
     SwapMarketMut<DECIMALS> + PositionImpactMarketMut<DECIMALS> + PerpMarket<DECIMALS>
 {
     /// Get the just passed time in seconds for the given kind of clock.
-    fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64>;
-
-    /// Get the just passed time in seconds for the given kind of clock.
     fn just_passed_in_seconds_for_funding(&mut self) -> crate::Result<u64>;
 
     /// Get funding factor per second mutably.
@@ -74,11 +69,6 @@ pub trait PerpMarketMut<const DECIMALS: u8>:
     ///   [`BaseMarket::open_interest_in_tokens_pool`](crate::BaseMarket::open_interest_in_tokens_pool) does.
     fn open_interest_in_tokens_pool_mut(&mut self, is_long: bool)
         -> crate::Result<&mut Self::Pool>;
-
-    /// Get borrowing factor pool mutably.
-    /// # Requirements
-    /// - This method must return `Ok` if [`BorrowingFeeMarket::borrowing_factor_pool`] does.
-    fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
 
     /// Get funding amount per size pool mutably.
     /// # Requirements
@@ -172,10 +162,6 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> PerpMarketMut<DECIMALS> for
         (**self).open_interest_in_tokens_pool_mut(is_long)
     }
 
-    fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
-        (**self).borrowing_factor_pool_mut()
-    }
-
     fn funding_amount_per_size_pool_mut(
         &mut self,
         is_long: bool,
@@ -196,10 +182,6 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> PerpMarketMut<DECIMALS> for
 
     fn total_borrowing_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
         (**self).total_borrowing_pool_mut()
-    }
-
-    fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64> {
-        (**self).just_passed_in_seconds_for_borrowing()
     }
 
     fn just_passed_in_seconds_for_funding(&mut self) -> crate::Result<u64> {
@@ -370,17 +352,6 @@ impl<M: PerpMarket<DECIMALS>, const DECIMALS: u8> PerpMarketExt<DECIMALS> for M 
 
 /// Extension trait for [`PerpMarketMut`].
 pub trait PerpMarketMutExt<const DECIMALS: u8>: PerpMarketMut<DECIMALS> {
-    /// Create a [`UpdateBorrowingState`] action.
-    fn update_borrowing(
-        &mut self,
-        prices: &Prices<Self::Num>,
-    ) -> crate::Result<UpdateBorrowingState<&mut Self, DECIMALS>>
-    where
-        Self: Sized,
-    {
-        UpdateBorrowingState::try_new(self, prices)
-    }
-
     /// Create a [`UpdateFundingState`] action.
     fn update_funding(
         &mut self,

@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
-use gmsol_model::{Bank, MarketAction, SwapMarketMutExt};
+use gmsol_model::{Bank, BorrowingFeeMarketMutExt, MarketAction, SwapMarketMutExt};
 use indexmap::{map::Entry, IndexMap};
 
 use crate::{
     constants,
-    events::{EventEmitter, SwapExecuted},
+    events::{BorrowingFeesUpdated, EventEmitter, SwapExecuted},
     states::{
         common::swap::SwapParams, market::utils::ValidateMarketBalances, HasMarketMeta, Market,
         Oracle,
@@ -75,7 +75,8 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
             + Revision
             + HasMarketMeta
             + gmsol_model::Bank<Pubkey, Num = u64>
-            + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>,
+            + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>
+            + gmsol_model::BorrowingFeeMarketMut<{ constants::MARKET_DECIMALS }>,
     {
         let long_path = params.validated_primary_swap_path()?;
         let long_output_amount = token_ins
@@ -210,6 +211,21 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
             }
             let side = market.market_meta().to_token_side(token_in)?;
             let prices = oracle.market_prices(market)?;
+            // Update borrowing state.
+            {
+                let report = market
+                    .update_borrowing(&prices)
+                    .map_err(ModelError::from)?
+                    .execute()
+                    .map_err(ModelError::from)?;
+                market
+                    .event_emitter()
+                    .emit_cpi(&BorrowingFeesUpdated::from_report(
+                        market.rev(),
+                        *market_token,
+                        report,
+                    ))?;
+            }
             let report = market
                 .swap(side, (*token_in_amount).into(), prices)
                 .map_err(ModelError::from)?
