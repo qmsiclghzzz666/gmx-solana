@@ -3,6 +3,7 @@ name = "gmsol-mock-chainlink-verifier"
 version.workspace = true
 edition.workspace = true
 license-file.workspace = true
+description.workspace = true
 repository.workspace = true
 documentation = "https://docs.rs/gmsol-mock-chainlink-verifier"
 readme.workspace = true

@@ -3,6 +3,7 @@ name = "gmsol-treasury"
 version.workspace = true
 edition.workspace = true
 license-file.workspace = true
+description.workspace = true
 repository.workspace = true
 documentation = "https://docs.rs/gmsol-treasury"
 readme.workspace = true

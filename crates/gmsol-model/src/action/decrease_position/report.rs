@@ -1,5 +1,6 @@
 use std::fmt;
 
+#[cfg(feature = "anchor-lang")]
 use anchor_lang::Space;
 
 use crate::{num::Unsigned, params::fee::PositionFees, position::InsolventCloseStep};

@@ -3,6 +3,7 @@ name = "gmsol-solana-utils"
 version.workspace = true
 edition.workspace = true
 license-file.workspace = true
+description.workspace = true
 repository.workspace = true
 documentation = "https://docs.rs/gmsol-solana-utils"
 readme.workspace = true
