@@ -7,6 +7,7 @@ description.workspace = true
 repository.workspace = true
 documentation = "https://docs.rs/gmsol-solana-utils"
 readme.workspace = true
+keywords.workspace = true
 
 [features]
 serde = ["dep:serde"]

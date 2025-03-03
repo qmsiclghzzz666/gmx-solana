@@ -9,6 +9,7 @@ license-file = "LICENSE"
 description = "GMX-Solana is an extension of GMX on the Solana blockchain."
 repository = "https://github.com/gmsol-labs/gmx-solana"
 readme = "README.md"
+keywords = ["gmx-solana", "gmx", "solana"]
 
 [workspace.dependencies]
 anchor-client = "0.30.1"
