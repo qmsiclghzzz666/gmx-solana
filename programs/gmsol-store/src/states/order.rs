@@ -158,6 +158,37 @@ pub struct TransferOut {
     pub short_token_for_claimable_account_of_holding: u64,
 }
 
+#[cfg(test)]
+impl From<crate::events::EventTransferOut> for TransferOut {
+    fn from(event: crate::events::EventTransferOut) -> Self {
+        let crate::events::EventTransferOut {
+            executed,
+            padding_0,
+            final_output_token,
+            secondary_output_token,
+            long_token,
+            short_token,
+            long_token_for_claimable_account_of_user,
+            short_token_for_claimable_account_of_user,
+            long_token_for_claimable_account_of_holding,
+            short_token_for_claimable_account_of_holding,
+        } = event;
+
+        Self {
+            executed,
+            padding_0,
+            final_output_token,
+            secondary_output_token,
+            long_token,
+            short_token,
+            long_token_for_claimable_account_of_user,
+            short_token_for_claimable_account_of_user,
+            long_token_for_claimable_account_of_holding,
+            short_token_for_claimable_account_of_holding,
+        }
+    }
+}
+
 /// Recevier Kind.
 pub enum CollateralReceiver {
     Collateral,

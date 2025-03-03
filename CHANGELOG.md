@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `GtState` (in `states::user`) -> `UserGtState`
 
 - programs: Replaced `Pool`, `Clocks`, and `OtherState` with `EventPool`, `EventClocks`, and `EventOtherState` in the `MarketStateUpdated` event.
+- programs: Redefined the `TradeEvent` structure to resolve `declare_program!` errors.
 
 - model: Separated `BorrowingFeeMarketMut` trait from the `PerpMarketMut` trait.
 - sdk: Changed the arguments of `SwitchboardPullOracle::from_parts` function.

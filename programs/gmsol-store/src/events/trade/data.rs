@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytemuck::Zeroable;
@@ -18,178 +16,11 @@ use crate::{
     CoreError,
 };
 
-use super::Event;
-
-/// Trade event.
-#[event]
-#[derive(Clone)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TradeEvent(TradeData);
-
-impl Deref for TradeEvent {
-    type Target = TradeData;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[cfg(feature = "utils")]
-impl TradeEvent {
-    /// Updated at.
-    pub fn updated_at(&self) -> i64 {
-        self.after.increased_at.max(self.after.decreased_at)
-    }
-
-    /// Delta size in usd.
-    pub fn delta_size_in_usd(&self) -> u128 {
-        self.after.size_in_usd.abs_diff(self.before.size_in_usd)
-    }
-
-    /// Delta size in tokens.
-    pub fn delta_size_in_tokens(&self) -> u128 {
-        self.after
-            .size_in_tokens
-            .abs_diff(self.before.size_in_tokens)
-    }
-
-    /// Delta collateral amount.
-    pub fn delta_collateral_amount(&self) -> u128 {
-        self.after
-            .collateral_amount
-            .abs_diff(self.before.collateral_amount)
-    }
-
-    /// Delta borrowing factor.
-    pub fn delta_borrowing_factor(&self) -> u128 {
-        self.after
-            .borrowing_factor
-            .abs_diff(self.before.borrowing_factor)
-    }
-
-    /// Delta funding fee amount per size.
-    pub fn delta_funding_fee_amount_per_size(&self) -> u128 {
-        self.after
-            .funding_fee_amount_per_size
-            .abs_diff(self.before.funding_fee_amount_per_size)
-    }
-
-    /// Funding fee amount.
-    pub fn funding_fee(&self) -> u128 {
-        self.delta_funding_fee_amount_per_size()
-            .saturating_mul(self.before.size_in_usd)
-    }
-
-    /// Delta claimable amount per size.
-    pub fn delta_claimable_funding_amount_per_size(&self, is_long_token: bool) -> u128 {
-        if is_long_token {
-            self.after
-                .long_token_claimable_funding_amount_per_size
-                .abs_diff(self.before.long_token_claimable_funding_amount_per_size)
-        } else {
-            self.after
-                .short_token_claimable_funding_amount_per_size
-                .abs_diff(self.before.short_token_claimable_funding_amount_per_size)
-        }
-    }
-
-    /// Create position from this event.
-    pub fn to_position(&self, meta: &impl crate::states::HasMarketMeta) -> Position {
-        use crate::states::position::PositionKind;
-
-        let mut position = Position::default();
-
-        let kind = if self.is_long() {
-            PositionKind::Long
-        } else {
-            PositionKind::Short
-        };
-
-        let collateral_token = if self.is_collateral_long() {
-            meta.market_meta().long_token_mint
-        } else {
-            meta.market_meta().short_token_mint
-        };
-
-        position
-            .try_init(
-                kind,
-                // Note: there's no need to provide a correct bump here for now.
-                0,
-                self.store,
-                &self.user,
-                &self.market_token,
-                &collateral_token,
-            )
-            .unwrap();
-        position.state = self.after;
-        position
-    }
-}
-
-#[cfg(feature = "display")]
-impl std::fmt::Display for TradeEvent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::utils::pubkey::optional_address;
-
-        f.debug_struct("TradeEvent")
-            .field("trade_id", &self.trade_id)
-            .field("store", &self.store.to_string())
-            .field("market_token", &self.market_token.to_string())
-            .field("user", &self.user.to_string())
-            .field("position", &self.position.to_string())
-            .field("order", &self.order.to_string())
-            .field(
-                "final_output_token",
-                &optional_address(&self.final_output_token),
-            )
-            .field("ts", &self.ts)
-            .field("slot", &self.slot)
-            .field("is_long", &self.is_long())
-            .field("is_collateral_long", &self.is_collateral_long())
-            .field("is_increase", &self.is_increase())
-            .field("delta_collateral_amount", &self.delta_collateral_amount())
-            .field("delta_size_in_usd", &self.delta_size_in_usd())
-            .field("delta_size_in_tokens", &self.delta_size_in_tokens())
-            .field("prices", &self.prices)
-            .field("execution_price", &self.execution_price)
-            .field("price_impact_value", &self.price_impact_value)
-            .field("price_impact_diff", &self.price_impact_diff)
-            .field("pnl", &self.pnl)
-            .field("fees", &self.fees)
-            .field("output_amounts", &self.output_amounts)
-            .field("transfer_out", &self.transfer_out)
-            .finish_non_exhaustive()
-    }
-}
-
-/// This is a cheaper variant of [`TradeEvent`], sharing the same format
-/// for serialization.
-#[derive(Clone, BorshSerialize)]
-pub(crate) struct TradeEventRef<'a>(&'a TradeData);
-
-impl<'a> From<&'a TradeData> for TradeEventRef<'a> {
-    fn from(value: &'a TradeData) -> Self {
-        Self(value)
-    }
-}
-
-impl anchor_lang::Discriminator for TradeEventRef<'_> {
-    const DISCRIMINATOR: [u8; 8] = TradeEvent::DISCRIMINATOR;
-}
-
-impl InitSpace for TradeEventRef<'_> {
-    // The borsh init space of `TradeData` is used here.
-    const INIT_SPACE: usize = <TradeData as anchor_lang::Space>::INIT_SPACE;
-}
-
-impl Event for TradeEventRef<'_> {}
-
+/// Trade Data Flags.
 #[allow(clippy::enum_variant_names)]
 #[derive(num_enum::IntoPrimitive)]
 #[repr(u8)]
-enum TradeFlag {
+pub enum TradeFlag {
     /// Is long.
     IsLong,
     /// Is collateral long.
@@ -278,7 +109,7 @@ pub struct TradeData {
     /// Price impact diff.
     pub price_impact_diff: u128,
     /// Processed pnl.
-    pub pnl: TradePnL,
+    pub pnl: TradePnl,
     /// Fees.
     pub fees: TradeFees,
     /// Output amounts.
@@ -336,7 +167,7 @@ impl TradePrices {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(BorshSerialize, BorshDeserialize, InitSpace)]
-pub struct TradePnL {
+pub struct TradePnl {
     /// Final PnL value.
     pub pnl: i128,
     /// Uncapped PnL value.
@@ -427,7 +258,7 @@ impl TradeData {
         self.execution_price = 0;
         self.price_impact_value = 0;
         self.price_impact_diff = 0;
-        self.pnl = TradePnL::zeroed();
+        self.pnl = TradePnl::zeroed();
         self.fees = TradeFees::zeroed();
         self.output_amounts = TradeOutputAmounts::zeroed();
         Ok(self)
@@ -569,5 +400,189 @@ impl TradeData {
         self.output_amounts.secondary_output_amount =
             *report.output_amounts().secondary_output_amount();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    #[cfg(feature = "utils")]
+    fn test_trade_event() {
+        use crate::events::{
+            EventPositionState, EventTradeFees, EventTradeOutputAmounts, EventTradePnl,
+            EventTradePrice, EventTradePrices, EventTransferOut, TradeEvent, TradeEventRef,
+        };
+
+        use super::*;
+
+        let state = EventPositionState {
+            trade_id: u64::MAX,
+            increased_at: i64::MAX,
+            updated_at_slot: u64::MAX,
+            decreased_at: i64::MAX,
+            size_in_tokens: u128::MAX,
+            collateral_amount: u128::MAX,
+            size_in_usd: u128::MAX,
+            borrowing_factor: u128::MAX,
+            funding_fee_amount_per_size: u128::MAX,
+            long_token_claimable_funding_amount_per_size: u128::MAX,
+            short_token_claimable_funding_amount_per_size: u128::MAX,
+            reserved: [0; 128],
+        };
+
+        let transfer_out = EventTransferOut {
+            executed: u8::MAX,
+            padding_0: Default::default(),
+            final_output_token: u64::MAX,
+            secondary_output_token: u64::MAX,
+            long_token: u64::MAX,
+            short_token: u64::MAX,
+            long_token_for_claimable_account_of_user: u64::MAX,
+            short_token_for_claimable_account_of_user: u64::MAX,
+            long_token_for_claimable_account_of_holding: u64::MAX,
+            short_token_for_claimable_account_of_holding: u64::MAX,
+        };
+
+        let price = EventTradePrice {
+            min: u128::MAX,
+            max: u128::MAX,
+        };
+
+        let event = TradeEvent {
+            flags: u8::MAX,
+            padding_0: Default::default(),
+            trade_id: u64::MAX,
+            authority: Pubkey::new_unique(),
+            store: Pubkey::new_unique(),
+            market_token: Pubkey::new_unique(),
+            user: Pubkey::new_unique(),
+            position: Pubkey::new_unique(),
+            order: Pubkey::new_unique(),
+            final_output_token: Pubkey::new_unique(),
+            ts: i64::MAX,
+            slot: u64::MAX,
+            before: state.clone(),
+            after: state,
+            transfer_out,
+            padding_1: Default::default(),
+            prices: EventTradePrices {
+                index: price.clone(),
+                long: price.clone(),
+                short: price.clone(),
+            },
+            execution_price: u128::MAX,
+            price_impact_value: i128::MAX,
+            price_impact_diff: u128::MAX,
+            pnl: EventTradePnl {
+                pnl: i128::MAX,
+                uncapped_pnl: i128::MAX,
+            },
+            fees: EventTradeFees {
+                order_fee_for_receiver_amount: u128::MAX,
+                order_fee_for_pool_amount: u128::MAX,
+                liquidation_fee_amount: u128::MAX,
+                liquidation_fee_for_receiver_amount: u128::MAX,
+                total_borrowing_fee_amount: u128::MAX,
+                borrowing_fee_for_receiver_amount: u128::MAX,
+                funding_fee_amount: u128::MAX,
+                claimable_funding_fee_long_token_amount: u128::MAX,
+                claimable_funding_fee_short_token_amount: u128::MAX,
+            },
+            output_amounts: EventTradeOutputAmounts {
+                output_amount: u128::MAX,
+                secondary_output_amount: u128::MAX,
+            },
+        };
+
+        let TradeEvent {
+            flags,
+            padding_0,
+            trade_id,
+            authority,
+            store,
+            market_token,
+            user,
+            position,
+            order,
+            final_output_token,
+            ts,
+            slot,
+            before,
+            after,
+            transfer_out,
+            padding_1,
+            prices: _,
+            execution_price,
+            price_impact_value,
+            price_impact_diff,
+            pnl,
+            fees,
+            output_amounts,
+        } = event.clone();
+
+        let price = TradePrice {
+            min: price.min,
+            max: price.max,
+        };
+        let data = TradeData {
+            flags,
+            padding_0,
+            trade_id,
+            authority,
+            store,
+            market_token,
+            user,
+            position,
+            order,
+            final_output_token,
+            ts,
+            slot,
+            before: before.into(),
+            after: after.into(),
+            transfer_out: transfer_out.into(),
+            padding_1,
+            prices: TradePrices {
+                index: price,
+                long: price,
+                short: price,
+            },
+            execution_price,
+            price_impact_value,
+            price_impact_diff,
+            pnl: TradePnl {
+                pnl: pnl.pnl,
+                uncapped_pnl: pnl.uncapped_pnl,
+            },
+            fees: TradeFees {
+                order_fee_for_receiver_amount: fees.order_fee_for_receiver_amount,
+                order_fee_for_pool_amount: fees.order_fee_for_pool_amount,
+                liquidation_fee_amount: fees.liquidation_fee_amount,
+                liquidation_fee_for_receiver_amount: fees.liquidation_fee_for_receiver_amount,
+                total_borrowing_fee_amount: fees.total_borrowing_fee_amount,
+                borrowing_fee_for_receiver_amount: fees.borrowing_fee_for_receiver_amount,
+                funding_fee_amount: fees.funding_fee_amount,
+                claimable_funding_fee_long_token_amount: fees
+                    .claimable_funding_fee_long_token_amount,
+                claimable_funding_fee_short_token_amount: fees
+                    .claimable_funding_fee_short_token_amount,
+            },
+            output_amounts: TradeOutputAmounts {
+                output_amount: output_amounts.output_amount,
+                secondary_output_amount: output_amounts.secondary_output_amount,
+            },
+        };
+
+        let mut serialized_event = Vec::with_capacity(TradeEvent::INIT_SPACE);
+        event
+            .serialize(&mut serialized_event)
+            .expect("serializing `TradeEvent`");
+
+        let mut serialized_data = Vec::with_capacity(<TradeData as anchor_lang::Space>::INIT_SPACE);
+        TradeEventRef::from(&data)
+            .serialize(&mut serialized_data)
+            .expect("serializing `TradeEventRef`");
+
+        assert_eq!(serialized_event, serialized_data);
     }
 }

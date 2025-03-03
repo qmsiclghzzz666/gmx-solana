@@ -169,6 +169,41 @@ pub struct PositionState {
     reserved: [u8; 128],
 }
 
+#[cfg(feature = "utils")]
+impl From<crate::events::EventPositionState> for PositionState {
+    fn from(event: crate::events::EventPositionState) -> Self {
+        let crate::events::EventPositionState {
+            trade_id,
+            increased_at,
+            updated_at_slot,
+            decreased_at,
+            size_in_tokens,
+            collateral_amount,
+            size_in_usd,
+            borrowing_factor,
+            funding_fee_amount_per_size,
+            long_token_claimable_funding_amount_per_size,
+            short_token_claimable_funding_amount_per_size,
+            reserved,
+        } = event;
+
+        Self {
+            trade_id,
+            increased_at,
+            updated_at_slot,
+            decreased_at,
+            size_in_tokens,
+            collateral_amount,
+            size_in_usd,
+            borrowing_factor,
+            funding_fee_amount_per_size,
+            long_token_claimable_funding_amount_per_size,
+            short_token_claimable_funding_amount_per_size,
+            reserved,
+        }
+    }
+}
+
 impl gmsol_model::PositionState<{ constants::MARKET_DECIMALS }> for PositionState {
     type Num = u128;
 
