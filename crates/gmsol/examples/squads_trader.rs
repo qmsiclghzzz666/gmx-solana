@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use anchor_client::solana_client::rpc_config::RpcSendTransactionConfig;
 use clap::Parser;
 use eyre::eyre;
 use figment::{
@@ -12,10 +13,12 @@ use gmsol::{
     solana_utils::cluster::Cluster,
     squads::{get_vault_pda, SquadsOps},
     utils::{builder::MakeBundleBuilder, local_signer, LocalSignerRef},
+    ClientOptions,
 };
+use gmsol_solana_utils::bundle_builder::SendBundleOptions;
 use serde_with::{serde_as, DisplayFromStr};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
-use solana_sdk::{pubkey::Pubkey, signature::NullSigner};
+use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signature::NullSigner};
 use tracing_subscriber::EnvFilter;
 
 #[serde_as]
@@ -26,6 +29,8 @@ struct Trader {
     wallet_manager: Option<Rc<RemoteWalletManager>>,
     #[arg(long = "url", short = 'u', default_value = "mainnet")]
     cluster: String,
+    #[arg(long, short = 'p')]
+    cu_price: Option<u64>,
     #[clap(long, default_value = "~/.config/solana/id.json")]
     proposer: String,
     #[clap(long)]
@@ -47,6 +52,10 @@ struct Trader {
     #[clap(long)]
     #[serde(default)]
     execute: bool,
+    #[clap(long)]
+    collateral_long: bool,
+    #[clap(long)]
+    short: bool,
 }
 
 impl Trader {
@@ -62,14 +71,26 @@ impl Trader {
 
     fn proposer(&mut self) -> eyre::Result<gmsol::Client<LocalSignerRef>> {
         let cluster = self.cluster()?;
-        Ok(gmsol::Client::new(cluster, self.proposer_wallet()?)?)
+        Ok(gmsol::Client::new_with_options(
+            cluster,
+            self.proposer_wallet()?,
+            ClientOptions::builder()
+                .commitment(CommitmentConfig::processed())
+                .build(),
+        )?)
     }
 
     fn multisig(&self) -> eyre::Result<gmsol::Client<LocalSignerRef>> {
         let cluster = self.cluster()?;
         let vault = get_vault_pda(&self.multisig, self.vault_index, None).0;
         let signer = NullSigner::new(&vault);
-        Ok(gmsol::Client::new(cluster, local_signer(signer))?)
+        Ok(gmsol::Client::new_with_options(
+            cluster,
+            local_signer(signer),
+            ClientOptions::builder()
+                .commitment(CommitmentConfig::processed())
+                .build(),
+        )?)
     }
 
     async fn run(&mut self) -> eyre::Result<()> {
@@ -83,9 +104,9 @@ impl Trader {
                 .market_decrease(
                     &store,
                     &self.market_token,
-                    true,
+                    self.collateral_long,
                     self.amount,
-                    true,
+                    !self.short,
                     self.size.parse()?,
                 )
                 .build_with_address()
@@ -95,9 +116,9 @@ impl Trader {
                 .market_increase(
                     &store,
                     &self.market_token,
-                    true,
+                    self.collateral_long,
                     self.amount,
-                    true,
+                    !self.short,
                     self.size.parse()?,
                 )
                 .build_with_address()
@@ -112,7 +133,14 @@ impl Trader {
             .execute(self.execute)
             .build()
             .await?
-            .send_all(true)
+            .send_all_with_opts(SendBundleOptions {
+                compute_unit_price_micro_lamports: self.cu_price,
+                config: RpcSendTransactionConfig {
+                    skip_preflight: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
             .map_err(|(signatures, err)| {
                 tracing::error!("partial success: {signatures:#?}");
                 err
