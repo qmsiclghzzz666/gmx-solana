@@ -1,0 +1,19 @@
+[package]
+name = "gmsol-programs"
+documentation = "https://docs.rs/gmsol-programs"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+
+[features]
+default = ["store"]
+store = []
+treasury = []
+
+[dependencies]
+anchor-lang = { workspace = true }
+bytemuck = { workspace = true, features = ["min_const_generics"] }

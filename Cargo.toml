@@ -128,7 +128,12 @@ path = "crates/chainlink-datastreams"
 git = "https://github.com/smartcontractkit/data-streams-sdk.git"
 
 [workspace.dependencies.gmsol-solana-utils]
+version = "0.5.0"
 path = "crates/solana-utils"
+
+[workspace.dependencies.gmsol-programs]
+version = "0.5.0"
+path = "crates/gmsol-programs"
 
 [profile.release]
 overflow-checks = true
