@@ -1,0 +1,22 @@
+{
+  "name": "@gmsol-labs/gmsol-sdk",
+  "version": "0.5.0",
+  "scripts": {
+    "build": "rimraf dist pkg && webpack --mode production",
+    "start": "rimraf dist pkg && webpack serve",
+    "test": "cargo test --features wasm && wasm-pack test --headless --features wasm"
+  },
+  "devDependencies": {
+    "@wasm-tool/wasm-pack-plugin": "1.7.0",
+    "html-webpack-plugin": "^5.6.3",
+    "rimraf": "^6.0.1",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.2",
+    "webpack": "5.98.0",
+    "webpack-cli": "6.0.1",
+    "webpack-dev-server": "5.2.0"
+  },
+  "files": [
+    "pkg"
+  ]
+}
