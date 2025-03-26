@@ -1,3 +1,6 @@
+/// Price.
+pub mod price;
+
 /// Market.
 pub mod market;
 

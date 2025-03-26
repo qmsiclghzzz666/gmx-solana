@@ -455,6 +455,7 @@ impl<M: BaseMarketMut<DECIMALS> + ?Sized, const DECIMALS: u8> BaseMarketMutExt<D
 #[cfg_attr(feature = "strum", strum(serialize_all = "snake_case"))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "js", derive(tsify_next::Tsify))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum PnlFactorKind {

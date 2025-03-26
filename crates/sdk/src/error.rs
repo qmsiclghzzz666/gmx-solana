@@ -21,7 +21,7 @@ impl From<AnchorLangError> for Error {
     }
 }
 
-#[cfg(feature = "wasm")]
+#[cfg(feature = "wasm-bindgen")]
 impl From<Error> for wasm_bindgen::JsValue {
     fn from(value: Error) -> Self {
         Self::from_str(&value.to_string())

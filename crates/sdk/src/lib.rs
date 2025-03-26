@@ -4,9 +4,9 @@ pub mod constants;
 /// Error type.
 pub mod error;
 
-/// WASM support.
-#[cfg(feature = "wasm")]
-pub mod wasm;
+/// JavaScript support.
+#[cfg(feature = "js")]
+pub mod js;
 
 /// Model support.
 pub mod model {

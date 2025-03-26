@@ -35,12 +35,11 @@ module.exports = {
     }),
     new WasmPackPlugin({
       crateDirectory: __dirname,
-      extraArgs: "--scope gmsol-labs --features wasm",
+      extraArgs: "--scope gmsol-labs --features js",
     }),
   ],
   devServer: {
     static: './dist',
-    open: true,
   },
   mode: "development",
 };
