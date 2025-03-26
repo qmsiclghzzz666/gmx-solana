@@ -1,2 +1,1 @@
-/// Default decimals for calculation.
-pub const MARKET_DECIMALS: u8 = 20;
+pub use gmsol_programs::constants::*;

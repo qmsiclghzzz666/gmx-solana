@@ -15,11 +15,17 @@ crate-type = ["cdylib"]
 [features]
 default = []
 treasury = ["gmsol-programs/treasury"]
-wasm = ["wasm-bindgen"]
+wasm = ["wasm-bindgen", "serde", "serde-wasm-bindgen"]
+serde = ["dep:serde", "gmsol-model/serde"]
 
 [dependencies]
-gmsol-programs = { workspace = true }
+gmsol-programs = { workspace = true, features = ["model"] }
 gmsol-model = { workspace = true, features = ["u128"] }
+thiserror = { workspace = true }
 
 # Dependencies for the `wasm` feature
 wasm-bindgen = { workspace = true, optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
+
+# Dependencies for the `serde` feature
+serde = { workspace = true, optional = true, features = ["derive"] }
