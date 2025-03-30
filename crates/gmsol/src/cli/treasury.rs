@@ -606,6 +606,8 @@ struct Sync {
 #[serde_with::serde_as]
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct BatchWithdraw {
+    #[serde(default)]
     withdraw: Vec<Withdraw>,
+    #[serde(default)]
     sync: Vec<Sync>,
 }
