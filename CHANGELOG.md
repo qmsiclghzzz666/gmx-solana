@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking Changes
 
 - programs: Renamed `mock_chainlink_verifier` to `gmsol_mock_chainlink_verifier`.
+- sdk: Added `compute_unit_min_priority_lamports` to `SendBundleOptions`.
+- sdk: Boxed `ClientError` in the `Error` definition.
 
 ### Added
 
@@ -31,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - cli: Allowed the `migrate referral-code` subcommand to accept multiple addresses and allow the use of user account addresses or owner account addresses.
+- cli: Ensured all commands respect the `--priority-lamports` option.
 
 ## [0.4.0] - 2025-03-08
 
