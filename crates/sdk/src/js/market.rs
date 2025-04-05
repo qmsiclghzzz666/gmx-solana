@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
+use crate::utils::zero_copy::ZeroCopy;
+
 use super::price::Prices;
 
 /// Wrapper of [`Market`].
@@ -29,10 +31,10 @@ impl JsMarket {
 
     /// Create from account data.
     pub fn decode(mut data: &[u8]) -> crate::Result<Self> {
-        let market = Market::try_deserialize(&mut data)?;
+        let market = ZeroCopy::<Market>::try_deserialize(&mut data)?;
 
         Ok(Self {
-            market: Arc::new(market),
+            market: Arc::new(market.0),
         })
     }
 

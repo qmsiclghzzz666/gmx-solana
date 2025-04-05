@@ -11,3 +11,4 @@ pub mod constants;
 pub mod model;
 
 pub use anchor_lang;
+pub use bytemuck;

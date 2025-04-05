@@ -8,8 +8,7 @@ const encoded =
 
 const supply = 229625153764384n;
 
-const data = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
-const market = Market.decode(data);
+const market = Market.decode_from_base64(encoded);
 const model = market.to_model(supply);
 const price = model.market_token_price({
   prices: {

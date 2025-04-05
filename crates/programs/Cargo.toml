@@ -18,7 +18,10 @@ wasm-bindgen = ["time?/wasm-bindgen"]
 
 [dependencies]
 anchor-lang = { workspace = true }
-bytemuck = { workspace = true, features = ["min_const_generics"] }
+bytemuck = { workspace = true, features = [
+    "min_const_generics",
+    "align_offset",
+] }
 gmsol-model = { workspace = true, optional = true, features = ["u128"] }
 bitmaps = { workspace = true, optional = true }
 time = { workspace = true, optional = true }

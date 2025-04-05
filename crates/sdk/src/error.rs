@@ -13,8 +13,19 @@ pub enum Error {
     #[cfg(feature = "serde-wasm-bindgen")]
     #[error("serde-wasm: {0}")]
     SerdeWasm(#[from] serde_wasm_bindgen::Error),
+    /// Base64 decode error.
     #[error("base64-decode: {0}")]
     Base64Decode(#[from] base64::DecodeError),
+    /// Unknown error.
+    #[error("unknown: {0}")]
+    Unknown(String),
+}
+
+impl Error {
+    /// Create an unknown error.
+    pub fn unknown(msg: impl ToString) -> Self {
+        Self::Unknown(msg.to_string())
+    }
 }
 
 impl From<AnchorLangError> for Error {

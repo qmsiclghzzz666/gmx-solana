@@ -4,6 +4,9 @@ pub mod constants;
 /// Error type.
 pub mod error;
 
+/// Utils.
+pub mod utils;
+
 /// JavaScript support.
 #[cfg(feature = "js")]
 pub mod js;
