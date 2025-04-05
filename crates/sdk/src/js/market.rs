@@ -18,6 +18,15 @@ pub struct JsMarket {
 
 #[wasm_bindgen(js_class = Market)]
 impl JsMarket {
+    /// Create from base64 encoded account data.
+    pub fn decode_from_base64(data: &str) -> crate::Result<Self> {
+        use base64::engine::{general_purpose, Engine};
+
+        let data = general_purpose::STANDARD.decode(data)?;
+
+        Self::decode(&data)
+    }
+
     /// Create from account data.
     pub fn decode(mut data: &[u8]) -> crate::Result<Self> {
         let market = Market::try_deserialize(&mut data)?;

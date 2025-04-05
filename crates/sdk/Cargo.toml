@@ -29,6 +29,7 @@ serde = ["dep:serde", "gmsol-model/serde"]
 gmsol-programs = { workspace = true, features = ["model"] }
 gmsol-model = { workspace = true, features = ["u128"] }
 thiserror = { workspace = true }
+base64 = { workspace = true }
 
 # Dependencies for the `wasm` feature
 wasm-bindgen = { workspace = true, optional = true }

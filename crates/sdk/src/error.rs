@@ -13,6 +13,8 @@ pub enum Error {
     #[cfg(feature = "serde-wasm-bindgen")]
     #[error("serde-wasm: {0}")]
     SerdeWasm(#[from] serde_wasm_bindgen::Error),
+    #[error("base64-decode: {0}")]
+    Base64Decode(#[from] base64::DecodeError),
 }
 
 impl From<AnchorLangError> for Error {
