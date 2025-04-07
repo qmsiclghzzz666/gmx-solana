@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
 use gmsol_model::{LiquidityMarketExt, PnlFactorKind};
-use gmsol_programs::{
-    anchor_lang::AccountDeserialize, gmsol_store::accounts::Market, model::MarketModel,
-};
+use gmsol_programs::{gmsol_store::accounts::Market, model::MarketModel};
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
-use crate::utils::zero_copy::ZeroCopy;
+use crate::utils::zero_copy::{try_deserialize_zero_copy, try_deserialize_zero_copy_from_base64};
 
 use super::price::Prices;
 
@@ -22,16 +20,16 @@ pub struct JsMarket {
 impl JsMarket {
     /// Create from base64 encoded account data.
     pub fn decode_from_base64(data: &str) -> crate::Result<Self> {
-        use base64::engine::{general_purpose, Engine};
+        let market = try_deserialize_zero_copy_from_base64(data)?;
 
-        let data = general_purpose::STANDARD.decode(data)?;
-
-        Self::decode(&data)
+        Ok(Self {
+            market: Arc::new(market.0),
+        })
     }
 
     /// Create from account data.
-    pub fn decode(mut data: &[u8]) -> crate::Result<Self> {
-        let market = ZeroCopy::<Market>::try_deserialize(&mut data)?;
+    pub fn decode(data: &[u8]) -> crate::Result<Self> {
+        let market = try_deserialize_zero_copy(data)?;
 
         Ok(Self {
             market: Arc::new(market.0),

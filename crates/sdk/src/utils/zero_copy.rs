@@ -22,18 +22,18 @@ pub fn check_discriminator<T: Discriminator>(data: &[u8]) -> anchor_lang::prelud
 /// A workaround to deserialize "zero-copy" account data.
 ///
 /// See [anchort#2689](https://github.com/coral-xyz/anchor/issues/2689) for more information.
-pub fn try_deserailize<T>(data: &[u8]) -> anchor_lang::prelude::Result<T>
+pub fn try_deserialize<T>(data: &[u8]) -> anchor_lang::prelude::Result<T>
 where
     T: anchor_lang::ZeroCopy,
 {
     check_discriminator::<T>(data)?;
-    try_deserailize_unchecked(data)
+    try_deserialize_unchecked(data)
 }
 
 /// A workaround to deserialize "zero-copy" account data.
 ///
 /// See [anchort#2689](https://github.com/coral-xyz/anchor/issues/2689) for more information.
-pub fn try_deserailize_unchecked<T>(data: &[u8]) -> anchor_lang::prelude::Result<T>
+pub fn try_deserialize_unchecked<T>(data: &[u8]) -> anchor_lang::prelude::Result<T>
 where
     T: anchor_lang::ZeroCopy,
 {
@@ -70,12 +70,12 @@ where
     T: anchor_lang::ZeroCopy,
 {
     fn try_deserialize(buf: &mut &[u8]) -> anchor_lang::Result<Self> {
-        let account = try_deserailize(buf)?;
+        let account = try_deserialize(buf)?;
         Ok(Self(account))
     }
 
     fn try_deserialize_unchecked(buf: &mut &[u8]) -> anchor_lang::Result<Self> {
-        let account = try_deserailize_unchecked(buf)?;
+        let account = try_deserialize_unchecked(buf)?;
         Ok(Self(account))
     }
 }
@@ -91,4 +91,23 @@ impl<T> AsRef<T> for ZeroCopy<T> {
     fn as_ref(&self) -> &T {
         &self.0
     }
+}
+
+/// Deserialize a [`ZeroCopy`](anchor_lang::ZeroCopy) structure.
+pub fn try_deserialize_zero_copy<T: anchor_lang::ZeroCopy>(
+    mut data: &[u8],
+) -> crate::Result<ZeroCopy<T>> {
+    use anchor_lang::AccountDeserialize;
+    Ok(ZeroCopy::<T>::try_deserialize(&mut data)?)
+}
+
+/// Deserialize a [`ZeroCopy`](anchor_lang::ZeroCopy) structure from base64.
+pub fn try_deserialize_zero_copy_from_base64<T: anchor_lang::ZeroCopy>(
+    data: &str,
+) -> crate::Result<ZeroCopy<T>> {
+    use base64::engine::{general_purpose, Engine};
+
+    let data = general_purpose::STANDARD.decode(data)?;
+
+    try_deserialize_zero_copy(&data)
 }
