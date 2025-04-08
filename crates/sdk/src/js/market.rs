@@ -78,3 +78,9 @@ impl JsMarketModel {
         )?)
     }
 }
+
+impl From<MarketModel> for JsMarketModel {
+    fn from(model: MarketModel) -> Self {
+        Self { model }
+    }
+}

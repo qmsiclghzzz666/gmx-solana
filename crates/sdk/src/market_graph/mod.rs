@@ -92,7 +92,6 @@ impl MarketState {
 }
 
 /// Market Graph.
-#[derive(Default)]
 pub struct MarketGraph {
     index_tokens: HashMap<Pubkey, IndexTokenState>,
     collateral_tokens: HashMap<Pubkey, CollateralTokenState>,
@@ -101,10 +100,18 @@ pub struct MarketGraph {
     config: MarketGraphConfig,
 }
 
-struct MarketGraphConfig {
-    value: u128,
-    base_cost: u128,
-    max_steps: usize,
+/// Config for [`MarketGraph`].
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "js", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "js", tsify(from_wasm_abi))]
+pub struct MarketGraphConfig {
+    /// Value.
+    pub value: u128,
+    /// Base cost.
+    pub base_cost: u128,
+    /// Max steps.
+    pub max_steps: usize,
 }
 
 const DEFAULT_VALUE: u128 = 1_000 * constants::MARKET_USD_UNIT;
@@ -184,7 +191,24 @@ impl MarketGraphConfig {
     }
 }
 
+impl Default for MarketGraph {
+    fn default() -> Self {
+        Self::with_config(MarketGraphConfig::default())
+    }
+}
+
 impl MarketGraph {
+    /// Create from the given [`MarketGraphConfig`].
+    pub fn with_config(config: MarketGraphConfig) -> Self {
+        Self {
+            index_tokens: Default::default(),
+            collateral_tokens: Default::default(),
+            markets: Default::default(),
+            graph: Default::default(),
+            config,
+        }
+    }
+
     /// Insert or update a market.
     ///
     /// Return `true` if the market is newly inserted.
@@ -376,6 +400,16 @@ impl MarketGraph {
     /// Get all markets.
     pub fn markets(&self) -> impl Iterator<Item = &MarketModel> {
         self.markets.values().map(|state| &state.market)
+    }
+
+    /// Get all market tokens.
+    pub fn market_tokens(&self) -> impl Iterator<Item = &Pubkey> {
+        self.markets.keys()
+    }
+
+    /// Get all index tokens.
+    pub fn index_tokens(&self) -> impl Iterator<Item = &Pubkey> {
+        self.index_tokens.keys()
     }
 
     fn to_index(&self, ix: TokenIx) -> usize {

@@ -1,4 +1,10 @@
-import { apply_factor, Market } from "../../pkg/index.js";
+import {
+  apply_factor,
+  Market,
+  MarketGraph,
+  MarketGraphConfig,
+  Pubkey,
+} from "../../pkg/index.js";
 
 const result = apply_factor(123n, 90_000_000_000_000_000_000n);
 console.log("apply factor:", result);
@@ -8,24 +14,56 @@ const encoded =
 
 const supply = 229625153764384n;
 
+// Decode Market from base64 data.
 const market = Market.decode_from_base64(encoded);
 const model = market.to_model(supply);
-const price = model.market_token_price({
-  prices: {
-    index_token: {
-      min: 1420120000000n,
-      max: 1420120000000n,
-    },
-    long_token: {
-      min: 14516900000000n,
-      max: 14516900000000n,
-    },
-    short_token: {
-      min: 99990000000000n,
-      max: 99990000000000n,
-    },
+const prices = {
+  index_token: {
+    min: 1420120000000n,
+    max: 1420120000000n,
   },
+  long_token: {
+    min: 14516900000000n,
+    max: 14516900000000n,
+  },
+  short_token: {
+    min: 99990000000000n,
+    max: 99990000000000n,
+  },
+};
+
+// Calculate market token price.
+const price = model.market_token_price({
+  prices,
   maximize: true,
   pnl_factor: "max_after_deposit",
 });
 console.log("market token price:", price);
+
+// Create a MarketGraph.
+const graph = new MarketGraph({
+  value: 1_000_000_000_000_000_000_000n,
+  base_cost: 1_000_000_000_000_000_000n,
+  max_steps: 5,
+});
+
+// Insert market from base64 data.
+graph.insert_market_from_base64(encoded, supply);
+
+console.log(graph.market_tokens().map((token) => token.toString()));
+
+const gmx = new Pubkey("GmxDsqjKYUrwgbvccGrpF1LoyHPUq8FQqT1FJfkvrMfY");
+const wsol = new Pubkey("So11111111111111111111111111111111111111112");
+const usdc = new Pubkey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+
+graph.update_token_price(gmx, { ...prices.index_token });
+graph.update_token_price(wsol, { ...prices.long_token });
+graph.update_token_price(usdc, { ...prices.short_token });
+
+// Calculate best swap path.
+const { path } = graph.best_swap_path(
+  new Pubkey("So11111111111111111111111111111111111111112"),
+  new Pubkey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+  false
+);
+console.log(path.map((token) => new Pubkey(token).toString()));

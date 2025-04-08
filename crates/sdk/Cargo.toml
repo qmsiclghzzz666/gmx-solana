@@ -13,9 +13,10 @@ keywords.workspace = true
 crate-type = ["cdylib"]
 
 [features]
-default = ["treasury", "market-graph"]
+default = ["market-graph"]
 treasury = ["gmsol-programs/treasury"]
 js = [
+    "market-graph",
     "wasm-bindgen",
     "serde",
     "serde-wasm-bindgen",
@@ -23,7 +24,7 @@ js = [
     "tsify-next",
     "gmsol-model/js",
 ]
-serde = ["dep:serde", "gmsol-model/serde"]
+serde = ["dep:serde", "gmsol-model/serde", "serde_with"]
 market-graph = ["petgraph", "rust_decimal/maths"]
 
 [dependencies]
@@ -33,9 +34,7 @@ thiserror = { workspace = true }
 base64 = { workspace = true }
 solana-sdk = { workspace = true }
 either = { workspace = true }
-rust_decimal = { workspace = true, default_features = false, features = [
-    "std",
-] }
+rust_decimal = { workspace = true, default_features = false }
 
 tracing = { workspace = true, optional = true }
 
@@ -46,10 +45,10 @@ tsify-next = { workspace = true, optional = true, features = ["js"] }
 
 # Dependencies for the `serde` feature
 serde = { workspace = true, optional = true, features = ["derive"] }
+serde_with = { workspace = true, optional = true }
 
 # Dependencies for the `market-graph` feature
 petgraph = { workspace = true, optional = true, default-features = false, features = [
-    "std",
     "stable_graph",
 ] }
 

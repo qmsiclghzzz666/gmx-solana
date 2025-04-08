@@ -24,6 +24,7 @@ impl From<Prices> for gmsol_model::price::Prices<u128> {
 
 /// Js Price.
 #[derive(Debug, Serialize, Deserialize, Tsify)]
+#[tsify(from_wasm_abi)]
 pub struct Price {
     /// Min price.
     pub min: u128,
