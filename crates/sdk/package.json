@@ -4,7 +4,7 @@
   "scripts": {
     "build": "rimraf dist pkg && webpack --mode production",
     "start": "rimraf dist pkg && webpack serve",
-    "test": "cargo test --features wasm && wasm-pack test --headless --features wasm"
+    "test": "cargo test --features js && wasm-pack test --chrome --features js"
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "1.7.0",
