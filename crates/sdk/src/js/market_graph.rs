@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
 use crate::{
-    market_graph::{MarketGraph, MarketGraphConfig},
+    market_graph::{MarketGraph, MarketGraphConfig, SwapEstimationParams},
     utils::zero_copy::try_deserialize_zero_copy_from_base64,
 };
 use gmsol_programs::model::MarketModel;
 use serde::{Deserialize, Serialize};
-use solana_sdk::pubkey::Pubkey;
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
@@ -22,10 +21,12 @@ pub struct JsMarketGraph {
 #[derive(Debug, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
 pub struct BestSwapPath {
+    /// Params.
+    pub params: SwapEstimationParams,
     /// Exchange rate.
     pub exchange_rate: Option<u128>,
     /// Path.
-    pub path: Vec<Pubkey>,
+    pub path: Vec<String>,
     /// Arbitrage exists.
     pub arbitrage_exists: Option<bool>,
 }
@@ -48,8 +49,10 @@ impl JsMarketGraph {
     }
 
     /// Update token price.
-    pub fn update_token_price(&mut self, token: Pubkey, price: Price) {
-        self.graph.update_token_price(&token, &price.into());
+    pub fn update_token_price(&mut self, token: &str, price: Price) -> crate::Result<()> {
+        self.graph
+            .update_token_price(&token.parse()?, &price.into());
+        Ok(())
     }
 
     /// Update value.
@@ -68,38 +71,51 @@ impl JsMarketGraph {
     }
 
     /// Get market by its market token.
-    pub fn get_market(&self, market_token: &Pubkey) -> Option<JsMarketModel> {
-        Some(self.graph.get_market(market_token)?.clone().into())
+    pub fn get_market(&self, market_token: &str) -> crate::Result<Option<JsMarketModel>> {
+        Ok(self
+            .graph
+            .get_market(&market_token.parse()?)
+            .map(|market| market.clone().into()))
     }
 
     /// Get all market tokens.
-    pub fn market_tokens(&self) -> Vec<Pubkey> {
-        self.graph.market_tokens().copied().collect()
+    pub fn market_tokens(&self) -> Vec<String> {
+        self.graph
+            .market_tokens()
+            .map(|token| token.to_string())
+            .collect()
     }
 
     /// Get all index tokens.
-    pub fn index_tokens(&self) -> Vec<Pubkey> {
-        self.graph.index_tokens().copied().collect()
+    pub fn index_tokens(&self) -> Vec<String> {
+        self.graph
+            .index_tokens()
+            .map(|token| token.to_string())
+            .collect()
     }
 
     /// Compute best swap path.
     pub fn best_swap_path(
         &self,
-        source: &Pubkey,
-        target: &Pubkey,
+        source: &str,
+        target: &str,
         skip_bellman_ford: bool,
     ) -> crate::Result<BestSwapPath> {
-        let paths = self.graph.best_swap_paths(source, skip_bellman_ford)?;
+        let target = target.parse()?;
+        let paths = self
+            .graph
+            .best_swap_paths(&source.parse()?, skip_bellman_ford)?;
         let arbitrage_exists = paths.arbitrage_exists();
-        let (exchange_rate, path) = paths.to(target);
+        let (exchange_rate, path) = paths.to(&target);
         Ok(BestSwapPath {
+            params: *paths.params(),
             exchange_rate: exchange_rate.map(|d| {
                 d.round_dp(crate::constants::MARKET_DECIMALS as u32)
                     .mantissa()
                     .try_into()
                     .unwrap()
             }),
-            path,
+            path: path.into_iter().map(|token| token.to_string()).collect(),
             arbitrage_exists,
         })
     }

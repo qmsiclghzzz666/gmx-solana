@@ -23,6 +23,9 @@ pub enum Error {
     #[cfg(feature = "market-graph")]
     #[error("market-graph: {0}")]
     MarketGraph(#[from] crate::market_graph::error::MarketGraphError),
+    /// Parse Pubkey Error.
+    #[error("parse pubkey error: {0}")]
+    ParsePubkey(#[from] solana_sdk::pubkey::ParsePubkeyError),
 }
 
 impl Error {

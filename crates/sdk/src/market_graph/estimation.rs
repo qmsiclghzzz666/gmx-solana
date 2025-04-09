@@ -11,9 +11,9 @@ pub(super) struct SwapEstimation {
 
 /// Estimation Parameters for Swap.
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "js", derive(tsify_next::Tsify))]
-#[cfg_attr(feature = "js", tsify(from_wasm_abi))]
+#[cfg_attr(feature = "js", tsify(from_wasm_abi, into_wasm_abi))]
 pub struct SwapEstimationParams {
     /// Value.
     pub value: u128,

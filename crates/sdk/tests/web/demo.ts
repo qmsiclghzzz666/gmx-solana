@@ -42,8 +42,10 @@ console.log("market token price:", price);
 
 // Create a MarketGraph.
 const graph = new MarketGraph({
-  value: 1_000_000_000_000_000_000_000n,
-  base_cost: 1_000_000_000_000_000_000n,
+  swap_estimation_params: {
+    value: 1_000_000_000_000_000_000_000n,
+    base_cost: 1_000_000_000_000_000_000n,
+  },
   max_steps: 5,
 });
 
@@ -52,9 +54,9 @@ graph.insert_market_from_base64(encoded, supply);
 
 console.log(graph.market_tokens().map((token) => token.toString()));
 
-const gmx = new Pubkey("GmxDsqjKYUrwgbvccGrpF1LoyHPUq8FQqT1FJfkvrMfY");
-const wsol = new Pubkey("So11111111111111111111111111111111111111112");
-const usdc = new Pubkey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const gmx = "GmxDsqjKYUrwgbvccGrpF1LoyHPUq8FQqT1FJfkvrMfY";
+const wsol = "So11111111111111111111111111111111111111112";
+const usdc = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 graph.update_token_price(gmx, { ...prices.index_token });
 graph.update_token_price(wsol, { ...prices.long_token });
@@ -62,8 +64,8 @@ graph.update_token_price(usdc, { ...prices.short_token });
 
 // Calculate best swap path.
 const { path } = graph.best_swap_path(
-  new Pubkey("So11111111111111111111111111111111111111112"),
-  new Pubkey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+  "So11111111111111111111111111111111111111112",
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
   false
 );
 console.log(path.map((token) => new Pubkey(token).toString()));
