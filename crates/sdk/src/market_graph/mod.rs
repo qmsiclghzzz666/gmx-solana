@@ -4,11 +4,7 @@ use std::{
 };
 
 use either::Either;
-use gmsol_model::{
-    price::{Price, Prices},
-    utils::div_to_factor,
-    MarketAction, SwapMarketMutExt,
-};
+use gmsol_model::price::{Price, Prices};
 use gmsol_programs::{gmsol_store::types::MarketMeta, model::MarketModel};
 use petgraph::{
     graph::{EdgeIndex, NodeIndex},
@@ -18,15 +14,22 @@ use petgraph::{
 use rust_decimal::{Decimal, MathematicalOps};
 use solana_sdk::pubkey::Pubkey;
 
-use crate::{constants, utils::fixed};
+use self::estimation::SwapEstimation;
+
+pub use self::{
+    config::MarketGraphConfig, error::MarketGraphError, estimation::SwapEstimationParams,
+};
+
+/// Estimation.
+pub mod estimation;
+
+/// Config.
+pub mod config;
 
 /// Error type.
 pub mod error;
 
-pub use self::error::MarketGraphError;
-
 type Graph = StableDiGraph<Node, Edge>;
-type TokenIx = NodeIndex;
 
 #[derive(Debug)]
 struct Node {
@@ -44,16 +47,11 @@ impl Node {
 #[derive(Debug)]
 struct Edge {
     market_token: Pubkey,
-    estimated: Option<Estimated>,
-}
-
-#[derive(Debug)]
-struct Estimated {
-    ln_exchange_rate: Decimal,
+    estimated: Option<SwapEstimation>,
 }
 
 impl Edge {
-    fn new(market_token: Pubkey, estimated: Option<Estimated>) -> Self {
+    fn new(market_token: Pubkey, estimated: Option<SwapEstimation>) -> Self {
         Self {
             market_token,
             estimated,
@@ -71,7 +69,7 @@ struct IndexTokenState {
 }
 
 struct CollateralTokenState {
-    ix: TokenIx,
+    ix: NodeIndex,
     markets: HashSet<Pubkey>,
 }
 
@@ -100,96 +98,8 @@ pub struct MarketGraph {
     config: MarketGraphConfig,
 }
 
-/// Config for [`MarketGraph`].
-#[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
-#[cfg_attr(feature = "js", derive(tsify_next::Tsify))]
-#[cfg_attr(feature = "js", tsify(from_wasm_abi))]
-pub struct MarketGraphConfig {
-    /// Value.
-    pub value: u128,
-    /// Base cost.
-    pub base_cost: u128,
-    /// Max steps.
-    pub max_steps: usize,
-}
-
-const DEFAULT_VALUE: u128 = 1_000 * constants::MARKET_USD_UNIT;
-const DEFAULT_BASE_COST: u128 = 2 * constants::MARKET_USD_UNIT / 100;
-const DEFAULT_MAX_STEPS: usize = 5;
-
-impl Default for MarketGraphConfig {
-    fn default() -> Self {
-        Self {
-            value: DEFAULT_VALUE,
-            base_cost: DEFAULT_BASE_COST,
-            max_steps: DEFAULT_MAX_STEPS,
-        }
-    }
-}
-
 type Distances = Vec<Option<Decimal>>;
 type Predecessors = Vec<Option<(NodeIndex, Pubkey)>>;
-
-impl MarketGraphConfig {
-    fn estimate(
-        &self,
-        market: &MarketModel,
-        is_from_long_side: bool,
-        prices: Option<Prices<u128>>,
-    ) -> Option<Estimated> {
-        if self.value == 0 {
-            #[cfg(tracing)]
-            {
-                tracing::trace!("estimation failed with zero input value");
-            }
-            return None;
-        }
-        let prices = prices?;
-        let mut market = market.clone();
-        let token_in_amount = self
-            .value
-            .checked_div(prices.collateral_token_price(is_from_long_side).min)?;
-        let swap = market
-            .swap(is_from_long_side, token_in_amount, prices)
-            .inspect_err(|err| {
-                #[cfg(tracing)]
-                {
-                    tracing::trace!("estimation failed when creating swap: {err}");
-                }
-                _ = err;
-            })
-            .ok()?
-            .execute()
-            .inspect_err(|err| {
-                #[cfg(tracing)]
-                {
-                    tracing::trace!("estimation failed when executing swap: {err}");
-                }
-                _ = err;
-            })
-            .ok()?;
-        let token_out_value = swap
-            .token_out_amount()
-            .checked_mul(prices.collateral_token_price(!is_from_long_side).max)?;
-        if token_out_value <= self.base_cost {
-            #[cfg(tracing)]
-            {
-                tracing::trace!("estimation failed with zero output value");
-            }
-            return None;
-        }
-        let token_out_value = token_out_value.abs_diff(self.base_cost);
-        let exchange_rate = div_to_factor::<_, { crate::constants::MARKET_DECIMALS }>(
-            &token_out_value,
-            &self.value,
-            false,
-        )?;
-        let exchange_rate = fixed::unsigned_value_to_decimal(exchange_rate);
-        let ln_exchange_rate = exchange_rate.checked_ln()?;
-        Some(Estimated { ln_exchange_rate })
-    }
-}
 
 impl Default for MarketGraph {
     fn default() -> Self {
@@ -224,19 +134,19 @@ impl MarketGraph {
                     self.graph
                         .add_edge(short_token_ix, long_token_ix, Edge::new(key, None));
                 e.insert(MarketState::new(market, long_edge, short_edge));
-                self.update_estimated(Some(&key));
+                self.update_estimation(Some(&key));
                 true
             }
             Entry::Occupied(mut e) => {
                 let state = e.get_mut();
                 state.market = market;
-                self.update_estimated(Some(&key));
+                self.update_estimation(Some(&key));
                 false
             }
         }
     }
 
-    fn update_estimated(&mut self, only: Option<&Pubkey>) {
+    fn update_estimation(&mut self, only: Option<&Pubkey>) {
         let markets = only
             .map(|token| Either::Left(self.markets.get(token).into_iter()))
             .unwrap_or_else(|| Either::Right(self.markets.values()));
@@ -285,30 +195,22 @@ impl MarketGraph {
             .copied()
             .collect::<HashSet<_>>();
         for market_token in related_markets {
-            self.update_estimated(Some(&market_token));
+            self.update_estimation(Some(&market_token));
         }
     }
 
     /// Update value for the estimation.
     pub fn update_value(&mut self, value: u128) {
-        self.update_config(
-            MarketGraphConfig {
-                value,
-                ..self.config
-            },
-            true,
-        );
+        let mut config = self.config;
+        config.swap_estimation_params.value = value;
+        self.update_config(config, true);
     }
 
     /// Update base cost.
     pub fn update_base_cost(&mut self, base_cost: u128) {
-        self.update_config(
-            MarketGraphConfig {
-                base_cost,
-                ..self.config
-            },
-            true,
-        );
+        let mut config = self.config;
+        config.swap_estimation_params.base_cost = base_cost;
+        self.update_config(config, true);
     }
 
     /// Update max steps.
@@ -326,11 +228,11 @@ impl MarketGraph {
     fn update_config(&mut self, config: MarketGraphConfig, should_update_estimation: bool) {
         self.config = config;
         if should_update_estimation {
-            self.update_estimated(None);
+            self.update_estimation(None);
         }
     }
 
-    fn insert_collateral_token(&mut self, token: Pubkey, market_token: Pubkey) -> TokenIx {
+    fn insert_collateral_token(&mut self, token: Pubkey, market_token: Pubkey) -> NodeIndex {
         match self.collateral_tokens.entry(token) {
             Entry::Vacant(e) => {
                 let ix = self.graph.add_node(Node::new(token));
@@ -359,7 +261,7 @@ impl MarketGraph {
             .insert(market_token);
     }
 
-    fn insert_tokens_with_meta(&mut self, meta: &MarketMeta) -> (TokenIx, TokenIx) {
+    fn insert_tokens_with_meta(&mut self, meta: &MarketMeta) -> (NodeIndex, NodeIndex) {
         self.insert_index_token(meta.index_token_mint, meta.market_token_mint);
         let long_token_ix =
             self.insert_collateral_token(meta.long_token_mint, meta.market_token_mint);
@@ -412,7 +314,7 @@ impl MarketGraph {
         self.index_tokens.keys()
     }
 
-    fn to_index(&self, ix: TokenIx) -> usize {
+    fn to_index(&self, ix: NodeIndex) -> usize {
         self.graph.to_index(ix)
     }
 
@@ -620,6 +522,11 @@ impl<'a> BestSwapPaths<'a> {
     /// Get the source.
     pub fn source(&self) -> &Pubkey {
         &self.source
+    }
+
+    /// Get swap estimation params.
+    pub fn params(&self) -> &SwapEstimationParams {
+        &self.graph.config.swap_estimation_params
     }
 
     /// Return whether there is an arbitrage opportunity.
