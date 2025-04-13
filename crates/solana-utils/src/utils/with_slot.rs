@@ -18,9 +18,19 @@ impl<T> WithSlot<T> {
         self.slot
     }
 
+    /// Get the mutable reference of the slot.
+    pub fn slot_mut(&mut self) -> &mut u64 {
+        &mut self.slot
+    }
+
     /// Get value.
     pub fn value(&self) -> &T {
         &self.value
+    }
+
+    /// Get the mutable reference for the value.
+    pub fn value_mut(&mut self) -> &mut T {
+        &mut self.value
     }
 
     /// Into value.
