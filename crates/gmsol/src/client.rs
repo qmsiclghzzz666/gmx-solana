@@ -1,8 +1,13 @@
-use std::{collections::BTreeMap, ops::Deref, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    ops::Deref,
+    sync::{Arc, OnceLock},
+};
 
 use anchor_client::{
     anchor_lang::{AccountDeserialize, AnchorSerialize, Discriminator},
     solana_client::{
+        nonblocking::rpc_client::RpcClient,
         rpc_config::RpcAccountInfoConfig,
         rpc_filter::{Memcmp, RpcFilterType},
     },
@@ -67,6 +72,7 @@ pub struct Client<C> {
     store_program: Program<C>,
     treasury_program: Program<C>,
     timelock_program: Program<C>,
+    rpc: OnceLock<RpcClient>,
     pub_sub: OnceCell<PubsubClient>,
     subscription_config: SubscriptionConfig,
 }
@@ -104,6 +110,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             cfg,
             anchor: Arc::new(anchor),
             pub_sub: OnceCell::default(),
+            rpc: Default::default(),
             subscription_config: subscription,
         })
     }
@@ -140,6 +147,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             treasury_program: self.program(*self.treasury_program_id()),
             timelock_program: self.program(*self.timelock_program_id()),
             pub_sub: OnceCell::default(),
+            rpc: Default::default(),
             subscription_config: self.subscription_config.clone(),
         })
     }
@@ -173,6 +181,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Get the payer.
     pub fn payer(&self) -> Pubkey {
         self.cfg.payer()
+    }
+
+    /// Get RPC Client.
+    pub fn rpc(&self) -> &RpcClient {
+        self.rpc.get_or_init(|| self.cfg.rpc())
     }
 
     /// Get the store program.

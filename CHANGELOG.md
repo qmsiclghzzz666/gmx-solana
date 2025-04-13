@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk: Introduced `OnceMakeBundleBuilder`, which implements `MakeBundleBuilder` and can be created directly from `BundleBuilder`.
 - sdk: Added the `gmsol-programs` crate.
 - sdk: Added the `gmsol-sdk` crate: unlike the `gmsol` crate, this crate is built on top of the `gmsol-programs` crate and includes WASM support.
+- sdk: Added `get_token_accounts_by_owner_with_context` utility function.
+- sdk: Added `Client::rpc` method to access the shared `RpcClient`.
 - cli: Added the `treasury batch-withdraw` subcommand.
 - cli: Added `--authority` option for the `inspect price-feed` subcommand.
 - cli: Introduced a new ALT type `PriceFeed` for the `alt extend` subcommand.

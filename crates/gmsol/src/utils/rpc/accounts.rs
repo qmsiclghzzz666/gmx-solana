@@ -5,9 +5,9 @@ use anchor_client::{
     solana_client::{
         client_error::ClientError,
         nonblocking::rpc_client::RpcClient,
-        rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
+        rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig, RpcTokenAccountsFilter},
         rpc_filter::{Memcmp, RpcFilterType},
-        rpc_request::{RpcError, RpcRequest},
+        rpc_request::{RpcError, RpcRequest, TokenAccountsFilter},
         rpc_response::{Response, RpcKeyedAccount},
     },
     solana_sdk::{
@@ -177,4 +177,68 @@ fn parse_keyed_accounts(
         ));
     }
     Ok(pubkey_accounts)
+}
+
+/// Get token accounts by owner and return with the context.
+pub async fn get_token_accounts_by_owner_with_context(
+    client: &RpcClient,
+    owner: &Pubkey,
+    token_account_filter: TokenAccountsFilter,
+    mut config: RpcAccountInfoConfig,
+) -> crate::Result<WithContext<Vec<RpcKeyedAccount>>> {
+    let token_account_filter = match token_account_filter {
+        TokenAccountsFilter::Mint(mint) => RpcTokenAccountsFilter::Mint(mint.to_string()),
+        TokenAccountsFilter::ProgramId(program_id) => {
+            RpcTokenAccountsFilter::ProgramId(program_id.to_string())
+        }
+    };
+
+    if config.commitment.is_none() {
+        config.commitment = Some(client.commitment());
+    }
+
+    let res = client
+        .send::<Response<Vec<RpcKeyedAccount>>>(
+            RpcRequest::GetTokenAccountsByOwner,
+            json!([owner.to_string(), token_account_filter, config]),
+        )
+        .await
+        .map_err(anchor_client::ClientError::from)?;
+
+    Ok(WithContext::from(res))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use gmsol_solana_utils::cluster::Cluster;
+    use solana_sdk::signature::Keypair;
+    use spl_token::ID;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn get_token_accounts_by_owner() -> crate::Result<()> {
+        let client = crate::Client::new(Cluster::Devnet, Arc::new(Keypair::new()))?;
+        let rpc = client.rpc();
+        let owner = "A1TMhSGzQxMr1TboBKtgixKz1sS6REASMxPo1qsyTSJd"
+            .parse()
+            .unwrap();
+        let accounts = get_token_accounts_by_owner_with_context(
+            rpc,
+            &owner,
+            TokenAccountsFilter::ProgramId(ID),
+            RpcAccountInfoConfig {
+                encoding: Some(UiAccountEncoding::Base64),
+                data_slice: None,
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        assert!(!accounts.value().is_empty());
+
+        Ok(())
+    }
 }
