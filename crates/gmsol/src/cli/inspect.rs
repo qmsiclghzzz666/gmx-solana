@@ -185,6 +185,17 @@ enum Command {
         #[arg(long)]
         post: bool,
     },
+    /// Get chainlink feed updates.
+    Chainlink {
+        #[arg(long, short)]
+        testnet: bool,
+        #[arg(long, short)]
+        decode: bool,
+        #[arg(long, short)]
+        watch: bool,
+        #[arg(required = true)]
+        feed_ids: Vec<String>,
+    },
     /// Insepct controller.
     Features,
     /// Get the event authority address.
@@ -977,6 +988,60 @@ impl InspectArgs {
                         }
                         Err((signatures, err)) => {
                             tracing::error!(%err, "sent txs error, successful list: {signatures:#?}");
+                        }
+                    }
+                }
+            }
+            Command::Chainlink {
+                testnet,
+                feed_ids,
+                decode,
+                watch,
+            } => {
+                use gmsol::{chainlink::Client, types::PriceFeedPrice};
+                use gmsol_chainlink_datastreams::report::Report;
+                use time::OffsetDateTime;
+
+                fn display_report(report: &Report) -> gmsol::Result<String> {
+                    Ok(format!(
+                        "{:#?}",
+                        PriceFeedPrice::from_chainlink_report(report)?
+                    ))
+                }
+
+                let client = if *testnet {
+                    Client::from_testnet_defaults()?
+                } else {
+                    Client::from_defaults()?
+                };
+
+                let feed_ids = feed_ids.iter().map(|s| s.as_str());
+
+                if *watch {
+                    let stream = client.subscribe(feed_ids).await?;
+                    futures_util::pin_mut!(stream);
+                    while let Some(report) = stream.next().await {
+                        match report {
+                            Ok(report) => {
+                                if *decode {
+                                    println!("{}", display_report(&report.decode()?)?);
+                                } else {
+                                    println!("{report:#?}");
+                                }
+                            }
+                            Err(err) => {
+                                tracing::error!(%err, "receive error");
+                            }
+                        }
+                    }
+                } else {
+                    let ts = OffsetDateTime::now_utc();
+                    let reports = client.bulk_report(feed_ids, ts).await?;
+                    for report in reports.iter() {
+                        if *decode {
+                            println!("{}", display_report(&report.decode()?)?);
+                        } else {
+                            println!("{report:#?}");
                         }
                     }
                 }
