@@ -1,8 +1,17 @@
+/// Error type.
+pub mod error;
+
+/// Instruction Group.
+pub mod instruction_group;
+
 /// Constants.
 pub mod constants;
 
-/// Error type.
-pub mod error;
+/// Functions for constructing Program Derived Addresses.
+pub mod pda;
+
+/// Instruction Builders.
+pub mod builders;
 
 /// Utils.
 pub mod utils;
@@ -22,6 +31,7 @@ pub mod model {
 }
 
 pub use error::Error;
+pub use instruction_group::{AtomicInstructionGroup, InstructionGroup, IntoAtomicInstructionGroup};
 
 /// Result type.
 pub type Result<T> = std::result::Result<T, Error>;
