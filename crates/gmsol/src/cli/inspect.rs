@@ -219,14 +219,10 @@ enum Command {
         // #[arg(long, short)]
         // output: Option<Output>,
     },
-    /// GLV account.
+    /// Inspect GLV.
     Glv {
-        #[arg(group = "select-glv")]
-        address: Option<Pubkey>,
-        #[arg(long, short, group = "select-glv")]
-        index: Option<u16>,
-        #[arg(long, short, group = "select-glv")]
-        token: Option<Pubkey>,
+        #[command(flatten)]
+        select: SelectGlv,
     },
     /// GT exchange vault.
     GtExchangeVault { address: Option<Pubkey> },
@@ -282,6 +278,16 @@ pub struct MarketPrices {
     /// Short token price (unit price).
     #[arg(long, short)]
     pub short_price: u128,
+}
+
+#[derive(clap::Args)]
+#[group(required = false)]
+struct SelectGlv {
+    address: Option<Pubkey>,
+    #[arg(long, short)]
+    index: Option<u16>,
+    #[arg(long, short)]
+    token: Option<Pubkey>,
 }
 
 impl MarketPrices {
@@ -1060,9 +1066,12 @@ impl InspectArgs {
                 println!("{data:#?}");
             }
             Command::Glv {
-                address,
-                index,
-                token,
+                select:
+                    SelectGlv {
+                        address,
+                        index,
+                        token,
+                    },
             } => {
                 use anchor_spl::{
                     associated_token::get_associated_token_address, token::TokenAccount,
@@ -1077,9 +1086,39 @@ impl InspectArgs {
                         client.find_glv_address(&glv_token)
                     }
                     (None, None, None) => {
-                        return Err(gmsol::Error::invalid_argument(
-                            "one of `address`, `--token` or `--index` must be provided",
-                        ));
+                        let glvs = client.glvs(store).await?;
+                        let mut table = Table::new();
+                        table.set_titles(row![
+                            "GLV token",
+                            "Index",
+                            "Long Token",
+                            "Short Token",
+                            "Markets"
+                        ]);
+                        table.set_format(table_format());
+                        for (_, glv) in glvs {
+                            let glv_token = glv.glv_token();
+                            let index = glv.index();
+                            let is_valid =
+                                client.find_glv_token_address(store, index) == *glv_token;
+                            if !is_valid {
+                                continue;
+                            }
+                            let long_token = glv.long_token();
+                            let short_token = glv.short_token();
+                            let num_markets = glv.num_markets();
+                            table.add_row(row![
+                                glv_token,
+                                index,
+                                truncate_pubkey(long_token),
+                                truncate_pubkey(short_token),
+                                num_markets
+                            ]);
+                        }
+
+                        println!("{table}");
+
+                        return Ok(());
                     }
                 };
                 let glv = client

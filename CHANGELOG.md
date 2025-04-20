@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- programs: Implemented `Default` for `Glv` and made the `store` field public.
 - sdk: Added more functions to `SquadsOps`:
   - `SquadsOps::squads_create_vault_transaction_and_return_data`: Creates a vault transaction and return the data.
   - `SquadsOps::squads_approve_proposal`: Approves a proposal.
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk: Added `get_token_accounts_by_owner_with_context` utility function.
 - sdk: Added `Client::rpc` method to access the shared `RpcClient`.
 - sdk: Added `WithSlot::slot_mut` and `WithSlot::value_mut` methods.
+- sdk: Added `Client::glvs_with_config` and `Client::glvs` methods.
 - cli: Added the `treasury batch-withdraw` subcommand.
 - cli: Added `--authority` option for the `inspect price-feed` subcommand.
 - cli: Introduced a new ALT type `PriceFeed` for the `alt extend` subcommand.
@@ -38,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - cli: Allowed the `migrate referral-code` subcommand to accept multiple addresses and allow the use of user account addresses or owner account addresses.
 - cli: Ensured all commands respect the `--priority-lamports` option.
+- cli: The `inspect glv` command now supports querying all existing valid GLV accounts.
 
 ## [0.4.0] - 2025-03-08
 

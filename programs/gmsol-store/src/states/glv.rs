@@ -40,7 +40,8 @@ pub struct Glv {
     padding_0: [u8; 3],
     /// Index.
     pub(crate) index: u16,
-    pub(crate) store: Pubkey,
+    /// Store.
+    pub store: Pubkey,
     pub(crate) glv_token: Pubkey,
     pub(crate) long_token: Pubkey,
     pub(crate) short_token: Pubkey,
@@ -65,6 +66,14 @@ gmsol_utils::fixed_map!(
     MAX_ALLOWED_NUMBER_OF_MARKETS,
     12
 );
+
+impl Default for Glv {
+    fn default() -> Self {
+        use bytemuck::Zeroable;
+
+        Self::zeroed()
+    }
+}
 
 impl Seed for Glv {
     const SEED: &'static [u8] = b"glv";

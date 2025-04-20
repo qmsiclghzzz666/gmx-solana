@@ -685,6 +685,40 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .0)
     }
 
+    /// Fetch all [`Glv`](types::Glv) accounts of the given store.
+    pub async fn glvs_with_config(
+        &self,
+        store: &Pubkey,
+        config: ProgramAccountsConfig,
+    ) -> crate::Result<WithContext<BTreeMap<Pubkey, types::Glv>>> {
+        let glvs = self
+            .store_accounts_with_config::<ZeroCopy<types::Glv>>(
+                Some(StoreFilter::new(
+                    store,
+                    bytemuck::offset_of!(types::Glv, store),
+                )),
+                None,
+                config,
+            )
+            .await?
+            .map(|accounts| {
+                accounts
+                    .into_iter()
+                    .map(|(pubkey, m)| (pubkey, m.0))
+                    .collect::<BTreeMap<_, _>>()
+            });
+        Ok(glvs)
+    }
+
+    /// Fetch all [`Glv`](types::Glv) accounts of the given store.
+    pub async fn glvs(&self, store: &Pubkey) -> crate::Result<BTreeMap<Pubkey, types::Glv>> {
+        let glvs = self
+            .glvs_with_config(store, ProgramAccountsConfig::default())
+            .await?
+            .into_value();
+        Ok(glvs)
+    }
+
     /// Fetch [`MarketStatus`] with the market token address.
     pub async fn market_status(
         &self,
