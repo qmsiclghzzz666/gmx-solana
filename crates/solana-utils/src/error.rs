@@ -17,6 +17,7 @@ pub enum Error {
     #[error("compile message: {0}")]
     CompileMessage(#[from] solana_sdk::message::CompileError),
     /// Client error.
+    #[cfg(feature = "solana-client")]
     #[error("client: {0}")]
     Client(#[from] Box<solana_client::client_error::ClientError>),
     /// Signer error.

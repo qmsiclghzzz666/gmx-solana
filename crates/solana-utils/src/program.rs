@@ -1,7 +1,9 @@
 use std::ops::Deref;
 
-use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
+
+#[cfg(client)]
+use solana_client::nonblocking::rpc_client::RpcClient;
 
 use crate::transaction_builder::{Config, TransactionBuilder};
 
@@ -18,6 +20,7 @@ impl<C> Program<C> {
     }
 
     /// Create a Solana RPC Client.
+    #[cfg(client)]
     pub fn rpc(&self) -> RpcClient {
         self.cfg.rpc()
     }

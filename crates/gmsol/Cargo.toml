@@ -108,7 +108,11 @@ squads = ["squads-multisig"]
 migration = []
 
 [dependencies]
-gmsol-solana-utils = { workspace = true, features = ["anchor", "serde"] }
+gmsol-solana-utils = { workspace = true, features = [
+    "anchor",
+    "serde",
+    "client",
+] }
 gmsol-utils = { workspace = true }
 gmsol-store = { workspace = true, features = [
     "no-entrypoint",

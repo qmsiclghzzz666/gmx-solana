@@ -3,9 +3,13 @@
 
 use std::str::FromStr;
 
-use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::commitment_config::CommitmentConfig;
 use url::Url;
+
+#[cfg(client)]
+use solana_client::nonblocking::rpc_client::RpcClient;
+
+#[cfg(client)]
+use solana_sdk::commitment_config::CommitmentConfig;
 
 /// Cluster.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
@@ -104,6 +108,7 @@ impl Cluster {
     }
 
     /// Create a Solana RPC Client.
+    #[cfg(client)]
     pub fn rpc(&self, commitment: CommitmentConfig) -> RpcClient {
         RpcClient::new_with_commitment(self.url().to_string(), commitment)
     }

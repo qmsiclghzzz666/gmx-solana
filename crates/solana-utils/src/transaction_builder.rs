@@ -3,7 +3,6 @@ use std::{
     ops::Deref,
 };
 
-use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig};
 use solana_sdk::{
     address_lookup_table::AddressLookupTableAccount,
     commitment_config::CommitmentConfig,
@@ -11,20 +10,25 @@ use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     message::{v0, VersionedMessage},
     pubkey::Pubkey,
-    signature::Signature,
     signer::Signer,
     transaction::VersionedTransaction,
 };
 
-#[cfg(feature = "anchor")]
+#[cfg(anchor)]
 use anchor_lang::prelude::*;
 
+#[cfg(client)]
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig};
+
+#[cfg(client)]
+use solana_sdk::signature::Signature;
+
+use crate::{cluster::Cluster, compute_budget::ComputeBudget, signer::BoxClonableSigner};
+
+#[cfg(client)]
 use crate::{
     bundle_builder::{BundleBuilder, BundleOptions, CreateBundleOptions},
     client::SendAndConfirm,
-    cluster::Cluster,
-    compute_budget::ComputeBudget,
-    signer::BoxClonableSigner,
     utils::WithSlot,
 };
 
@@ -57,6 +61,7 @@ impl<C> Config<C> {
     }
 
     /// Create a Solana RPC Client.
+    #[cfg(client)]
     pub fn rpc(&self) -> RpcClient {
         self.cluster.rpc(self.options)
     }
@@ -176,6 +181,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     }
 
     /// Convert into a [`BundleBuilder`] with the given options.
+    #[cfg(client)]
     pub fn into_bundle_with_options(
         self,
         options: BundleOptions,
@@ -190,6 +196,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     }
 
     /// Convert into a [`BundleBuilder`].
+    #[cfg(client)]
     pub fn into_bundle(self) -> crate::Result<BundleBuilder<'a, C>> {
         self.into_bundle_with_options(Default::default())
     }
@@ -451,6 +458,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
     }
 
     /// Get versioned message with options.
+    #[cfg(client)]
     pub async fn message_with_options(
         &self,
         without_compute_budget: bool,
@@ -491,6 +499,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
     }
 
     /// Get signed transactoin with options.
+    #[cfg(client)]
     pub async fn signed_transaction_with_options(
         &self,
         without_compute_budget: bool,
@@ -507,6 +516,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
     }
 
     /// Sign and send the transaction with options.
+    #[cfg(client)]
     pub async fn send_with_options(
         &self,
         without_compute_budget: bool,
@@ -535,6 +545,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
     }
 
     /// Build and send the transaction without preflight.
+    #[cfg(client)]
     pub async fn send_without_preflight(self) -> crate::Result<Signature> {
         Ok(self
             .send_with_options(
@@ -550,6 +561,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
     }
 
     /// Build and send the transaction with default options.
+    #[cfg(client)]
     pub async fn send(self) -> crate::Result<Signature> {
         Ok(self
             .send_with_options(false, None, Default::default())
@@ -585,6 +597,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
     }
 
     /// Estimated the execution fee of the result transaction.
+    #[cfg(client)]
     pub async fn estimate_execution_fee(
         &self,
         _client: &RpcClient,
