@@ -1,4 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
+use anchor_spl::associated_token::get_associated_token_address;
 use gmsol::{
     alt::AddressLookupTableOps,
     types::{PriceProviderKind, TokenMapAccess},
@@ -77,7 +78,12 @@ impl Args {
                         vec![]
                     }
                     AltKind::Common => common_addresses(client, store).await?,
-                    AltKind::Market => market_addresses(client, store).await?,
+                    AltKind::Market => {
+                        let mut market_addresses = market_addresses(client, store).await?;
+                        let mut glv_addresses = glv_addresses(client, store).await?;
+                        market_addresses.append(&mut glv_addresses);
+                        market_addresses
+                    }
                     AltKind::PriceFeed => {
                         price_feed_addresses(
                             client,
@@ -102,7 +108,10 @@ impl Args {
                 }
 
                 if !new_addresses.is_empty() {
-                    tracing::info!("extending ALT with addresses: {new_addresses:#?}");
+                    tracing::info!(
+                        "extending ALT with {} addresses: {new_addresses:#?}",
+                        new_addresses.len()
+                    );
                     let extend_txns = client.extend_alt(&alt, new_addresses.clone(), None)?;
                     txns.append(extend_txns, false)?;
                 }
@@ -169,6 +178,21 @@ async fn market_addresses(client: &GMSOLClient, store: &Pubkey) -> gmsol::Result
         let market_token = market.meta().market_token_mint;
         addresses.push(market_token);
         addresses.push(client.find_market_vault_address(store, &market_token));
+    }
+
+    Ok(addresses)
+}
+
+async fn glv_addresses(client: &GMSOLClient, store: &Pubkey) -> gmsol::Result<Vec<Pubkey>> {
+    let mut addresses = Vec::default();
+
+    let glvs = client.glvs(store).await?;
+    for (address, glv) in glvs {
+        addresses.push(address);
+        addresses.push(*glv.glv_token());
+        for market_token in glv.market_tokens() {
+            addresses.push(get_associated_token_address(&address, &market_token));
+        }
     }
 
     Ok(addresses)
