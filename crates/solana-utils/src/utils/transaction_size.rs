@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{borrow::Borrow, collections::HashSet};
 
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 
@@ -6,8 +6,8 @@ use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 ///
 /// Based on the docs of [Solana Transactions](https://solana.com/docs/core/transactions),
 /// and referring to the implementation of `@pythnetwork/solana-utils`.
-pub fn transaction_size(
-    ixs: &[Instruction],
+pub fn transaction_size<T: Borrow<Instruction>>(
+    ixs: &[T],
     is_versioned_transaction: bool,
     lookup_table: Option<&HashSet<Pubkey>>,
     lookup_table_addresses: usize,
@@ -27,6 +27,7 @@ pub fn transaction_size(
     let mut signers = HashSet::<Pubkey>::default();
 
     let ixs_size = ixs.iter().fold(0, |size, ix| {
+        let ix = ix.borrow();
         programs.insert(ix.program_id);
         accounts.insert(ix.program_id);
         ix.accounts.iter().for_each(|account| {

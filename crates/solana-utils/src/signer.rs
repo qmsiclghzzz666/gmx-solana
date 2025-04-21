@@ -1,8 +1,17 @@
+use std::{collections::HashMap, fmt};
+
 use dyn_clone::{clone_trait_object, DynClone};
 use solana_sdk::{
+    hash::Hash,
     pubkey::Pubkey,
     signature::Signature,
     signer::{Signer, SignerError},
+    transaction::VersionedTransaction,
+};
+
+use crate::{
+    address_lookup_table::AddressLookupTables, instruction_group::GetInstructionsOptions,
+    AtomicGroup,
 };
 
 /// Boxed Signer.
@@ -11,6 +20,14 @@ pub type BoxSigner = Box<dyn Signer>;
 /// Boxed Clonable Signer.
 #[derive(Clone)]
 pub struct BoxClonableSigner<'a>(pub Box<dyn CloneableSigner + 'a>);
+
+impl fmt::Debug for BoxClonableSigner<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BoxClonableSigner")
+            .field("pubkey", &self.0.pubkey())
+            .finish_non_exhaustive()
+    }
+}
 
 impl<'a> BoxClonableSigner<'a> {
     /// Create from `impl Signer`.
@@ -45,5 +62,89 @@ impl Signer for BoxClonableSigner<'_> {
 
     fn is_interactive(&self) -> bool {
         self.0.is_interactive()
+    }
+}
+
+/// Transaction Signers.
+#[derive(Debug, Clone)]
+pub struct TransactionSigners<C> {
+    signers: HashMap<Pubkey, C>,
+}
+
+impl<C> Default for TransactionSigners<C> {
+    fn default() -> Self {
+        Self {
+            signers: Default::default(),
+        }
+    }
+}
+
+impl<C> TransactionSigners<C> {
+    fn project(&self, ag: &AtomicGroup) -> HashMap<Pubkey, &C> {
+        ag.external_signers()
+            .filter_map(|pubkey| self.signers.get(pubkey).map(|s| (*pubkey, s)))
+            .collect()
+    }
+}
+
+impl<C: Signer> TransactionSigners<C> {
+    /// Insert a signer.
+    pub fn insert(&mut self, signer: C) -> Option<C> {
+        self.signers.insert(signer.pubkey(), signer)
+    }
+
+    /// Sign the given [`AtomicGroup`].
+    pub fn sign_atomic_instruction_group(
+        &self,
+        ag: &AtomicGroup,
+        recent_blockhash: Hash,
+        options: GetInstructionsOptions,
+        luts: Option<&AddressLookupTables>,
+        allow_partial_sign: bool,
+    ) -> crate::Result<VersionedTransaction> {
+        let signers = self.project(ag);
+        let mut tx = ag.partially_signed_transaction_with_blockhash_and_options(
+            recent_blockhash,
+            options,
+            luts,
+        )?;
+        let message = tx.message.serialize();
+        let expected_signers = &tx.message.static_account_keys()
+            [0..(tx.message.header().num_required_signatures as usize)];
+        let default_signature = Signature::default();
+        for (idx, signature) in tx.signatures.iter_mut().enumerate() {
+            if *signature == default_signature {
+                let pubkey = expected_signers[idx];
+                let Some(signer) = signers.get(&pubkey) else {
+                    if allow_partial_sign {
+                        continue;
+                    } else {
+                        return Err(crate::Error::Signer(SignerError::Custom(format!(
+                            "missing signer for {pubkey}"
+                        ))));
+                    }
+                };
+                *signature = signer.sign_message(&message);
+            }
+        }
+        Ok(tx)
+    }
+}
+
+impl<C: Signer> FromIterator<C> for TransactionSigners<C> {
+    fn from_iter<T: IntoIterator<Item = C>>(iter: T) -> Self {
+        let mut this = Self::default();
+        for signer in iter {
+            this.insert(signer);
+        }
+        this
+    }
+}
+
+impl<C: Signer> Extend<C> for TransactionSigners<C> {
+    fn extend<T: IntoIterator<Item = C>>(&mut self, iter: T) {
+        for signer in iter {
+            self.insert(signer);
+        }
     }
 }

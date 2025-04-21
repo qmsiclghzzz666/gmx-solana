@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk: Added `Client::rpc` method to access the shared `RpcClient`.
 - sdk: Added `WithSlot::slot_mut` and `WithSlot::value_mut` methods.
 - sdk: Added `Client::glvs_with_config` and `Client::glvs` methods.
+- sdk: Introduced the `AddressLookupTables` struct to manage multiple address lookup tables.
+- sdk: Introduced the `AtomicGroup` struct to represent a set of instructions intended to be executed atomically in a single transaction.
+- sdk: Introduced the `ParallelGroup` struct to represent a group of atomic instructions that are safe to execute in parallel.
+- sdk: Introduced the `TransactionGroup` struct to build transactions from a sequence of `ParallelGroup`s.
 - cli: Added the `treasury batch-withdraw` subcommand.
 - cli: Added `--authority` option for the `inspect price-feed` subcommand.
 - cli: Introduced a new ALT type `PriceFeed` for the `alt extend` subcommand.

@@ -583,7 +583,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
         &self.luts
     }
 
-    /// Estimated the size of the result transaction.
+    /// Estimates the size of the result transaction.
     ///
     /// See [`transaction_size()`](crate::utils::transaction_size()) for more information.
     pub fn transaction_size(&self, is_versioned_transaction: bool) -> usize {

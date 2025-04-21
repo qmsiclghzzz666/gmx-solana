@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use typed_builder::TypedBuilder;
 
-use crate::{utils::serde::StringPubkey, AtomicInstructionGroup, IntoAtomicInstructionGroup};
+use crate::{utils::serde::StringPubkey, AtomicGroup, IntoAtomicGroup};
 
 use super::utils::prepare_ata;
 
@@ -25,25 +25,18 @@ pub struct PrepareTokenAccounts {
     pub token_program: StringPubkey,
 }
 
-impl IntoAtomicInstructionGroup for PrepareTokenAccounts {
+impl IntoAtomicGroup for PrepareTokenAccounts {
     type Hint = ();
 
-    fn into_atomic_instruction_group(
-        self,
-        _hint: &Self::Hint,
-    ) -> crate::Result<AtomicInstructionGroup> {
+    fn into_atomic_group(self, _hint: &Self::Hint) -> Result<AtomicGroup, crate::SolanaUtilsError> {
         let payer = self.payer.0;
         let owner = self.owner.as_deref().copied().unwrap_or(payer);
-        let insts = self
-            .tokens
-            .iter()
-            .map(|token| {
-                prepare_ata(&payer, &owner, Some(token), &self.token_program)
-                    .unwrap()
-                    .1
-            })
-            .collect();
-        Ok(insts)
+        let insts = self.tokens.iter().map(|token| {
+            prepare_ata(&payer, &owner, Some(token), &self.token_program)
+                .unwrap()
+                .1
+        });
+        Ok(AtomicGroup::with_instructions(&payer, insts))
     }
 }
 
@@ -58,13 +51,10 @@ pub struct WrapNative {
     pub lamports: u64,
 }
 
-impl IntoAtomicInstructionGroup for WrapNative {
+impl IntoAtomicGroup for WrapNative {
     type Hint = ();
 
-    fn into_atomic_instruction_group(
-        self,
-        _hint: &Self::Hint,
-    ) -> crate::Result<AtomicInstructionGroup> {
+    fn into_atomic_group(self, _hint: &Self::Hint) -> Result<AtomicGroup, crate::SolanaUtilsError> {
         use anchor_spl::token::spl_token::{
             instruction::sync_native, native_mint::ID as NATIVE_MINT,
         };
@@ -76,7 +66,10 @@ impl IntoAtomicInstructionGroup for WrapNative {
         let transfer = transfer(&owner, &ata, self.lamports);
         let sync = sync_native(&ID, &ata).unwrap();
 
-        Ok([prepare, transfer, sync].into_iter().collect())
+        Ok(AtomicGroup::with_instructions(
+            &owner,
+            [prepare, transfer, sync],
+        ))
     }
 }
 
@@ -93,9 +86,16 @@ mod tests {
             .payer(Pubkey::new_unique())
             .tokens(tokens)
             .build()
-            .into_atomic_instruction_group(&())
+            .into_atomic_group(&())
             .unwrap();
         assert_eq!(insts.len(), tokens.len());
+        insts
+            .partially_signed_transaction_with_blockhash_and_options(
+                Default::default(),
+                Default::default(),
+                None,
+            )
+            .unwrap();
     }
 
     #[test]
@@ -104,7 +104,13 @@ mod tests {
             .owner(Pubkey::new_unique())
             .lamports(1_000_000_000)
             .build()
-            .into_atomic_instruction_group(&())
+            .into_atomic_group(&())
+            .unwrap()
+            .partially_signed_transaction_with_blockhash_and_options(
+                Default::default(),
+                Default::default(),
+                None,
+            )
             .unwrap();
     }
 }

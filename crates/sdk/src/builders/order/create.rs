@@ -3,7 +3,7 @@ use gmsol_programs::anchor_lang::{InstructionData, ToAccountMetas};
 use gmsol_programs::gmsol_store::client::args;
 use gmsol_programs::gmsol_store::types::CreateOrderParams as StoreCreateOrderParams;
 use gmsol_programs::gmsol_store::{client::accounts, types::OrderKind};
-use solana_sdk::instruction::Instruction;
+use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::system_program;
 use typed_builder::TypedBuilder;
@@ -13,7 +13,7 @@ use crate::builders::{
     NonceBytes, StoreProgram,
 };
 use crate::utils::serde::StringPubkey;
-use crate::{AtomicInstructionGroup, IntoAtomicInstructionGroup};
+use crate::{AtomicGroup, IntoAtomicGroup};
 
 use super::MIN_EXECUTION_LAMPORTS_FOR_ORDER;
 
@@ -86,6 +86,8 @@ pub struct CreateOrderParams {
     /// Delta size in USD.
     pub size: u128,
     /// The amount of pay tokens to use.
+    #[cfg_attr(serde, serde(default))]
+    #[builder(default)]
     pub pay_token_amount: u64,
     /// Minimum amount or value of output tokens.
     ///
@@ -190,16 +192,14 @@ pub struct CreateOrderHint {
     pub short_token: StringPubkey,
 }
 
-impl IntoAtomicInstructionGroup for CreateOrder {
+impl IntoAtomicGroup for CreateOrder {
     type Hint = CreateOrderHint;
 
-    fn into_atomic_instruction_group(
-        self,
-        hint: &Self::Hint,
-    ) -> crate::Result<AtomicInstructionGroup> {
-        let mut insts = AtomicInstructionGroup::default();
-
+    fn into_atomic_group(self, hint: &Self::Hint) -> Result<AtomicGroup, crate::SolanaUtilsError> {
         let owner = self.payer.0;
+
+        let mut insts = AtomicGroup::new(&owner);
+
         let receiver = self.receiver.as_deref().copied().unwrap_or(owner);
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let order = self.program.find_order_address(&owner, &nonce);
@@ -281,6 +281,15 @@ impl IntoAtomicInstructionGroup for CreateOrder {
             )
         });
         let params = &self.params;
+        let swap_markets = self
+            .swap_path
+            .iter()
+            .map(|mint| AccountMeta {
+                pubkey: self.program.find_market_address(mint),
+                is_signer: false,
+                is_writable: false,
+            })
+            .collect::<Vec<_>>();
 
         let create = Instruction {
             program_id: self.program.id,
@@ -305,7 +314,10 @@ impl IntoAtomicInstructionGroup for CreateOrder {
                 token_program: token_program_id,
                 associated_token_program: associated_token::ID,
             }
-            .to_account_metas(None),
+            .to_account_metas(None)
+            .into_iter()
+            .chain(swap_markets)
+            .collect(),
             data: args::CreateOrder {
                 nonce: nonce.to_bytes(),
                 params: StoreCreateOrderParams {
@@ -330,5 +342,40 @@ impl IntoAtomicInstructionGroup for CreateOrder {
         insts.add(create);
 
         Ok(insts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn create_order() -> crate::Result<()> {
+        let params = CreateOrderParams::builder()
+            .kind(CreateOrderKind::MarketIncrease)
+            .is_long(true)
+            .size(1_000 * crate::constants::MARKET_USD_UNIT)
+            .build();
+        CreateOrder::builder()
+            .program(StoreProgram::default())
+            .payer(Pubkey::new_unique())
+            .market_token(Pubkey::new_unique())
+            .is_collateral_or_swap_out_token_long(true)
+            .params(params)
+            .swap_path([Pubkey::new_unique().into()])
+            .build()
+            .into_atomic_group(
+                &CreateOrderHint::builder()
+                    .long_token(Pubkey::new_unique())
+                    .short_token(Pubkey::new_unique())
+                    .build(),
+            )?
+            .partially_signed_transaction_with_blockhash_and_options(
+                Default::default(),
+                Default::default(),
+                None,
+            )?;
+        Ok(())
     }
 }

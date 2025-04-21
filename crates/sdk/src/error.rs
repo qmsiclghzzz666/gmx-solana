@@ -3,6 +3,9 @@ use gmsol_programs::anchor_lang::prelude::Error as AnchorLangError;
 /// SDK Error.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Error from [`gmsol-solana-utils`].
+    #[error("utils: {0}")]
+    SolanaUtils(#[from] gmsol_solana_utils::Error),
     /// Anchor Error.
     #[error("anchor: {0}")]
     Anchor(Box<AnchorLangError>),

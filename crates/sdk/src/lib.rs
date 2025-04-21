@@ -1,9 +1,6 @@
 /// Error type.
 pub mod error;
 
-/// Instruction Group.
-pub mod instruction_group;
-
 /// Constants.
 pub mod constants;
 
@@ -31,9 +28,13 @@ pub mod model {
 }
 
 pub use error::Error;
-pub use instruction_group::{AtomicInstructionGroup, InstructionGroup, IntoAtomicInstructionGroup};
 
 /// Result type.
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub use gmsol_programs as programs;
+pub use gmsol_solana_utils as solana_utils;
+
+pub use gmsol_solana_utils::{
+    AtomicGroup, Error as SolanaUtilsError, IntoAtomicGroup, ParallelGroup, TransactionGroup,
+};
