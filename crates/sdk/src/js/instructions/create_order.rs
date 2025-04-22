@@ -12,6 +12,7 @@ use crate::{
     builders::{
         order::{CreateOrder, CreateOrderHint, CreateOrderKind, CreateOrderParams},
         token::{PrepareTokenAccounts, WrapNative},
+        user::PrepareUser,
         StoreProgram,
     },
     utils::serde::StringPubkey,
@@ -49,6 +50,13 @@ pub fn create_orders(
     options: CreateOrderOptions,
 ) -> crate::Result<Transactions> {
     let mut group = TransactionGroup::default();
+
+    group.add(
+        PrepareUser::builder()
+            .payer(options.payer)
+            .build()
+            .into_atomic_group(&())?,
+    )?;
 
     if kind.is_increase() || kind.is_swap() {
         let pay_token = options

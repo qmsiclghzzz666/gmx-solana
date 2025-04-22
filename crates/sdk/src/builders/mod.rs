@@ -9,6 +9,9 @@ pub mod token;
 /// Instruction builders related to order.
 pub mod order;
 
+/// Instruction builders related to user.
+pub mod user;
+
 pub(crate) mod utils;
 
 /// Nonce Bytes.
