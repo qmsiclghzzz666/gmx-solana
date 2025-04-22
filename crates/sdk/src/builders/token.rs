@@ -8,7 +8,7 @@ use crate::{utils::serde::StringPubkey, AtomicGroup, IntoAtomicGroup};
 
 use super::utils::prepare_ata;
 
-/// Prepares token accounts for the owner.
+/// Prepare token accounts for the owner.
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct PrepareTokenAccounts {

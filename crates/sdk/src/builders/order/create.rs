@@ -342,6 +342,41 @@ impl IntoAtomicGroup for CreateOrder {
             })
             .collect::<Vec<_>>();
 
+        let params = StoreCreateOrderParams {
+            kind: self.kind.into(),
+            decrease_position_swap_type: params.decrease_position_swap_type.map(Into::into),
+            execution_lamports: self.execution_lamports,
+            swap_path_length: self.swap_path.len() as u8,
+            initial_collateral_delta_amount: self
+                .params
+                .amount
+                .try_into()
+                .map_err(crate::SolanaUtilsError::custom)?,
+            size_delta_value: self.params.size,
+            is_long: self.params.is_long,
+            is_collateral_long: is_collateral_or_swap_out_token_long,
+            min_output: Some(self.params.min_output),
+            trigger_price: self.params.trigger_price,
+            acceptable_price: self.params.acceptable_price,
+            should_unwrap_native_token: self.unwrap_native_on_receive,
+            valid_from_ts: self.params.valid_from_ts,
+        };
+
+        if self.kind.is_increase() {
+            insts.add(Instruction {
+                program_id: self.program.id.0,
+                accounts: accounts::PreparePosition {
+                    owner,
+                    store: self.program.store.0,
+                    market,
+                    position: position.unwrap(),
+                    system_program: system_program::ID,
+                }
+                .to_account_metas(None),
+                data: args::PreparePosition { params }.data(),
+            });
+        }
+
         let create = Instruction {
             program_id: self.program.id.0,
             accounts: accounts::CreateOrder {
@@ -371,25 +406,7 @@ impl IntoAtomicGroup for CreateOrder {
             .collect(),
             data: args::CreateOrder {
                 nonce: nonce.to_bytes(),
-                params: StoreCreateOrderParams {
-                    kind: self.kind.into(),
-                    decrease_position_swap_type: params.decrease_position_swap_type.map(Into::into),
-                    execution_lamports: self.execution_lamports,
-                    swap_path_length: self.swap_path.len() as u8,
-                    initial_collateral_delta_amount: self
-                        .params
-                        .amount
-                        .try_into()
-                        .map_err(crate::SolanaUtilsError::custom)?,
-                    size_delta_value: self.params.size,
-                    is_long: self.params.is_long,
-                    is_collateral_long: is_collateral_or_swap_out_token_long,
-                    min_output: Some(self.params.min_output),
-                    trigger_price: self.params.trigger_price,
-                    acceptable_price: self.params.acceptable_price,
-                    should_unwrap_native_token: self.unwrap_native_on_receive,
-                    valid_from_ts: self.params.valid_from_ts,
-                },
+                params,
             }
             .data(),
         };
