@@ -30,6 +30,8 @@ impl Deref for StringPubkey {
 /// Serialize [`Pubkey`](solana_sdk::pubkey::Pubkey) as string.
 #[cfg(serde)]
 pub mod pubkey {
+    use std::borrow::Cow;
+
     use serde::{Deserialize, Deserializer, Serializer};
     use solana_sdk::pubkey::Pubkey;
 
@@ -46,7 +48,7 @@ pub mod pubkey {
     where
         D: Deserializer<'de>,
     {
-        let pubkey: &str = Deserialize::deserialize(deserializer)?;
+        let pubkey: Cow<'de, str> = Deserialize::deserialize(deserializer)?;
         pubkey
             .parse::<Pubkey>()
             .map_err(<D::Error as serde::de::Error>::custom)

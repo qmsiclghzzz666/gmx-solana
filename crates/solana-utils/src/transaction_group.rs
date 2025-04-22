@@ -162,7 +162,8 @@ impl TransactionGroup {
     }
 
     /// Add a [`ParallelGroup`].
-    pub fn add(&mut self, group: ParallelGroup) -> crate::Result<&mut Self> {
+    pub fn add(&mut self, group: impl Into<ParallelGroup>) -> crate::Result<&mut Self> {
+        let group = group.into();
         if group.is_empty() {
             return Ok(self);
         }
@@ -302,7 +303,7 @@ mod tests {
             ),
         ]
         .into_iter()
-        .collect();
+        .collect::<ParallelGroup>();
 
         let mut group = TransactionGroup::default();
         let txns = group
@@ -354,7 +355,7 @@ mod tests {
             ),
         ]
         .into_iter()
-        .collect();
+        .collect::<ParallelGroup>();
 
         let mut group = TransactionGroup::default();
         let txns = group
@@ -411,7 +412,7 @@ mod tests {
             ),
         ]
         .into_iter()
-        .collect();
+        .collect::<ParallelGroup>();
 
         let ig_2 = [
             {
@@ -434,7 +435,7 @@ mod tests {
             ),
         ]
         .into_iter()
-        .collect();
+        .collect::<ParallelGroup>();
 
         let mut group = TransactionGroup::default();
         let txns = group
@@ -495,7 +496,7 @@ mod tests {
             },
         ]
         .into_iter()
-        .collect();
+        .collect::<ParallelGroup>();
 
         let ig_2 = [
             {
@@ -518,7 +519,7 @@ mod tests {
             ),
         ]
         .into_iter()
-        .collect();
+        .collect::<ParallelGroup>();
 
         let mut group = TransactionGroup::default();
         let txns = group

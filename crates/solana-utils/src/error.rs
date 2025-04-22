@@ -23,10 +23,20 @@ pub enum Error {
     /// Signer error.
     #[error("signer: {0}")]
     Signer(#[from] solana_sdk::signer::SignerError),
+    /// Custom error.
+    #[error("custom: {0}")]
+    Custom(String),
 }
 
 impl<T> From<(T, Error)> for Error {
     fn from(value: (T, crate::Error)) -> Self {
         value.1
+    }
+}
+
+impl Error {
+    /// Create a custom error.
+    pub fn custom(msg: impl ToString) -> Self {
+        Self::Custom(msg.to_string())
     }
 }

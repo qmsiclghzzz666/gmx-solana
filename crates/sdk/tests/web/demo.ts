@@ -1,11 +1,20 @@
 import {
   apply_factor,
+  create_orders,
   Market,
   MarketGraph,
-  MarketGraphConfig,
   Pubkey,
 } from "../../pkg/index.js";
 
+function toBase64(data: number[]): string {
+  const uint8 = new Uint8Array(data);
+
+  const binary = String.fromCharCode(...uint8);
+
+  return btoa(binary);
+}
+
+// Apply factor.
 const result = apply_factor(123n, 90_000_000_000_000_000_000n);
 console.log("apply factor:", result);
 
@@ -69,3 +78,37 @@ const { path } = graph.best_swap_path(
   false
 );
 console.log(path.map((token) => new Pubkey(token).toString()));
+
+// Create order.
+const marketToken = "BwN2FWixP5JyKjJNyD1YcRKN1XhgvFtnzrPrkfyb4DkW";
+const transactions = create_orders(
+  "MarketIncrease",
+  [
+    {
+      market_token: marketToken,
+      is_long: true,
+      size: 100_000_000_000_000_000_000_000n,
+      amount: 10_000_000n,
+    },
+  ],
+  {
+    recent_blockhash: "3KarAamyLd6dFFmMsh79fXjrdAWp5DB6dxF3BgLK3SuM",
+    payer: "26Pk1e629cgtpbGTTuLSXum31b2NhPu4Q6wdyiX3D3Me",
+    collateral_or_swap_out_token: wsol,
+    hints: new Map([
+      [
+        marketToken,
+        {
+          long_token: wsol,
+          short_token: usdc,
+        },
+      ],
+    ]),
+  }
+);
+
+for (const batch of transactions.serialize()) {
+  for (const txn of batch) {
+    console.log(toBase64(txn));
+  }
+}

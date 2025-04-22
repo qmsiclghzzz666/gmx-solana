@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use anchor_spl::token::spl_token::native_mint;
+use solana_sdk::pubkey::Pubkey;
 use typed_builder::TypedBuilder;
 
 use crate::{utils::serde::StringPubkey, AtomicGroup, IntoAtomicGroup};
@@ -51,18 +53,20 @@ pub struct WrapNative {
     pub lamports: u64,
 }
 
+impl WrapNative {
+    /// Native mint.
+    pub const NATIVE_MINT: Pubkey = native_mint::ID;
+}
+
 impl IntoAtomicGroup for WrapNative {
     type Hint = ();
 
     fn into_atomic_group(self, _hint: &Self::Hint) -> Result<AtomicGroup, crate::SolanaUtilsError> {
-        use anchor_spl::token::spl_token::{
-            instruction::sync_native, native_mint::ID as NATIVE_MINT,
-        };
-        use anchor_spl::token::ID;
+        use anchor_spl::token::{spl_token::instruction::sync_native, ID};
         use gmsol_programs::anchor_lang::solana_program::system_instruction::transfer;
 
         let owner = self.owner.0;
-        let (ata, prepare) = prepare_ata(&owner, &owner, Some(&NATIVE_MINT), &ID).unwrap();
+        let (ata, prepare) = prepare_ata(&owner, &owner, Some(&Self::NATIVE_MINT), &ID).unwrap();
         let transfer = transfer(&owner, &ata, self.lamports);
         let sync = sync_native(&ID, &ata).unwrap();
 

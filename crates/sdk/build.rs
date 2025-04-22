@@ -4,5 +4,6 @@ fn main() {
     cfg_aliases! {
         tracing: { feature = "tracing" },
         serde: { feature = "serde" },
+        js: { feature = "js" },
     }
 }

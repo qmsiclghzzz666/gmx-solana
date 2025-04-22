@@ -19,6 +19,10 @@ pub enum Error {
     /// Base64 decode error.
     #[error("base64-decode: {0}")]
     Base64Decode(#[from] base64::DecodeError),
+    /// Bincode error.
+    #[cfg(feature = "bincode")]
+    #[error("bincode: {0}")]
+    Bincode(#[from] bincode::Error),
     /// Unknown error.
     #[error("unknown: {0}")]
     Unknown(String),

@@ -4,7 +4,6 @@ use gmsol_programs::gmsol_store::client::args;
 use gmsol_programs::gmsol_store::types::CreateOrderParams as StoreCreateOrderParams;
 use gmsol_programs::gmsol_store::{client::accounts, types::OrderKind};
 use solana_sdk::instruction::{AccountMeta, Instruction};
-use solana_sdk::pubkey::Pubkey;
 use solana_sdk::system_program;
 use typed_builder::TypedBuilder;
 
@@ -18,6 +17,8 @@ use crate::{AtomicGroup, IntoAtomicGroup};
 use super::MIN_EXECUTION_LAMPORTS_FOR_ORDER;
 
 /// Create Order Kind.
+#[cfg_attr(js, derive(tsify_next::Tsify))]
+#[cfg_attr(js, tsify(from_wasm_abi))]
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy)]
 pub enum CreateOrderKind {
@@ -51,7 +52,29 @@ impl From<CreateOrderKind> for OrderKind {
     }
 }
 
+impl CreateOrderKind {
+    /// Returns whether the order kind is "swap".
+    pub fn is_swap(&self) -> bool {
+        matches!(self, Self::MarketSwap | Self::LimitSwap)
+    }
+
+    /// Returns whether the order kind is "increase".
+    pub fn is_increase(&self) -> bool {
+        matches!(self, Self::MarketIncrease | Self::LimitIncrease)
+    }
+
+    /// Returns whether the ordr kind is "decrease".
+    pub fn is_decrease(&self) -> bool {
+        matches!(
+            self,
+            Self::MarketDecrease | Self::LimitDecrease | Self::StopLossDecrease
+        )
+    }
+}
+
 /// Swap type for decreasing position.
+#[cfg_attr(js, derive(tsify_next::Tsify))]
+#[cfg_attr(js, tsify(from_wasm_abi))]
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy)]
 pub enum DecreasePositionSwapType {
@@ -76,19 +99,24 @@ impl From<DecreasePositionSwapType>
 }
 
 /// Parameters for creating an order.
+#[cfg_attr(js, derive(tsify_next::Tsify))]
+#[cfg_attr(js, tsify(from_wasm_abi))]
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct CreateOrderParams {
-    /// Order Kind.
-    pub kind: CreateOrderKind,
+    /// The market token of the market in which the order will be created.
+    #[builder(setter(into))]
+    pub market_token: StringPubkey,
     /// Whether the order is for a long or short position.
     pub is_long: bool,
     /// Delta size in USD.
     pub size: u128,
-    /// The amount of pay tokens to use.
+    /// Delta amount of tokens:
+    /// - For increase / swap orders, it is the amount of pay tokens.
+    /// - For decrease orders, it is the amount of collateral tokens to withdraw.
     #[cfg_attr(serde, serde(default))]
     #[builder(default)]
-    pub pay_token_amount: u64,
+    pub amount: u128,
     /// Minimum amount or value of output tokens.
     ///
     /// - Minimum collateral amount for increase-position orders after swap.
@@ -116,10 +144,14 @@ pub struct CreateOrderParams {
 }
 
 /// Instruction builder for the `create_order` instruction.
+#[cfg_attr(js, derive(tsify_next::Tsify))]
+#[cfg_attr(js, tsify(from_wasm_abi))]
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct CreateOrder {
     /// Program.
+    #[cfg_attr(serde, serde(default))]
+    #[builder(default)]
     pub program: StoreProgram,
     /// Payer (a.k.a. owner).
     #[builder(setter(into))]
@@ -136,24 +168,24 @@ pub struct CreateOrder {
     #[cfg_attr(serde, serde(default = "default_execution_lamports"))]
     #[builder(default = MIN_EXECUTION_LAMPORTS_FOR_ORDER)]
     pub execution_lamports: u64,
-    /// The market token of the market in which the order will be created.
+    /// Order Kind.
+    pub kind: CreateOrderKind,
+    /// Collateral or swap out token.
     #[builder(setter(into))]
-    pub market_token: StringPubkey,
-    /// Whether the collateral or the swap-out token is the long token.
-    pub is_collateral_or_swap_out_token_long: bool,
+    pub collateral_or_swap_out_token: StringPubkey,
     /// Order Parameters.
     pub params: CreateOrderParams,
     /// Pay token.
     #[cfg_attr(serde, serde(default))]
-    #[builder(default, setter(strip_option, into))]
+    #[builder(default, setter(into))]
     pub pay_token: Option<StringPubkey>,
     /// Pay token account.
     #[cfg_attr(serde, serde(default))]
-    #[builder(default, setter(strip_option, into))]
+    #[builder(default, setter(into))]
     pub pay_token_account: Option<StringPubkey>,
     /// Receive token.
     #[cfg_attr(serde, serde(default))]
-    #[builder(default, setter(strip_option, into))]
+    #[builder(default, setter(into))]
     pub receive_token: Option<StringPubkey>,
     /// Swap path.
     #[cfg_attr(serde, serde(default))]
@@ -171,16 +203,26 @@ fn default_execution_lamports() -> u64 {
 }
 
 impl CreateOrder {
-    fn collateral_or_swap_out_token(&self, hint: &CreateOrderHint) -> Pubkey {
-        if self.is_collateral_or_swap_out_token_long {
-            hint.long_token.0
+    fn is_collateral_or_swap_out_token_long(
+        &self,
+        hint: &CreateOrderHint,
+    ) -> Result<bool, crate::SolanaUtilsError> {
+        let token = &*self.collateral_or_swap_out_token;
+        if *token == *hint.long_token {
+            Ok(true)
+        } else if *token == *hint.short_token {
+            Ok(false)
         } else {
-            hint.short_token.0
+            Err(crate::SolanaUtilsError::custom(
+                "invalid hint: `collateral_or_swap_out_token` is not one of the specified long or short tokens",
+            ))
         }
     }
 }
 
 /// Hint for [`CreateOrder`].
+#[cfg_attr(js, derive(tsify_next::Tsify))]
+#[cfg_attr(js, tsify(from_wasm_abi))]
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct CreateOrderHint {
@@ -205,11 +247,19 @@ impl IntoAtomicGroup for CreateOrder {
         let order = self.program.find_order_address(&owner, &nonce);
         let token_program_id = anchor_spl::token::ID;
 
-        let collateral_or_swap_out_token = self.collateral_or_swap_out_token(hint);
+        let collateral_or_swap_out_token = self.collateral_or_swap_out_token.0;
+        let is_collateral_or_swap_out_token_long =
+            self.is_collateral_or_swap_out_token_long(hint)?;
 
-        let (pay_token, receive_token, long_token, short_token, is_position_order) =
-            match self.params.kind {
-                CreateOrderKind::MarketSwap | CreateOrderKind::LimitSwap => (
+        let (pay_token, receive_token, long_token, short_token, is_position_order) = match self.kind
+        {
+            CreateOrderKind::MarketSwap | CreateOrderKind::LimitSwap => {
+                if let Some(receive_token) = self.receive_token {
+                    if receive_token.0 != collateral_or_swap_out_token {
+                        return Err(crate::SolanaUtilsError::custom("invalid `receive_token`: it must be the same as `collateral_or_swap_out_token` for swap orders if provided"));
+                    }
+                }
+                (
                     Some(
                         self.pay_token
                             .as_deref()
@@ -220,34 +270,35 @@ impl IntoAtomicGroup for CreateOrder {
                     None,
                     None,
                     false,
+                )
+            }
+            CreateOrderKind::MarketIncrease | CreateOrderKind::LimitIncrease => (
+                Some(
+                    self.pay_token
+                        .as_deref()
+                        .copied()
+                        .unwrap_or(collateral_or_swap_out_token),
                 ),
-                CreateOrderKind::MarketIncrease | CreateOrderKind::LimitIncrease => (
-                    Some(
-                        self.pay_token
-                            .as_deref()
-                            .copied()
-                            .unwrap_or(collateral_or_swap_out_token),
-                    ),
-                    None,
-                    Some(hint.long_token.0),
-                    Some(hint.short_token.0),
-                    true,
+                None,
+                Some(hint.long_token.0),
+                Some(hint.short_token.0),
+                true,
+            ),
+            CreateOrderKind::MarketDecrease
+            | CreateOrderKind::LimitDecrease
+            | CreateOrderKind::StopLossDecrease => (
+                None,
+                Some(
+                    self.receive_token
+                        .as_deref()
+                        .copied()
+                        .unwrap_or(collateral_or_swap_out_token),
                 ),
-                CreateOrderKind::MarketDecrease
-                | CreateOrderKind::LimitDecrease
-                | CreateOrderKind::StopLossDecrease => (
-                    None,
-                    Some(
-                        self.receive_token
-                            .as_deref()
-                            .copied()
-                            .unwrap_or(collateral_or_swap_out_token),
-                    ),
-                    Some(hint.long_token.0),
-                    Some(hint.short_token.0),
-                    true,
-                ),
-            };
+                Some(hint.long_token.0),
+                Some(hint.short_token.0),
+                true,
+            ),
+        };
 
         let pay_token_account = pay_token.as_ref().map(|token| {
             self.pay_token_account
@@ -270,12 +321,12 @@ impl IntoAtomicGroup for CreateOrder {
             prepare_ata(&owner, &order, short_token.as_ref(), &token_program_id).unzip();
         insts.extend(prepare);
 
-        let market = self.program.find_market_address(&self.market_token);
+        let market = self.program.find_market_address(&self.params.market_token);
         let user = self.program.find_user_address(&owner);
         let position = (is_position_order).then(|| {
             self.program.find_position_address(
                 &owner,
-                &self.market_token,
+                &self.params.market_token,
                 &collateral_or_swap_out_token,
                 self.params.is_long,
             )
@@ -292,11 +343,11 @@ impl IntoAtomicGroup for CreateOrder {
             .collect::<Vec<_>>();
 
         let create = Instruction {
-            program_id: self.program.id,
+            program_id: self.program.id.0,
             accounts: accounts::CreateOrder {
                 owner,
                 receiver,
-                store: self.program.store,
+                store: self.program.store.0,
                 market,
                 user,
                 order,
@@ -321,14 +372,18 @@ impl IntoAtomicGroup for CreateOrder {
             data: args::CreateOrder {
                 nonce: nonce.to_bytes(),
                 params: StoreCreateOrderParams {
-                    kind: params.kind.into(),
+                    kind: self.kind.into(),
                     decrease_position_swap_type: params.decrease_position_swap_type.map(Into::into),
                     execution_lamports: self.execution_lamports,
                     swap_path_length: self.swap_path.len() as u8,
-                    initial_collateral_delta_amount: self.params.pay_token_amount,
+                    initial_collateral_delta_amount: self
+                        .params
+                        .amount
+                        .try_into()
+                        .map_err(crate::SolanaUtilsError::custom)?,
                     size_delta_value: self.params.size,
                     is_long: self.params.is_long,
-                    is_collateral_long: self.is_collateral_or_swap_out_token_long,
+                    is_collateral_long: is_collateral_or_swap_out_token_long,
                     min_output: Some(self.params.min_output),
                     trigger_price: self.params.trigger_price,
                     acceptable_price: self.params.acceptable_price,
@@ -348,27 +403,30 @@ impl IntoAtomicGroup for CreateOrder {
 #[cfg(test)]
 mod tests {
 
+    use solana_sdk::pubkey::Pubkey;
+
     use super::*;
 
     #[test]
     fn create_order() -> crate::Result<()> {
+        let long_token = Pubkey::new_unique();
+        let short_token = Pubkey::new_unique();
         let params = CreateOrderParams::builder()
-            .kind(CreateOrderKind::MarketIncrease)
+            .market_token(Pubkey::new_unique())
             .is_long(true)
             .size(1_000 * crate::constants::MARKET_USD_UNIT)
             .build();
         CreateOrder::builder()
-            .program(StoreProgram::default())
             .payer(Pubkey::new_unique())
-            .market_token(Pubkey::new_unique())
-            .is_collateral_or_swap_out_token_long(true)
+            .kind(CreateOrderKind::MarketIncrease)
+            .collateral_or_swap_out_token(long_token)
             .params(params)
             .swap_path([Pubkey::new_unique().into()])
             .build()
             .into_atomic_group(
                 &CreateOrderHint::builder()
-                    .long_token(Pubkey::new_unique())
-                    .short_token(Pubkey::new_unique())
+                    .long_token(long_token)
+                    .short_token(short_token)
                     .build(),
             )?
             .partially_signed_transaction_with_blockhash_and_options(

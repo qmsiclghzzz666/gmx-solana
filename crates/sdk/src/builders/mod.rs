@@ -15,23 +15,25 @@ pub(crate) mod utils;
 pub type NonceBytes = StringPubkey;
 
 /// A store program.
+#[cfg_attr(js, derive(tsify_next::Tsify))]
+#[cfg_attr(js, tsify(from_wasm_abi))]
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct StoreProgram {
     /// Program ID.
-    #[cfg_attr(serde, serde(with = "crate::utils::serde::pubkey"))]
-    pub id: Pubkey,
+    #[builder(setter(into))]
+    pub id: StringPubkey,
     /// Store address.
-    #[cfg_attr(serde, serde(with = "crate::utils::serde::pubkey"))]
-    pub store: Pubkey,
+    #[builder(setter(into))]
+    pub store: StringPubkey,
 }
 
 impl Default for StoreProgram {
     fn default() -> Self {
         use gmsol_programs::gmsol_store::ID;
         Self {
-            id: ID,
-            store: pda::find_store_address("", &ID).0,
+            id: ID.into(),
+            store: pda::find_store_address("", &ID).0.into(),
         }
     }
 }

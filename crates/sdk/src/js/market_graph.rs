@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::*;
 
 use super::{market::JsMarketModel, price::Price};
 
-/// A JS binding of [`MarkegGraph`].
+/// A JS binding for [`MarkegGraph`].
 #[wasm_bindgen(js_name = MarketGraph)]
 pub struct JsMarketGraph {
     graph: MarketGraph,

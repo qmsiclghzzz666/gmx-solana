@@ -21,8 +21,9 @@ js = [
     "serde",
     "serde-wasm-bindgen",
     "gmsol-programs/wasm-bindgen",
-    "tsify-next",
+    "tsify-next/wasm-bindgen",
     "gmsol-model/js",
+    "bincode",
 ]
 serde = [
     "dep:serde",
@@ -51,10 +52,11 @@ rand = { workspace = true }
 
 tracing = { workspace = true, optional = true }
 
-# Dependencies for the `wasm` feature
+# Dependencies for the `js` feature
 wasm-bindgen = { workspace = true, optional = true }
 serde-wasm-bindgen = { workspace = true, optional = true }
 tsify-next = { workspace = true, optional = true, features = ["js"] }
+bincode = { workspace = true, optional = true }
 
 # Dependencies for the `serde` feature
 serde = { workspace = true, optional = true, features = ["derive"] }
