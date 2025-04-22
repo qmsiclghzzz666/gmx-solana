@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use anchor_spl::token::spl_token::native_mint;
+use either::Either;
 use solana_sdk::pubkey::Pubkey;
 use typed_builder::TypedBuilder;
 
@@ -58,10 +59,16 @@ impl WrapNative {
     pub const NATIVE_MINT: Pubkey = native_mint::ID;
 }
 
-impl IntoAtomicGroup for WrapNative {
-    type Hint = ();
+/// Whether to skip the ATA preparation.
+pub type SkipPreparation = bool;
 
-    fn into_atomic_group(self, _hint: &Self::Hint) -> Result<AtomicGroup, crate::SolanaUtilsError> {
+impl IntoAtomicGroup for WrapNative {
+    type Hint = SkipPreparation;
+
+    fn into_atomic_group(
+        self,
+        skip_preparation: &Self::Hint,
+    ) -> Result<AtomicGroup, crate::SolanaUtilsError> {
         use anchor_spl::token::{spl_token::instruction::sync_native, ID};
         use gmsol_programs::anchor_lang::solana_program::system_instruction::transfer;
 
@@ -72,7 +79,11 @@ impl IntoAtomicGroup for WrapNative {
 
         Ok(AtomicGroup::with_instructions(
             &owner,
-            [prepare, transfer, sync],
+            if *skip_preparation {
+                Either::Left([transfer, sync].into_iter())
+            } else {
+                Either::Right([prepare, transfer, sync].into_iter())
+            },
         ))
     }
 }
@@ -108,7 +119,7 @@ mod tests {
             .owner(Pubkey::new_unique())
             .lamports(1_000_000_000)
             .build()
-            .into_atomic_group(&())
+            .into_atomic_group(&true)
             .unwrap()
             .partially_signed_transaction_with_blockhash_and_options(
                 Default::default(),

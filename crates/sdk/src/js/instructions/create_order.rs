@@ -51,29 +51,17 @@ pub fn create_orders(
 ) -> crate::Result<Transactions> {
     let mut group = TransactionGroup::default();
 
-    group.add(
-        PrepareUser::builder()
-            .payer(options.payer)
-            .build()
-            .into_atomic_group(&())?,
-    )?;
+    let prepare_user = PrepareUser::builder()
+        .payer(options.payer)
+        .build()
+        .into_atomic_group(&())?;
 
-    if kind.is_increase() || kind.is_swap() {
-        let pay_token = options
-            .pay_token
-            .unwrap_or(options.collateral_or_swap_out_token);
-        if pay_token.0 == WrapNative::NATIVE_MINT
-            && !options.skip_wrap_native_on_pay.unwrap_or_default()
-        {
-            let lamports: u128 = orders.iter().map(|params| params.amount).sum();
-            let wrap = WrapNative::builder()
-                .owner(options.payer)
-                .lamports(lamports.try_into().map_err(crate::Error::unknown)?)
-                .build()
-                .into_atomic_group(&())?;
-            group.add(wrap)?;
-        }
-    }
+    let pay_token = options
+        .pay_token
+        .unwrap_or(options.collateral_or_swap_out_token);
+    let wrap_native = (kind.is_increase() || kind.is_swap())
+        && (pay_token.0 == WrapNative::NATIVE_MINT
+            && !options.skip_wrap_native_on_pay.unwrap_or_default());
 
     let mut tokens = HashSet::default();
 
@@ -98,7 +86,8 @@ pub fn create_orders(
                 tokens.insert(hint.short_token);
             }
 
-            Ok(CreateOrder::builder()
+            let amount = params.amount;
+            let create = CreateOrder::builder()
                 .program(options.program.clone().unwrap_or_default())
                 .payer(options.payer)
                 .kind(kind)
@@ -111,7 +100,21 @@ pub fn create_orders(
                     !options.skip_unwrap_native_on_receive.unwrap_or_default(),
                 )
                 .build()
-                .into_atomic_group(hint)?)
+                .into_atomic_group(hint)?;
+
+            let ag = if wrap_native {
+                let mut wrap = WrapNative::builder()
+                    .owner(options.payer)
+                    .lamports(amount.try_into().map_err(crate::Error::unknown)?)
+                    .build()
+                    .into_atomic_group(&true)?;
+                wrap.merge(create);
+                wrap
+            } else {
+                create
+            };
+
+            Ok(ag)
         })
         .collect::<crate::Result<ParallelGroup>>()?;
 
@@ -124,6 +127,7 @@ pub fn create_orders(
 
     let signers = TransactionSigners::<NullSigner>::default();
     let transactions = group
+        .add(prepare_user)?
         .add(prepare)?
         .add(create)?
         .optimize(false)
