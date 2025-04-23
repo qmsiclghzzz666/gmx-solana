@@ -109,6 +109,6 @@ const transactions = create_orders(
 
 for (const batch of transactions.serialize()) {
   for (const txn of batch) {
-    console.log(toBase64(txn));
+    console.log(txn);
   }
 }

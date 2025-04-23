@@ -8,27 +8,31 @@ pub mod create_order;
 
 /// A JS binding for transactions.
 #[wasm_bindgen]
-pub struct Transactions(Vec<Vec<VersionedTransaction>>);
+pub struct TransactionGroup(Vec<Vec<VersionedTransaction>>);
 
-/// Serialized transactions.
+/// Serialized transaction group.
 #[derive(Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
-pub struct SerializedTransactions(Vec<Vec<Vec<u8>>>);
+pub struct SerializedTransactionGroup(Vec<Vec<String>>);
 
 #[wasm_bindgen]
-impl Transactions {
-    /// Serialize to serialized transaciton list.
-    pub fn serialize(&self) -> crate::Result<SerializedTransactions> {
+impl TransactionGroup {
+    /// Returns serialized transaciton group.
+    pub fn serialize(&self) -> crate::Result<SerializedTransactionGroup> {
         let serialized = self
             .0
             .iter()
             .map(|batch| {
                 batch
                     .iter()
-                    .map(|txn| Ok(bincode::serialize(txn)?))
+                    .map(|txn| {
+                        Ok(crate::utils::base64::encode_base64(
+                            bincode::serialize(txn)?.as_slice(),
+                        ))
+                    })
                     .collect::<crate::Result<Vec<_>>>()
             })
             .collect::<crate::Result<Vec<_>>>()?;
-        Ok(SerializedTransactions(serialized))
+        Ok(SerializedTransactionGroup(serialized))
     }
 }

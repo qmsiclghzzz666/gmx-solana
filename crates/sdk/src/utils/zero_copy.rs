@@ -105,9 +105,5 @@ pub fn try_deserialize_zero_copy<T: anchor_lang::ZeroCopy>(
 pub fn try_deserialize_zero_copy_from_base64<T: anchor_lang::ZeroCopy>(
     data: &str,
 ) -> crate::Result<ZeroCopy<T>> {
-    use base64::engine::{general_purpose, Engine};
-
-    let data = general_purpose::STANDARD.decode(data)?;
-
-    try_deserialize_zero_copy(&data)
+    try_deserialize_zero_copy(&crate::utils::base64::decode_base64(data)?)
 }

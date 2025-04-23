@@ -18,7 +18,7 @@ use crate::{
     utils::serde::StringPubkey,
 };
 
-use super::Transactions;
+use super::TransactionGroup as JsTransactionGroup;
 
 /// Options for creating orders.
 #[derive(Debug, Serialize, Deserialize, Tsify)]
@@ -48,7 +48,7 @@ pub fn create_orders(
     kind: CreateOrderKind,
     orders: Vec<CreateOrderParams>,
     options: CreateOrderOptions,
-) -> crate::Result<Transactions> {
+) -> crate::Result<JsTransactionGroup> {
     let mut group = TransactionGroup::default();
 
     let prepare_user = PrepareUser::builder()
@@ -142,5 +142,5 @@ pub fn create_orders(
         .map(|res| res.map_err(crate::Error::from))
         .collect::<crate::Result<Vec<_>>>()?;
 
-    Ok(Transactions(transactions))
+    Ok(JsTransactionGroup(transactions))
 }
