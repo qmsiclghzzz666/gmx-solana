@@ -13,7 +13,7 @@ pub struct TransactionGroup(Vec<Vec<VersionedTransaction>>);
 /// Serialized transaction group.
 #[derive(Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
-pub struct SerializedTransactionGroup(Vec<Vec<String>>);
+pub struct SerializedTransactionGroup(Vec<Vec<Vec<u8>>>);
 
 #[wasm_bindgen]
 impl TransactionGroup {
@@ -25,11 +25,7 @@ impl TransactionGroup {
             .map(|batch| {
                 batch
                     .iter()
-                    .map(|txn| {
-                        Ok(crate::utils::base64::encode_base64(
-                            bincode::serialize(txn)?.as_slice(),
-                        ))
-                    })
+                    .map(|txn| Ok(bincode::serialize(txn)?))
                     .collect::<crate::Result<Vec<_>>>()
             })
             .collect::<crate::Result<Vec<_>>>()?;
