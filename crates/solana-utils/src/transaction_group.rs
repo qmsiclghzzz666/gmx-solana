@@ -19,6 +19,8 @@ pub struct TransactionGroupOptions {
     /// # Note
     /// Compute budget instructions are ignored.
     pub max_instructions_per_tx: usize,
+    /// Compute unit price in micro lamports.
+    pub compute_unit_price_micro_lamports: Option<u64>,
 }
 
 impl Default for TransactionGroupOptions {
@@ -26,13 +28,17 @@ impl Default for TransactionGroupOptions {
         Self {
             max_transaction_size: PACKET_DATA_SIZE,
             max_instructions_per_tx: 14,
+            compute_unit_price_micro_lamports: None,
         }
     }
 }
 
 impl TransactionGroupOptions {
     fn instruction_options(&self) -> GetInstructionsOptions {
-        Default::default()
+        GetInstructionsOptions {
+            without_compute_budget: false,
+            compute_unit_price_micro_lamports: self.compute_unit_price_micro_lamports,
+        }
     }
 
     fn build_transaction_batch<C: Deref<Target = impl Signer>>(

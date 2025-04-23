@@ -1,3 +1,9 @@
+use std::collections::HashMap;
+
+use crate::{
+    solana_utils::transaction_group::TransactionGroupOptions as SdkTransactionGroupOptions,
+    utils::serde::StringPubkey,
+};
 use serde::{Deserialize, Serialize};
 use solana_sdk::transaction::VersionedTransaction;
 use tsify_next::Tsify;
@@ -6,7 +12,35 @@ use wasm_bindgen::prelude::wasm_bindgen;
 /// Create order.
 pub mod create_order;
 
-/// A JS binding for transactions.
+/// A JS version transaction group options.
+#[derive(Debug, Serialize, Deserialize, Tsify, Default)]
+#[tsify(from_wasm_abi)]
+pub struct TransactionGroupOptions {
+    #[serde(default)]
+    max_transaction_size: Option<usize>,
+    #[serde(default)]
+    max_instructions_per_tx: Option<usize>,
+    #[serde(default)]
+    compute_unit_price_micro_lamports: Option<u64>,
+    #[serde(default)]
+    luts: HashMap<StringPubkey, Vec<StringPubkey>>,
+}
+
+impl<'a> From<&'a TransactionGroupOptions> for SdkTransactionGroupOptions {
+    fn from(value: &'a TransactionGroupOptions) -> Self {
+        let mut options = SdkTransactionGroupOptions::default();
+        if let Some(size) = value.max_transaction_size {
+            options.max_transaction_size = size;
+        }
+        if let Some(num) = value.max_instructions_per_tx {
+            options.max_instructions_per_tx = num;
+        }
+        options.compute_unit_price_micro_lamports = value.compute_unit_price_micro_lamports;
+        options
+    }
+}
+
+/// A JS binding for transaction group.
 #[wasm_bindgen]
 pub struct TransactionGroup(Vec<Vec<VersionedTransaction>>);
 

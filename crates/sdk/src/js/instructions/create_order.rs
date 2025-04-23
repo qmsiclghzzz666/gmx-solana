@@ -21,7 +21,7 @@ use crate::{
     utils::serde::StringPubkey,
 };
 
-use super::TransactionGroup as JsTransactionGroup;
+use super::{TransactionGroup as JsTransactionGroup, TransactionGroupOptions};
 
 /// Options for creating orders.
 #[derive(Debug, Serialize, Deserialize, Tsify)]
@@ -43,6 +43,8 @@ pub struct CreateOrderOptions {
     skip_wrap_native_on_pay: Option<bool>,
     #[serde(default)]
     skip_unwrap_native_on_receive: Option<bool>,
+    #[serde(default)]
+    transaction_group: TransactionGroupOptions,
 }
 
 /// Build transactions for creating orders.
@@ -52,7 +54,17 @@ pub fn create_orders(
     orders: Vec<CreateOrderParams>,
     options: CreateOrderOptions,
 ) -> crate::Result<JsTransactionGroup> {
-    let mut group = TransactionGroup::default();
+    let transaction_group_options = &options.transaction_group;
+    let mut group = TransactionGroup::with_options_and_luts(
+        transaction_group_options.into(),
+        transaction_group_options
+            .luts
+            .iter()
+            .map(|(pubkey, addresses)| {
+                (**pubkey, addresses.iter().map(|pubkey| **pubkey).collect())
+            })
+            .collect(),
+    );
 
     let prepare_user = PrepareUser::builder()
         .payer(options.payer)

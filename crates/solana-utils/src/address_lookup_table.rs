@@ -43,3 +43,11 @@ impl AddressLookupTables {
             })
     }
 }
+
+impl FromIterator<(Pubkey, Vec<Pubkey>)> for AddressLookupTables {
+    fn from_iter<T: IntoIterator<Item = (Pubkey, Vec<Pubkey>)>>(iter: T) -> Self {
+        Self {
+            luts: FromIterator::from_iter(iter),
+        }
+    }
+}
