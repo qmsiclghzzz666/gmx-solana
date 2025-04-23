@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, ops::Deref};
 
 use dyn_clone::{clone_trait_object, DynClone};
 use solana_sdk::{
@@ -87,7 +87,7 @@ impl<C> TransactionSigners<C> {
     }
 }
 
-impl<C: Signer> TransactionSigners<C> {
+impl<C: Deref<Target = impl Signer>> TransactionSigners<C> {
     /// Insert a signer.
     pub fn insert(&mut self, signer: C) -> Option<C> {
         self.signers.insert(signer.pubkey(), signer)
@@ -131,7 +131,7 @@ impl<C: Signer> TransactionSigners<C> {
     }
 }
 
-impl<C: Signer> FromIterator<C> for TransactionSigners<C> {
+impl<C: Deref<Target = impl Signer>> FromIterator<C> for TransactionSigners<C> {
     fn from_iter<T: IntoIterator<Item = C>>(iter: T) -> Self {
         let mut this = Self::default();
         for signer in iter {
@@ -141,7 +141,7 @@ impl<C: Signer> FromIterator<C> for TransactionSigners<C> {
     }
 }
 
-impl<C: Signer> Extend<C> for TransactionSigners<C> {
+impl<C: Deref<Target = impl Signer>> Extend<C> for TransactionSigners<C> {
     fn extend<T: IntoIterator<Item = C>>(&mut self, iter: T) {
         for signer in iter {
             self.insert(signer);

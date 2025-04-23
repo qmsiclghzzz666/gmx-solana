@@ -1,4 +1,4 @@
-use std::borrow::BorrowMut;
+use std::{borrow::BorrowMut, ops::Deref};
 
 use solana_sdk::{
     hash::Hash, packet::PACKET_DATA_SIZE, pubkey::Pubkey, signer::Signer,
@@ -35,7 +35,7 @@ impl TransactionGroupOptions {
         Default::default()
     }
 
-    fn build_transaction_batch<C: Signer>(
+    fn build_transaction_batch<C: Deref<Target = impl Signer>>(
         &self,
         recent_blockhash: Hash,
         luts: &AddressLookupTables,
@@ -243,7 +243,7 @@ pub struct TransactionGroupIter<'a, C> {
     allow_partial_sign: bool,
 }
 
-impl<'a, C: Signer> Iterator for TransactionGroupIter<'a, C> {
+impl<'a, C: Deref<Target = impl Signer>> Iterator for TransactionGroupIter<'a, C> {
     type Item = crate::Result<Vec<VersionedTransaction>>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -260,6 +260,8 @@ impl<'a, C: Signer> Iterator for TransactionGroupIter<'a, C> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use solana_sdk::{
         pubkey::Pubkey,
         signature::{Keypair, Signature},
@@ -271,13 +273,13 @@ mod tests {
     fn fully_sign() -> crate::Result<()> {
         use solana_sdk::system_instruction::transfer;
 
-        let payer_1 = Keypair::new();
+        let payer_1 = Arc::new(Keypair::new());
         let payer_1_pubkey = payer_1.pubkey();
 
-        let payer_2 = Keypair::new();
+        let payer_2 = Arc::new(Keypair::new());
         let payer_2_pubkey = payer_2.pubkey();
 
-        let payer_3 = Keypair::new();
+        let payer_3 = Arc::new(Keypair::new());
         let payer_3_pubkey = payer_3.pubkey();
 
         let signers = TransactionSigners::from_iter([payer_1, payer_2, payer_3]);
@@ -323,13 +325,13 @@ mod tests {
     fn partially_sign() -> crate::Result<()> {
         use solana_sdk::system_instruction::transfer;
 
-        let payer_1 = Keypair::new();
+        let payer_1 = Arc::new(Keypair::new());
         let payer_1_pubkey = payer_1.pubkey();
 
-        let payer_2 = Keypair::new();
+        let payer_2 = Arc::new(Keypair::new());
         let payer_2_pubkey = payer_2.pubkey();
 
-        let payer_3 = Keypair::new();
+        let payer_3 = Arc::new(Keypair::new());
         let payer_3_pubkey = payer_3.pubkey();
 
         let signers = TransactionSigners::from_iter([payer_1, payer_3]);
@@ -380,13 +382,13 @@ mod tests {
     fn optimize() -> crate::Result<()> {
         use solana_sdk::system_instruction::transfer;
 
-        let payer_1 = Keypair::new();
+        let payer_1 = Arc::new(Keypair::new());
         let payer_1_pubkey = payer_1.pubkey();
 
-        let payer_2 = Keypair::new();
+        let payer_2 = Arc::new(Keypair::new());
         let payer_2_pubkey = payer_2.pubkey();
 
-        let payer_3 = Keypair::new();
+        let payer_3 = Arc::new(Keypair::new());
         let payer_3_pubkey = payer_3.pubkey();
 
         let signers = TransactionSigners::from_iter([payer_1, payer_2, payer_3]);
@@ -460,13 +462,13 @@ mod tests {
     fn optimize_deny_payer_change() -> crate::Result<()> {
         use solana_sdk::system_instruction::transfer;
 
-        let payer_1 = Keypair::new();
+        let payer_1 = Arc::new(Keypair::new());
         let payer_1_pubkey = payer_1.pubkey();
 
-        let payer_2 = Keypair::new();
+        let payer_2 = Arc::new(Keypair::new());
         let payer_2_pubkey = payer_2.pubkey();
 
-        let payer_3 = Keypair::new();
+        let payer_3 = Arc::new(Keypair::new());
         let payer_3_pubkey = payer_3.pubkey();
 
         let signers = TransactionSigners::from_iter([payer_1, payer_2, payer_3]);

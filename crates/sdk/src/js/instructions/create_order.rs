@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use gmsol_solana_utils::{
     signer::TransactionSigners, IntoAtomicGroup, ParallelGroup, TransactionGroup,
@@ -125,7 +128,7 @@ pub fn create_orders(
         .build()
         .into_atomic_group(&())?;
 
-    let signers = TransactionSigners::<NullSigner>::default();
+    let signers = TransactionSigners::<Arc<NullSigner>>::default();
     let transactions = group
         .add(prepare_user)?
         .add(prepare)?
