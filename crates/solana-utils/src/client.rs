@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{future::Future, time::Duration};
 
 use solana_client::{
     client_error::ClientError as SolanaClientError,
@@ -14,12 +14,14 @@ use tokio::time::sleep;
 
 use crate::utils::WithSlot;
 
-pub(crate) trait SendAndConfirm {
-    async fn send_and_confirm_transaction_with_config(
+/// Add `send_and_confirm_transaction_with_config` method.
+pub trait SendAndConfirm {
+    /// Send and confirm a transaction.
+    fn send_and_confirm_transaction_with_config(
         &self,
         transaction: &impl SerializableTransaction,
         config: RpcSendTransactionConfig,
-    ) -> std::result::Result<WithSlot<Signature>, SolanaClientError>;
+    ) -> impl Future<Output = std::result::Result<WithSlot<Signature>, SolanaClientError>>;
 }
 
 impl SendAndConfirm for RpcClient {

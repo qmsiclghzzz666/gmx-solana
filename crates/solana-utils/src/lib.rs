@@ -36,7 +36,7 @@ pub mod bundle_builder;
 
 /// RPC client extension.
 #[cfg(client)]
-pub(crate) mod client;
+pub mod client;
 
 /// Utils.
 pub mod utils;
