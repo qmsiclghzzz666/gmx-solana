@@ -10,6 +10,9 @@ pub mod pda;
 /// Instruction Builders.
 pub mod builders;
 
+/// Market calculations.
+pub mod market;
+
 /// Utils.
 pub mod utils;
 

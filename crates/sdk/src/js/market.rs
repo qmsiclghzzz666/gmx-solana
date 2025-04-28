@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
-use crate::utils::zero_copy::{try_deserialize_zero_copy, try_deserialize_zero_copy_from_base64};
+use crate::{
+    market::{MarketCalculations, MarketStatus},
+    utils::zero_copy::{try_deserialize_zero_copy, try_deserialize_zero_copy_from_base64},
+};
 
 use super::price::Prices;
 
@@ -61,10 +64,18 @@ fn default_pnl_factor() -> PnlFactorKind {
     PnlFactorKind::MaxAfterDeposit
 }
 
+/// Params for calculating market status.
+#[derive(Debug, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct MarketStatusParams {
+    /// Prices.
+    pub prices: Prices,
+}
+
 /// Wrapper of [`MarketModel`].
 #[wasm_bindgen(js_name = MarketModel)]
 pub struct JsMarketModel {
-    model: MarketModel,
+    pub(super) model: MarketModel,
 }
 
 #[wasm_bindgen(js_class = MarketModel)]
@@ -76,6 +87,12 @@ impl JsMarketModel {
             params.pnl_factor,
             params.maximize,
         )?)
+    }
+
+    /// Get market status.
+    pub fn status(&self, params: MarketStatusParams) -> crate::Result<MarketStatus> {
+        let prices = params.prices.into();
+        self.model.status(&prices)
     }
 }
 

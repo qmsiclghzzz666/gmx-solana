@@ -28,7 +28,8 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
         })
     }
 
-    fn next_funding_amount_per_size(
+    /// Calculate next funding amounts per size.
+    pub fn next_funding_amount_per_size(
         &self,
         duration_in_seconds: u64,
     ) -> crate::Result<UpdateFundingReport<M::Num, <M::Num as Unsigned>::Signed>> {
@@ -161,7 +162,8 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
         Ok(())
     }
 
-    fn next_funding_factor_per_second(
+    /// Get next funding factor per second.
+    pub fn next_funding_factor_per_second(
         &self,
         duration_in_seconds: u64,
         long_open_interest: &M::Num,

@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- model: make the `UpdateFundingState::next_funding_amount_per_size` function public.
 - cli: Allowed the `migrate referral-code` subcommand to accept multiple addresses and allow the use of user account addresses or owner account addresses.
 - cli: Ensured all commands respect the `--priority-lamports` option.
 - cli: The `inspect glv` command now supports querying all existing valid GLV accounts.

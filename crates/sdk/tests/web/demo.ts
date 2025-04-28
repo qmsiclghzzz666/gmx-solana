@@ -49,6 +49,9 @@ const price = model.market_token_price({
 });
 console.log("market token price:", price);
 
+// Calculate market status.
+console.log("market status:", model.status({ prices }));
+
 // Create a MarketGraph.
 const graph = new MarketGraph({
   swap_estimation_params: {

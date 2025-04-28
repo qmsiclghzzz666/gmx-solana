@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    market::Value,
     market_graph::{MarketGraph, MarketGraphConfig, SwapEstimationParams},
     utils::zero_copy::try_deserialize_zero_copy_from_base64,
 };
@@ -9,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
-use super::{market::JsMarketModel, price::Price};
+use super::market::JsMarketModel;
 
 /// A JS binding for [`MarkegGraph`].
 #[wasm_bindgen(js_name = MarketGraph)]
@@ -49,7 +50,7 @@ impl JsMarketGraph {
     }
 
     /// Update token price.
-    pub fn update_token_price(&mut self, token: &str, price: Price) -> crate::Result<()> {
+    pub fn update_token_price(&mut self, token: &str, price: Value) -> crate::Result<()> {
         self.graph
             .update_token_price(&token.parse()?, &price.into());
         Ok(())
