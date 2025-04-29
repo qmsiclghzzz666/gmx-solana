@@ -13,6 +13,9 @@ pub mod builders;
 /// Market calculations.
 pub mod market;
 
+/// Position calculations.
+pub mod position;
+
 /// Utils.
 pub mod utils;
 

@@ -229,6 +229,11 @@ impl MarketModel {
     fn make_market_mut(&mut self) -> &mut Market {
         Arc::make_mut(&mut self.market)
     }
+
+    /// Returns the time in seconds since last funding fee state update.
+    pub fn passed_in_seconds_for_funding(&self) -> gmsol_model::Result<u64> {
+        AsClock::from(&self.state.clocks.funding).passed_in_seconds()
+    }
 }
 
 impl gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for MarketModel {

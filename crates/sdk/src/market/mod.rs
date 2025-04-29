@@ -35,7 +35,11 @@ impl MarketCalculations for MarketModel {
         let (funding_factor_per_second, longs_pay_shorts, _) = self
             .clone()
             .update_funding(prices)?
-            .next_funding_factor_per_second(0, &open_interest_for_long, &open_interest_for_short)?;
+            .next_funding_factor_per_second(
+                self.passed_in_seconds_for_funding()?,
+                &open_interest_for_long,
+                &open_interest_for_short,
+            )?;
         let size_for_larger_side = open_interest_for_long.max(open_interest_for_short);
         let funding_value = funding_factor_per_second
             .checked_mul(size_for_larger_side)
