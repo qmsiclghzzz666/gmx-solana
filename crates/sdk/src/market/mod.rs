@@ -32,39 +32,58 @@ impl MarketCalculations for MarketModel {
         let open_interest_in_tokens = self.open_interest_in_tokens()?;
 
         // Calculate funding rates.
-        let (funding_factor_per_second, longs_pay_shorts, _) = self
-            .clone()
-            .update_funding(prices)?
-            .next_funding_factor_per_second(
-                self.passed_in_seconds_for_funding()?,
-                &open_interest_for_long,
-                &open_interest_for_short,
-            )?;
-        let size_for_larger_side = open_interest_for_long.max(open_interest_for_short);
-        let funding_value = funding_factor_per_second
-            .checked_mul(size_for_larger_side)
-            .ok_or_else(|| crate::Error::unknown("failed to calculate funding value"))?;
-        let funding_rate_per_second_for_long = if longs_pay_shorts {
-            funding_value
-                .checked_round_up_div(&open_interest_for_long)
-                .ok_or_else(|| crate::Error::unknown("failed to calculate funding rate for long"))?
-                .to_signed()?
-        } else {
-            funding_value
-                .checked_div(open_interest_for_long)
-                .ok_or_else(|| crate::Error::unknown("failed to calculate funding rate for long"))?
-                .to_opposite_signed()?
-        };
-        let funding_rate_per_second_for_short = if !longs_pay_shorts {
-            funding_value
-                .checked_round_up_div(&open_interest_for_short)
-                .ok_or_else(|| crate::Error::unknown("failed to calculate funding rate for short"))?
-                .to_signed()?
-        } else {
-            funding_value
-                .checked_div(open_interest_for_short)
-                .ok_or_else(|| crate::Error::unknown("failed to calculate funding rate for short"))?
-                .to_opposite_signed()?
+        let (funding_rate_per_second_for_long, funding_rate_per_second_for_short) = {
+            if open_interest_for_long == 0 || open_interest_for_short == 0 {
+                (0, 0)
+            } else {
+                let (funding_factor_per_second, longs_pay_shorts, _) = self
+                    .clone()
+                    .update_funding(prices)?
+                    .next_funding_factor_per_second(
+                        self.passed_in_seconds_for_funding()?,
+                        &open_interest_for_long,
+                        &open_interest_for_short,
+                    )?;
+                let size_for_larger_side = open_interest_for_long.max(open_interest_for_short);
+                let funding_value = funding_factor_per_second
+                    .checked_mul(size_for_larger_side)
+                    .ok_or_else(|| crate::Error::unknown("failed to calculate funding value"))?;
+                let funding_rate_per_second_for_long = if longs_pay_shorts {
+                    funding_value
+                        .checked_round_up_div(&open_interest_for_long)
+                        .ok_or_else(|| {
+                            crate::Error::unknown("failed to calculate funding rate for long")
+                        })?
+                        .to_signed()?
+                } else {
+                    funding_value
+                        .checked_div(open_interest_for_long)
+                        .ok_or_else(|| {
+                            crate::Error::unknown("failed to calculate funding rate for long")
+                        })?
+                        .to_opposite_signed()?
+                };
+                let funding_rate_per_second_for_short = if !longs_pay_shorts {
+                    funding_value
+                        .checked_round_up_div(&open_interest_for_short)
+                        .ok_or_else(|| {
+                            crate::Error::unknown("failed to calculate funding rate for short")
+                        })?
+                        .to_signed()?
+                } else {
+                    funding_value
+                        .checked_div(open_interest_for_short)
+                        .ok_or_else(|| {
+                            crate::Error::unknown("failed to calculate funding rate for short")
+                        })?
+                        .to_opposite_signed()?
+                };
+
+                (
+                    funding_rate_per_second_for_long,
+                    funding_rate_per_second_for_short,
+                )
+            }
         };
 
         // Calculate liquidities.
