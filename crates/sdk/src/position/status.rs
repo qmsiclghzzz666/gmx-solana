@@ -2,7 +2,7 @@
 #[cfg_attr(js, derive(tsify_next::Tsify))]
 #[cfg_attr(js, tsify(from_wasm_abi, into_wasm_abi))]
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PositionStatus {
     /// Entry price.
     pub entry_price: u128,
@@ -21,9 +21,9 @@ pub struct PositionStatus {
     /// Close order fee value.
     pub close_order_fee_value: u128,
     /// Net value.
-    pub net_value: u128,
+    pub net_value: i128,
     /// Leverage.
-    pub leverage: u128,
+    pub leverage: Option<u128>,
     /// Liquidation price.
-    pub liquidation_price: u128,
+    pub liquidation_price: Option<i128>,
 }
