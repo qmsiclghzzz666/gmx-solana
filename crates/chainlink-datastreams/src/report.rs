@@ -3,7 +3,7 @@ use std::fmt;
 use num_bigint::{BigInt, BigUint};
 use ruint::aliases::U192;
 
-use data_streams_report::{
+use chainlink_data_streams_report::{
     feed_id::ID,
     report::{base::ReportError, v3::ReportDataV3},
 };
@@ -89,7 +89,7 @@ pub enum DecodeError {
     Snap(#[from] snap::Error),
     /// Report.
     #[error(transparent)]
-    Report(#[from] data_streams_report::report::base::ReportError),
+    Report(#[from] chainlink_data_streams_report::report::base::ReportError),
 }
 
 /// Decode compressed full report.

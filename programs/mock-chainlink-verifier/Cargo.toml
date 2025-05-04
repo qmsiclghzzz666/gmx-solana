@@ -30,6 +30,6 @@ migration = []
 
 [dependencies]
 anchor-lang = { workspace = true }
-data-streams-report = { workspace = true }
+chainlink-data-streams-report = { workspace = true }
 snap = { workspace = true }
 cfg-if = { workspace = true }

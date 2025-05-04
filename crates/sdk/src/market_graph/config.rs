@@ -3,7 +3,7 @@ use gmsol_programs::model::MarketModel;
 
 use super::{estimation::SwapEstimationParams, SwapEstimation};
 
-/// Config for [`MarketGraph`].
+/// Config for [`MarketGraph`](super::MarketGraph).
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "js", derive(tsify_next::Tsify))]

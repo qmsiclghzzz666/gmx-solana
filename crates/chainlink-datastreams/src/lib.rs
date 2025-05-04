@@ -14,4 +14,4 @@ pub mod utils;
 #[cfg(feature = "mock")]
 pub mod mock;
 
-pub use data_streams_report;
+pub use chainlink_data_streams_report;

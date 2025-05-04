@@ -133,8 +133,8 @@ path = "crates/gmsol-decode"
 version = "0.5.0"
 path = "crates/chainlink-datastreams"
 
-[workspace.dependencies.data-streams-report]
-git = "https://github.com/smartcontractkit/data-streams-sdk.git"
+[workspace.dependencies.chainlink-data-streams-report]
+version = "1.0.0"
 
 [workspace.dependencies.gmsol-solana-utils]
 version = "0.5.0"

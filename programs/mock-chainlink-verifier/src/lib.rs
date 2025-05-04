@@ -15,7 +15,7 @@ pub mod gmsol_mock_chainlink_verifier {
     }
 
     pub fn verify(_ctx: Context<VerifyContext>, compressed_report: Vec<u8>) -> Result<Vec<u8>> {
-        use data_streams_report::report::decode_full_report;
+        use chainlink_data_streams_report::report::decode_full_report;
         use snap::raw::Decoder;
 
         let mut decoder = Decoder::new();
