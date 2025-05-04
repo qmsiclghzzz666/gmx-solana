@@ -5,8 +5,8 @@ pub mod value;
 pub mod status;
 
 use gmsol_model::{
-    num::Unsigned, price::Prices, Balance, BaseMarket, BaseMarketExt, BorrowingFeeMarketExt,
-    PerpMarketMutExt,
+    num::Unsigned, num_traits::Zero, price::Prices, Balance, BaseMarket, BaseMarketExt,
+    BorrowingFeeMarketExt, PerpMarket, PerpMarketExt, PerpMarketMutExt,
 };
 use gmsol_programs::model::MarketModel;
 
@@ -100,20 +100,32 @@ impl MarketCalculations for MarketModel {
         let reserve_factor = self
             .reserve_factor()?
             .min(self.open_interest_reserve_factor()?);
-        let max_reserved_value_for_long = gmsol_model::utils::apply_factor::<
+        let max_reserve_value_for_long = gmsol_model::utils::apply_factor::<
             _,
             { constants::MARKET_DECIMALS },
         >(
             &pool_value_without_pnl_for_long.min, &reserve_factor
         )
         .ok_or_else(|| crate::Error::unknown("failed to calculate max reserved value for long"))?;
-        let max_reserved_value_for_short = gmsol_model::utils::apply_factor::<
+        let max_reserve_value_for_short = gmsol_model::utils::apply_factor::<
             _,
             { constants::MARKET_DECIMALS },
         >(
             &pool_value_without_pnl_for_short.min, &reserve_factor
         )
         .ok_or_else(|| crate::Error::unknown("failed to calculate max reserved value for short"))?;
+        let max_liquidity_for_long = max_reserve_value_for_long.min(self.max_open_interest(true)?);
+        let max_liquidity_for_short =
+            max_reserve_value_for_short.min(self.max_open_interest(false)?);
+
+        // Calculate min collateral factor.
+        let min_collateral_factor = *self.position_params()?.min_collateral_factor();
+        let min_collateral_factor_for_long = self
+            .min_collateral_factor_for_open_interest(&Zero::zero(), true)?
+            .max(min_collateral_factor);
+        let min_collateral_factor_for_short = self
+            .min_collateral_factor_for_open_interest(&Zero::zero(), false)?
+            .max(min_collateral_factor);
 
         Ok(MarketStatus {
             funding_rate_per_second_for_long,
@@ -130,15 +142,20 @@ impl MarketCalculations for MarketModel {
             },
             reserved_value_for_long,
             reserved_value_for_short,
+            max_reserve_value_for_long,
+            max_reserve_value_for_short,
             pool_value_without_pnl_for_long,
             pool_value_without_pnl_for_short,
-            liquidity_for_long: max_reserved_value_for_long.saturating_sub(reserved_value_for_long),
-            liquidity_for_short: max_reserved_value_for_short
-                .saturating_sub(reserved_value_for_short),
+            liquidity_for_long: max_liquidity_for_long.saturating_sub(reserved_value_for_long),
+            liquidity_for_short: max_liquidity_for_short.saturating_sub(reserved_value_for_short),
+            max_liquidity_for_long,
+            max_liquidity_for_short,
             open_interest_for_long,
             open_interest_for_short,
             open_interest_in_tokens_for_long: open_interest_in_tokens.long_amount()?,
             open_interest_in_tokens_for_short: open_interest_in_tokens.short_amount()?,
+            min_collateral_factor_for_long,
+            min_collateral_factor_for_short,
         })
     }
 }

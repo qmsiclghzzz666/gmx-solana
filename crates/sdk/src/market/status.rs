@@ -22,6 +22,10 @@ pub struct MarketStatus {
     pub reserved_value_for_long: u128,
     /// Reserved value for short.
     pub reserved_value_for_short: u128,
+    /// Max reserve value for long.
+    pub max_reserve_value_for_long: u128,
+    /// Max reserve value for short.
+    pub max_reserve_value_for_short: u128,
     /// Pool value without pnl for long.
     pub pool_value_without_pnl_for_long: Value,
     /// Pool avlue without pnl for short.
@@ -30,6 +34,10 @@ pub struct MarketStatus {
     pub liquidity_for_long: u128,
     /// Liquidity for short.
     pub liquidity_for_short: u128,
+    /// Max liquidity for long.
+    pub max_liquidity_for_long: u128,
+    /// Max liquidity for short.
+    pub max_liquidity_for_short: u128,
     /// Open interest for long.
     pub open_interest_for_long: u128,
     /// Open interest for short.
@@ -38,4 +46,8 @@ pub struct MarketStatus {
     pub open_interest_in_tokens_for_long: u128,
     /// Open interest in tokens for short.
     pub open_interest_in_tokens_for_short: u128,
+    /// Min collateral factor for long.
+    pub min_collateral_factor_for_long: u128,
+    /// Min collateral factor for short.
+    pub min_collateral_factor_for_short: u128,
 }
