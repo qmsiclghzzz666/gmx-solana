@@ -129,60 +129,36 @@ impl PositionCalculations for PositionModel {
         let params = self.market().position_params()?;
         let min_collateral_factor = params.min_collateral_factor();
         let min_collateral_value = params.min_collateral_value();
-        let liquidation_collateral_usd = position_size_in_usd
-            .checked_mul(*min_collateral_factor)
-            .max(Some(*min_collateral_value))
-            .ok_or(gmsol_model::Error::Computation(
-                "calculating liquidation collateral usd",
-            ))?;
+        let liquidation_collateral_usd = gmsol_model::utils::apply_factor::<
+            _,
+            { constants::MARKET_DECIMALS },
+        >(position_size_in_usd, min_collateral_factor)
+        .max(Some(*min_collateral_value))
+        .ok_or(gmsol_model::Error::Computation(
+            "calculating liquidation collateral usd",
+        ))?;
 
         let liquidation_price = if position_size_in_tokens.is_zero() {
             None
         } else {
-            let remaining_collateral_usd = collateral_value
-                .to_signed()?
-                .checked_add(price_impact_value)
-                .ok_or(gmsol_model::Error::Computation(
-                    "calculating remaining collateral usd",
-                ))?
-                .checked_sub(pending_borrowing_fee_value.to_signed()?)
-                .ok_or(gmsol_model::Error::Computation("calculating net value"))?
-                .checked_sub(pending_funding_fee_value.to_signed()?)
-                .ok_or(gmsol_model::Error::Computation("calculating net value"))?
-                .checked_sub(close_order_fee_value.to_signed()?)
-                .ok_or(gmsol_model::Error::Computation("calculating net value"))?;
-
-            let lq = if self.is_collateral_token_long() {
-                liquidation_collateral_usd
-                    .to_signed()?
-                    .checked_sub(remaining_collateral_usd)
-                    .ok_or(gmsol_model::Error::Computation(
-                        "calculating liquidation price",
-                    ))?
-                    .checked_add(position_size_in_usd.to_signed()?)
-                    .ok_or(gmsol_model::Error::Computation(
-                        "calculating liquidation price",
-                    ))?
-                    .checked_div(position_size_in_tokens.to_signed()?)
-                    .ok_or(gmsol_model::Error::Computation(
-                        "calculating liquidation price",
-                    ))?
-            } else {
-                remaining_collateral_usd
-                    .checked_add(position_size_in_usd.to_signed()?)
-                    .ok_or(gmsol_model::Error::Computation(
-                        "calculating liquidation price",
-                    ))?
-                    .checked_sub(liquidation_collateral_usd.to_signed()?)
-                    .ok_or(gmsol_model::Error::Computation(
-                        "calculating liquidation price",
-                    ))?
-                    .checked_div(position_size_in_tokens.to_signed()?)
-                    .ok_or(gmsol_model::Error::Computation(
-                        "calculating liquidation price",
-                    ))?
-            };
-            Some(lq)
+            collateral_value
+                .checked_add_signed(price_impact_value)
+                .and_then(|a| a.checked_sub(pending_borrowing_fee_value))
+                .and_then(|a| a.checked_sub(pending_funding_fee_value))
+                .and_then(|a| a.checked_sub(close_order_fee_value))
+                .and_then(|remaining_collateral_usd| {
+                    if self.is_collateral_token_long() {
+                        liquidation_collateral_usd
+                            .checked_add(*position_size_in_usd)?
+                            .checked_sub(remaining_collateral_usd)?
+                            .checked_div(*position_size_in_tokens)
+                    } else {
+                        remaining_collateral_usd
+                            .checked_add(*position_size_in_usd)?
+                            .checked_sub(liquidation_collateral_usd)?
+                            .checked_div(*position_size_in_tokens)
+                    }
+                })
         };
 
         Ok(PositionStatus {

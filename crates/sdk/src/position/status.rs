@@ -25,5 +25,5 @@ pub struct PositionStatus {
     /// Leverage.
     pub leverage: Option<u128>,
     /// Liquidation price.
-    pub liquidation_price: Option<i128>,
+    pub liquidation_price: Option<u128>,
 }
