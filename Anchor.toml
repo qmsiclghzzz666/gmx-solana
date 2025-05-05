@@ -7,10 +7,11 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-gmsol-store = "Gmso1uvJnLbawvw7yezdfCDcPydwW2s2iqG3w6MDucLo"
-gmsol-treasury = "GTuvYD5SxkTq4FLG6JV1FQ5dkczr1AfgDcBHaFsBdtBg"
-gmsol-timelock = "TimeBQ7gQyWyQMD3bTteAdy7hTVDNWSwELdSVZHfSXL"
-gmsol-mock-chainlink-verifier = "4nMxSRfeW7W2zFbN8FJ4YDvuTzEzCo1e6GzJxJLnDUoZ"
+# Lib names must be used here, otherwise they will not be recognized by the Anchor CLI.
+gmsol_store = "Gmso1uvJnLbawvw7yezdfCDcPydwW2s2iqG3w6MDucLo"
+gmsol_treasury = "GTuvYD5SxkTq4FLG6JV1FQ5dkczr1AfgDcBHaFsBdtBg"
+gmsol_timelock = "TimeBQ7gQyWyQMD3bTteAdy7hTVDNWSwELdSVZHfSXL"
+gmsol_mock_chainlink_verifier = "4nMxSRfeW7W2zFbN8FJ4YDvuTzEzCo1e6GzJxJLnDUoZ"
 
 [registry]
 url = "https://api.apr.dev"
@@ -25,7 +26,7 @@ test = "cargo test --test anchor --features anchor-test -- $GMSOL_TEST $EXTRA_CA
 [test]
 startup_wait = 15000
 shutdown_wait = 2000
-upgradeable = false
+upgradeable = true
 
 [[test.genesis]]
 address = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
