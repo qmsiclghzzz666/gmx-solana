@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("4nMxSRfeW7W2zFbN8FJ4YDvuTzEzCo1e6GzJxJLnDUoZ");
+declare_id!("AiAJ7kmkK4QZKajcG5tivEo4qUkTQeW1iDLVjqoMW8Ex");
 
 #[program]
 pub mod gmsol_mock_chainlink_verifier {

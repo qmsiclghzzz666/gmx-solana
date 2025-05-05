@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("2AxuNr6euZPKQbTwNsLBjzFTZFAevA85F4PW9m9Dv8pc");
+declare_id!("Dc8QwR6nv9q1maxJ6EPXb3aedo4UehrNX65gBtjo9eXG");
 
 #[program]
 pub mod gmsol_competition {

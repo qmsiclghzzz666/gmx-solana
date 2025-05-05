@@ -250,7 +250,7 @@ use gmsol_model::price::Prices;
 #[cfg_attr(test, macro_use)]
 extern crate static_assertions;
 
-declare_id!("Gmso1uvJnLbawvw7yezdfCDcPydwW2s2iqG3w6MDucLo");
+declare_id!("6axZyfdgJftSzZbvsVKq5tbzGVWi2D68VpMehH9myyP6");
 
 #[program]
 /// Instructions definitions of the GMSOL Store Program.

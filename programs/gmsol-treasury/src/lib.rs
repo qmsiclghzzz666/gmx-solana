@@ -14,7 +14,7 @@ use anchor_lang::prelude::*;
 use gmsol_store::utils::CpiAuthenticate;
 use instructions::*;
 
-declare_id!("GTuvYD5SxkTq4FLG6JV1FQ5dkczr1AfgDcBHaFsBdtBg");
+declare_id!("CLdoqeSL9LWt4k4NkPXPv1xJ6DnmTXcdrbvUvMAcdosn");
 
 #[program]
 pub mod gmsol_treasury {
