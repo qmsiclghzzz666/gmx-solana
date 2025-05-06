@@ -38,3 +38,34 @@ pub(crate) fn prepare_ata(
 
     Some((ata, prepare))
 }
+
+pub(crate) fn get_ata_or_owner(
+    owner: &Pubkey,
+    mint: &Pubkey,
+    should_unwrap_native_token: bool,
+) -> Pubkey {
+    get_ata_or_owner_with_program_id(
+        owner,
+        mint,
+        should_unwrap_native_token,
+        &anchor_spl::token::ID,
+    )
+}
+
+pub(crate) fn get_ata_or_owner_with_program_id(
+    owner: &Pubkey,
+    mint: &Pubkey,
+    should_unwrap_native_token: bool,
+    token_program_id: &Pubkey,
+) -> Pubkey {
+    use anchor_spl::{
+        associated_token::get_associated_token_address_with_program_id,
+        token::spl_token::native_mint,
+    };
+
+    if should_unwrap_native_token && *mint == native_mint::ID {
+        *owner
+    } else {
+        get_associated_token_address_with_program_id(owner, mint, token_program_id)
+    }
+}

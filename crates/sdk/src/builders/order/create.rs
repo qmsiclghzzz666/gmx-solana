@@ -1,9 +1,8 @@
 use anchor_spl::associated_token::{self, get_associated_token_address_with_program_id};
-use gmsol_programs::anchor_lang::{InstructionData, ToAccountMetas};
 use gmsol_programs::gmsol_store::client::args;
 use gmsol_programs::gmsol_store::types::CreateOrderParams as StoreCreateOrderParams;
 use gmsol_programs::gmsol_store::{client::accounts, types::OrderKind};
-use solana_sdk::instruction::{AccountMeta, Instruction};
+use solana_sdk::instruction::AccountMeta;
 use solana_sdk::system_program;
 use typed_builder::TypedBuilder;
 
@@ -143,7 +142,7 @@ pub struct CreateOrderParams {
     pub valid_from_ts: Option<i64>,
 }
 
-/// Instruction builder for the `create_order` instruction.
+/// Builder for the `create_order` instruction.
 #[cfg_attr(js, derive(tsify_next::Tsify))]
 #[cfg_attr(js, tsify(from_wasm_abi))]
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
@@ -363,53 +362,55 @@ impl IntoAtomicGroup for CreateOrder {
         };
 
         if self.kind.is_increase() {
-            insts.add(Instruction {
-                program_id: self.program.id.0,
-                accounts: accounts::PreparePosition {
-                    owner,
-                    store: self.program.store.0,
-                    market,
-                    position: position.unwrap(),
-                    system_program: system_program::ID,
-                }
-                .to_account_metas(None),
-                data: args::PreparePosition { params }.data(),
-            });
+            insts.add(
+                self.program
+                    .instruction(args::PreparePosition { params })
+                    .accounts(
+                        accounts::PreparePosition {
+                            owner,
+                            store: self.program.store.0,
+                            market,
+                            position: position.unwrap(),
+                            system_program: system_program::ID,
+                        },
+                        true,
+                    )
+                    .build(),
+            );
         }
 
-        let create = Instruction {
-            program_id: self.program.id.0,
-            accounts: accounts::CreateOrder {
-                owner,
-                receiver,
-                store: self.program.store.0,
-                market,
-                user,
-                order,
-                position,
-                initial_collateral_token: pay_token,
-                final_output_token: receive_token.unwrap_or(collateral_or_swap_out_token),
-                long_token,
-                short_token,
-                initial_collateral_token_escrow: pay_token_escrow,
-                final_output_token_escrow: receive_token_escrow,
-                long_token_escrow,
-                short_token_escrow,
-                initial_collateral_token_source: pay_token_account,
-                system_program: system_program::ID,
-                token_program: token_program_id,
-                associated_token_program: associated_token::ID,
-            }
-            .to_account_metas(None)
-            .into_iter()
-            .chain(swap_markets)
-            .collect(),
-            data: args::CreateOrder {
+        let create = self
+            .program
+            .instruction(args::CreateOrder {
                 nonce: nonce.to_bytes(),
                 params,
-            }
-            .data(),
-        };
+            })
+            .accounts(
+                accounts::CreateOrder {
+                    owner,
+                    receiver,
+                    store: self.program.store.0,
+                    market,
+                    user,
+                    order,
+                    position,
+                    initial_collateral_token: pay_token,
+                    final_output_token: receive_token.unwrap_or(collateral_or_swap_out_token),
+                    long_token,
+                    short_token,
+                    initial_collateral_token_escrow: pay_token_escrow,
+                    final_output_token_escrow: receive_token_escrow,
+                    long_token_escrow,
+                    short_token_escrow,
+                    initial_collateral_token_source: pay_token_account,
+                    system_program: system_program::ID,
+                    token_program: token_program_id,
+                    associated_token_program: associated_token::ID,
+                },
+                true,
+            )
+            .accounts(swap_markets, false)
+            .build();
 
         insts.add(create);
 

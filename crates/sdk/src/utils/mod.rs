@@ -10,6 +10,9 @@ pub mod serde;
 /// Base64 utils.
 pub mod base64;
 
+/// Optional account utils.
+pub mod optional;
+
 /// Test utils.
 #[cfg(test)]
 pub mod test;

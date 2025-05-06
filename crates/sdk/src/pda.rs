@@ -5,8 +5,14 @@ use gmsol_programs::gmsol_store::accounts as store_accounts;
 
 use crate::builders::NonceBytes;
 
+/// Event authority SEED.
+pub const EVENT_AUTHORITY_SEED: &[u8] = b"__event_authority";
+
 /// Seed for [`Store`](store_accounts::Store).
 pub const STORE_SEED: &[u8] = b"data_store";
+
+/// Seed for store wallet.
+pub const STORE_WALLET_SEED: &[u8] = b"store_wallet";
 
 /// Seed for [`Market`](store_accounts::Market).
 pub const MARKET_SEED: &[u8] = b"market";
@@ -25,9 +31,19 @@ fn to_seed(key: &str) -> [u8; 32] {
     hash(key.as_bytes()).to_bytes()
 }
 
+/// Find the PDA for `event_authority` account.
+pub fn find_event_authority_address(program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[EVENT_AUTHORITY_SEED], program_id)
+}
+
 /// Find the PDA for [`Store`](store_accounts::Store) account.
 pub fn find_store_address(key: &str, store_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[STORE_SEED, &to_seed(key)], store_program_id)
+}
+
+/// Find the PDA for store wallet account.
+pub fn find_store_wallet_address(store: &Pubkey, store_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[STORE_WALLET_SEED, store.as_ref()], store_program_id)
 }
 
 /// Find the PDA for [`Order`](store_accounts::Order) account.
