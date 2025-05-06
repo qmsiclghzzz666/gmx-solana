@@ -13,6 +13,9 @@ pub mod instructions;
 /// Position.
 pub mod position;
 
+/// User.
+pub mod user;
+
 /// Utils.
 pub mod utils;
 

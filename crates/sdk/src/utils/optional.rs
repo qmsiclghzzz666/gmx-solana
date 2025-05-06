@@ -29,3 +29,15 @@ pub fn fix_optional_account_metas(
     });
     metas
 }
+
+/// The "default" pubkey.
+pub const DEFAULT_PUBKEY: Pubkey = Pubkey::new_from_array([0; 32]);
+
+/// Parse optional address where the default pubkey is treated as `None`.
+pub fn optional_address(pubkey: &Pubkey) -> Option<&Pubkey> {
+    if *pubkey == DEFAULT_PUBKEY {
+        None
+    } else {
+        Some(pubkey)
+    }
+}
