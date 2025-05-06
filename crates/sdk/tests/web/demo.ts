@@ -1,5 +1,6 @@
 import {
   apply_factor,
+  close_orders,
   create_orders,
   Market,
   MarketGraph,
@@ -86,6 +87,8 @@ const { path } = graph.best_swap_path(
 );
 console.log(path.map((token) => new Pubkey(token).toString()));
 
+const payer = "11111111111111111111111111111112";
+
 // Create order.
 const marketToken = "BwN2FWixP5JyKjJNyD1YcRKN1XhgvFtnzrPrkfyb4DkW";
 const transactions = create_orders(
@@ -100,7 +103,7 @@ const transactions = create_orders(
   ],
   {
     recent_blockhash: "3KarAamyLd6dFFmMsh79fXjrdAWp5DB6dxF3BgLK3SuM",
-    payer: "11111111111111111111111111111112",
+    payer,
     collateral_or_swap_out_token: wsol,
     hints: new Map([
       [
@@ -130,3 +133,45 @@ console.log("size:", positionModel.size());
 console.log("size_in_tokens:", positionModel.size_in_tokens());
 console.log("collateral amount:", positionModel.collateral_amount());
 console.log("status:", positionModel.status(prices));
+
+// Close orders.
+const closeOrders = close_orders({
+  recent_blockhash: "3KarAamyLd6dFFmMsh79fXjrdAWp5DB6dxF3BgLK3SuM",
+  payer,
+  orders: new Map([
+    [
+      "11111111111111111111111111111113",
+      {
+        owner: payer,
+        receiver: payer,
+        rent_receiver: payer,
+        referrer: undefined,
+        initial_collateral_token: wsol,
+        final_output_token: undefined,
+        long_token: wsol,
+        short_token: usdc,
+        should_unwrap_native_token: true,
+      },
+    ],
+    [
+      "11111111111111111111111111111114",
+      {
+        owner: payer,
+        receiver: payer,
+        rent_receiver: payer,
+        referrer: "11111111111111111111111111111115",
+        initial_collateral_token: wsol,
+        final_output_token: undefined,
+        long_token: usdc,
+        short_token: usdc,
+        should_unwrap_native_token: false,
+      },
+    ],
+  ]),
+});
+
+for (const batch of closeOrders.serialize()) {
+  for (const txn of batch) {
+    console.log(toBase64(txn));
+  }
+}

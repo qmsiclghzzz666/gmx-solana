@@ -7,6 +7,9 @@ pub mod close;
 /// Min execution lamports for order.
 pub const MIN_EXECUTION_LAMPORTS_FOR_ORDER: u64 = 300_000;
 
-pub use self::create::{
-    CreateOrder, CreateOrderHint, CreateOrderKind, CreateOrderParams, DecreasePositionSwapType,
+pub use self::{
+    close::{CloseOrder, CloseOrderHint},
+    create::{
+        CreateOrder, CreateOrderHint, CreateOrderKind, CreateOrderParams, DecreasePositionSwapType,
+    },
 };

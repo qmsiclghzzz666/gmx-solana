@@ -3,9 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use gmsol_solana_utils::{
-    signer::TransactionSigners, IntoAtomicGroup, ParallelGroup, TransactionGroup,
-};
+use gmsol_solana_utils::{signer::TransactionSigners, IntoAtomicGroup, ParallelGroup};
 use serde::{Deserialize, Serialize};
 use solana_sdk::signature::NullSigner;
 use tsify_next::Tsify;
@@ -21,7 +19,7 @@ use crate::{
     utils::serde::StringPubkey,
 };
 
-use super::{TransactionGroup as JsTransactionGroup, TransactionGroupOptions};
+use super::{TransactionGroup, TransactionGroupOptions};
 
 /// Options for creating orders.
 #[derive(Debug, Serialize, Deserialize, Tsify)]
@@ -53,18 +51,8 @@ pub fn create_orders(
     kind: CreateOrderKind,
     orders: Vec<CreateOrderParams>,
     options: CreateOrderOptions,
-) -> crate::Result<JsTransactionGroup> {
-    let transaction_group_options = &options.transaction_group;
-    let mut group = TransactionGroup::with_options_and_luts(
-        transaction_group_options.into(),
-        transaction_group_options
-            .luts
-            .iter()
-            .map(|(pubkey, addresses)| {
-                (**pubkey, addresses.iter().map(|pubkey| **pubkey).collect())
-            })
-            .collect(),
-    );
+) -> crate::Result<TransactionGroup> {
+    let mut group = options.transaction_group.build();
 
     let prepare_user = PrepareUser::builder()
         .payer(options.payer)
@@ -157,5 +145,5 @@ pub fn create_orders(
         .map(|res| res.map_err(crate::Error::from))
         .collect::<crate::Result<Vec<_>>>()?;
 
-    Ok(JsTransactionGroup(transactions))
+    Ok(TransactionGroup(transactions))
 }

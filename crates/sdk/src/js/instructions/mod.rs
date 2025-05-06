@@ -12,6 +12,9 @@ use wasm_bindgen::prelude::wasm_bindgen;
 /// Create order.
 pub mod create_order;
 
+/// Close order.
+pub mod close_order;
+
 /// A JS version transaction group options.
 #[derive(Debug, Serialize, Deserialize, Tsify, Default)]
 #[tsify(from_wasm_abi)]
@@ -37,6 +40,20 @@ impl<'a> From<&'a TransactionGroupOptions> for SdkTransactionGroupOptions {
         }
         options.compute_unit_price_micro_lamports = value.compute_unit_price_micro_lamports;
         options
+    }
+}
+
+impl TransactionGroupOptions {
+    pub(crate) fn build(&self) -> gmsol_solana_utils::TransactionGroup {
+        gmsol_solana_utils::TransactionGroup::with_options_and_luts(
+            self.into(),
+            self.luts
+                .iter()
+                .map(|(pubkey, addresses)| {
+                    (**pubkey, addresses.iter().map(|pubkey| **pubkey).collect())
+                })
+                .collect(),
+        )
     }
 }
 
