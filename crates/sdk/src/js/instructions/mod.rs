@@ -1,11 +1,12 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     solana_utils::transaction_group::TransactionGroupOptions as SdkTransactionGroupOptions,
     utils::serde::StringPubkey,
 };
+use gmsol_solana_utils::signer::TransactionSigners;
 use serde::{Deserialize, Serialize};
-use solana_sdk::transaction::VersionedTransaction;
+use solana_sdk::{signature::NullSigner, transaction::VersionedTransaction};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -14,6 +15,9 @@ pub mod create_order;
 
 /// Close order.
 pub mod close_order;
+
+/// Update order.
+pub mod update_order;
 
 /// A JS version transaction group options.
 #[derive(Debug, Serialize, Deserialize, Tsify, Default)]
@@ -82,4 +86,26 @@ impl TransactionGroup {
             .collect::<crate::Result<Vec<_>>>()?;
         Ok(SerializedTransactionGroup(serialized))
     }
+}
+
+impl TransactionGroup {
+    fn new(
+        group: &gmsol_solana_utils::TransactionGroup,
+        recent_blockhash: &str,
+    ) -> crate::Result<Self> {
+        let signers = empty_signers();
+        let transactions = group
+            .to_transactions(
+                &signers,
+                recent_blockhash.parse().map_err(crate::Error::unknown)?,
+                true,
+            )
+            .map(|res| res.map_err(crate::Error::from))
+            .collect::<crate::Result<Vec<_>>>()?;
+        Ok(Self(transactions))
+    }
+}
+
+fn empty_signers() -> TransactionSigners<Arc<NullSigner>> {
+    Default::default()
 }

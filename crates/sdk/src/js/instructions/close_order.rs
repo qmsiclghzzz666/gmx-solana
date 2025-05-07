@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     builders::{
@@ -13,16 +10,15 @@ use crate::{
 };
 
 use super::{TransactionGroup, TransactionGroupOptions};
-use gmsol_solana_utils::{signer::TransactionSigners, IntoAtomicGroup};
+use gmsol_solana_utils::{IntoAtomicGroup, ParallelGroup};
 use serde::{Deserialize, Serialize};
-use solana_sdk::signature::NullSigner;
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 /// Parameters for closing orders.
 #[derive(Debug, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct CloseOrderParams {
+pub struct CloseOrderArgs {
     recent_blockhash: String,
     payer: StringPubkey,
     orders: HashMap<StringPubkey, CloseOrderHint>,
@@ -34,14 +30,14 @@ pub struct CloseOrderParams {
 
 /// Build transactions for closing orders.
 #[wasm_bindgen]
-pub fn close_orders(params: CloseOrderParams) -> crate::Result<TransactionGroup> {
-    let mut group = params.transaction_group.build();
+pub fn close_orders(args: CloseOrderArgs) -> crate::Result<TransactionGroup> {
+    let mut group = args.transaction_group.build();
 
-    let payer = params.payer;
-    let program = params.program.unwrap_or_default();
+    let payer = args.payer;
+    let program = args.program.unwrap_or_default();
     let mut tokens = HashMap::<_, HashSet<_>>::default();
 
-    for hint in params.orders.values() {
+    for hint in args.orders.values() {
         let owner = hint.owner;
         let owner_tokens = tokens.entry(owner).or_default();
         if let Some(token) = hint.initial_collateral_token {
@@ -61,41 +57,33 @@ pub fn close_orders(params: CloseOrderParams) -> crate::Result<TransactionGroup>
         }
     }
 
-    for (owner, tokens) in tokens {
-        group.add(
-            PrepareTokenAccounts::builder()
+    let prepare = tokens
+        .into_iter()
+        .map(|(owner, tokens)| {
+            Ok(PrepareTokenAccounts::builder()
                 .owner(owner)
                 .payer(payer)
                 .tokens(tokens)
                 .build()
-                .into_atomic_group(&())?,
-        )?;
-    }
+                .into_atomic_group(&())?)
+        })
+        .collect::<crate::Result<ParallelGroup>>()?;
 
-    for (order, hint) in params.orders {
-        group.add(
-            CloseOrder::builder()
+    let close = args
+        .orders
+        .into_iter()
+        .map(|(order, hint)| {
+            Ok(CloseOrder::builder()
                 .payer(payer)
                 .order(order)
                 .program(program.clone())
                 .build()
-                .into_atomic_group(&hint)?,
-        )?;
-    }
+                .into_atomic_group(&hint)?)
+        })
+        .collect::<crate::Result<ParallelGroup>>()?;
 
-    let signers = TransactionSigners::<Arc<NullSigner>>::default();
-    let transactions = group
-        .optimize(false)
-        .to_transactions(
-            &signers,
-            params
-                .recent_blockhash
-                .parse()
-                .map_err(crate::Error::unknown)?,
-            true,
-        )
-        .map(|res| res.map_err(crate::Error::from))
-        .collect::<crate::Result<Vec<_>>>()?;
-
-    Ok(TransactionGroup(transactions))
+    TransactionGroup::new(
+        group.add(prepare)?.add(close)?.optimize(false),
+        &args.recent_blockhash,
+    )
 }

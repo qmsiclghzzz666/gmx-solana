@@ -1,11 +1,8 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
-use gmsol_solana_utils::{signer::TransactionSigners, IntoAtomicGroup, ParallelGroup};
+use gmsol_solana_utils::{IntoAtomicGroup, ParallelGroup};
 use serde::{Deserialize, Serialize};
-use solana_sdk::signature::NullSigner;
+
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
@@ -128,22 +125,12 @@ pub fn create_orders(
         .build()
         .into_atomic_group(&())?;
 
-    let signers = TransactionSigners::<Arc<NullSigner>>::default();
-    let transactions = group
-        .add(prepare_user)?
-        .add(prepare)?
-        .add(create)?
-        .optimize(false)
-        .to_transactions(
-            &signers,
-            options
-                .recent_blockhash
-                .parse()
-                .map_err(crate::Error::unknown)?,
-            true,
-        )
-        .map(|res| res.map_err(crate::Error::from))
-        .collect::<crate::Result<Vec<_>>>()?;
-
-    Ok(TransactionGroup(transactions))
+    TransactionGroup::new(
+        group
+            .add(prepare_user)?
+            .add(prepare)?
+            .add(create)?
+            .optimize(false),
+        &options.recent_blockhash,
+    )
 }

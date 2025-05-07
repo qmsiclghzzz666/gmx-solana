@@ -45,6 +45,26 @@ impl JsMarket {
             model: MarketModel::from_parts(self.market.clone(), supply),
         }
     }
+
+    /// Get market token address.
+    pub fn market_token_address(&self) -> String {
+        self.market.meta.market_token_mint.to_string()
+    }
+
+    /// Get index token address.
+    pub fn index_token_address(&self) -> String {
+        self.market.meta.index_token_mint.to_string()
+    }
+
+    /// Get long token address.
+    pub fn long_token_address(&self) -> String {
+        self.market.meta.long_token_mint.to_string()
+    }
+
+    /// Get short token address.
+    pub fn short_token_address(&self) -> String {
+        self.market.meta.short_token_mint.to_string()
+    }
 }
 
 /// Params for calculating market token price.
