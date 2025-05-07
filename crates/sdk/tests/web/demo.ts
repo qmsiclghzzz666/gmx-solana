@@ -2,6 +2,7 @@ import {
   apply_factor,
   close_orders,
   create_orders,
+  default_store_program,
   Market,
   MarketGraph,
   Position,
@@ -175,3 +176,6 @@ for (const batch of closeOrders.serialize()) {
     console.log(toBase64(txn));
   }
 }
+
+// Get default store program and store address.
+console.log(default_store_program());

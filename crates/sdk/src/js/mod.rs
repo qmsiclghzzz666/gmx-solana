@@ -1,6 +1,9 @@
 /// Price.
 pub mod price;
 
+/// Program.
+pub mod program;
+
 /// Market.
 pub mod market;
 

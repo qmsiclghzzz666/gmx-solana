@@ -15,7 +15,7 @@ pub type NonceBytes = StringPubkey;
 
 /// A store program.
 #[cfg_attr(js, derive(tsify_next::Tsify))]
-#[cfg_attr(js, tsify(from_wasm_abi))]
+#[cfg_attr(js, tsify(from_wasm_abi, into_wasm_abi))]
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct StoreProgram {
