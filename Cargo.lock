@@ -2499,6 +2499,7 @@ dependencies = [
  "solana-client",
  "solana-sdk",
  "solana-transaction-status",
+ "spl-memo",
  "thiserror",
  "tokio",
  "tracing",

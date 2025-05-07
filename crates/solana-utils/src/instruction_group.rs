@@ -35,6 +35,8 @@ pub struct GetInstructionsOptions {
     pub without_compute_budget: bool,
     /// Compute unit price in micro lamports.
     pub compute_unit_price_micro_lamports: Option<u64>,
+    /// If set, a memo will be included in the final transaction.
+    pub memo: Option<String>,
 }
 
 /// A group of instructions that are expected to be executed in the same transaction.
@@ -124,8 +126,13 @@ impl AtomicGroup {
         } else {
             self.compute_budget_instructions(options.compute_unit_price_micro_lamports)
         };
+        let memo_instruction = options
+            .memo
+            .as_ref()
+            .map(|s| spl_memo::build_memo(s.as_bytes(), &[&self.payer]));
         compute_budget_instructions
             .into_iter()
+            .chain(memo_instruction)
             .map(Cow::Owned)
             .chain(self.instructions.iter().map(Cow::Borrowed))
     }
@@ -172,7 +179,7 @@ impl AtomicGroup {
     /// Merge two [`AtomicGroup`]s.
     ///
     /// # Note
-    /// Merging does not change the payer of the current [`AtomicGroup`].
+    /// - Merging does not change the payer of the current [`AtomicGroup`].
     pub fn merge(&mut self, mut other: Self) -> &mut Self {
         self.signers.append(&mut other.signers);
         self.owned_signers.append(&mut other.owned_signers);

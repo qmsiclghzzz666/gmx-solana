@@ -28,6 +28,7 @@ base64 = { workspace = true }
 dyn-clone = { workspace = true }
 url = { workspace = true }
 smallvec = { workspace = true }
+spl-memo = { workspace = true }
 
 tracing = { workspace = true, optional = true }
 solana-client = { workspace = true, optional = true }

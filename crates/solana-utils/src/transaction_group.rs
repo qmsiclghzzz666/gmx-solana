@@ -17,10 +17,12 @@ pub struct TransactionGroupOptions {
     pub max_transaction_size: usize,
     /// Max instructions per transaction.
     /// # Note
-    /// Compute budget instructions are ignored.
+    /// - Compute budget instructions are ignored.
     pub max_instructions_per_tx: usize,
     /// Compute unit price in micro lamports.
     pub compute_unit_price_micro_lamports: Option<u64>,
+    /// Memo for each transaction in this group.
+    pub memo: Option<String>,
 }
 
 impl Default for TransactionGroupOptions {
@@ -29,6 +31,7 @@ impl Default for TransactionGroupOptions {
             max_transaction_size: PACKET_DATA_SIZE,
             max_instructions_per_tx: 14,
             compute_unit_price_micro_lamports: None,
+            memo: None,
         }
     }
 }
@@ -38,6 +41,7 @@ impl TransactionGroupOptions {
         GetInstructionsOptions {
             without_compute_budget: false,
             compute_unit_price_micro_lamports: self.compute_unit_price_micro_lamports,
+            memo: self.memo.clone(),
         }
     }
 

@@ -130,6 +130,7 @@ const transactions = create_orders(
     ]),
     transaction_group: {
       compute_unit_price_micro_lamports: 2000000,
+      memo: "aBsLTf/2DhUG5rg79iU+vUDAXkk=",
     },
   }
 );

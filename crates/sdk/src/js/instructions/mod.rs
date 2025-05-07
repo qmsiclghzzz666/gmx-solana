@@ -31,6 +31,8 @@ pub struct TransactionGroupOptions {
     compute_unit_price_micro_lamports: Option<u64>,
     #[serde(default)]
     luts: HashMap<StringPubkey, Vec<StringPubkey>>,
+    #[serde(default)]
+    memo: Option<String>,
 }
 
 impl<'a> From<&'a TransactionGroupOptions> for SdkTransactionGroupOptions {
@@ -43,6 +45,7 @@ impl<'a> From<&'a TransactionGroupOptions> for SdkTransactionGroupOptions {
             options.max_instructions_per_tx = num;
         }
         options.compute_unit_price_micro_lamports = value.compute_unit_price_micro_lamports;
+        options.memo = value.memo.clone();
         options
     }
 }
