@@ -5,8 +5,11 @@ pub mod value;
 pub mod status;
 
 use gmsol_model::{
-    num::Unsigned, num_traits::Zero, price::Prices, Balance, BaseMarket, BaseMarketExt,
-    BorrowingFeeMarketExt, PerpMarket, PerpMarketExt, PerpMarketMutExt,
+    num::{MulDiv, Unsigned},
+    num_traits::Zero,
+    price::Prices,
+    Balance, BaseMarket, BaseMarketExt, BorrowingFeeMarketExt, PerpMarket, PerpMarketExt,
+    PerpMarketMutExt,
 };
 use gmsol_programs::model::MarketModel;
 
@@ -45,34 +48,31 @@ impl MarketCalculations for MarketModel {
                         &open_interest_for_short,
                     )?;
                 let size_for_larger_side = open_interest_for_long.max(open_interest_for_short);
-                let funding_value = funding_factor_per_second
-                    .checked_mul(size_for_larger_side)
-                    .ok_or_else(|| crate::Error::unknown("failed to calculate funding value"))?;
                 let funding_rate_per_second_for_long = if longs_pay_shorts {
-                    funding_value
-                        .checked_round_up_div(&open_interest_for_long)
+                    funding_factor_per_second
+                        .checked_mul_div_ceil(&size_for_larger_side, &open_interest_for_long)
                         .ok_or_else(|| {
                             crate::Error::unknown("failed to calculate funding rate for long")
                         })?
                         .to_signed()?
                 } else {
-                    funding_value
-                        .checked_div(open_interest_for_long)
+                    funding_factor_per_second
+                        .checked_mul_div(&size_for_larger_side, &open_interest_for_long)
                         .ok_or_else(|| {
                             crate::Error::unknown("failed to calculate funding rate for long")
                         })?
                         .to_opposite_signed()?
                 };
                 let funding_rate_per_second_for_short = if !longs_pay_shorts {
-                    funding_value
-                        .checked_round_up_div(&open_interest_for_short)
+                    funding_factor_per_second
+                        .checked_mul_div_ceil(&size_for_larger_side, &open_interest_for_short)
                         .ok_or_else(|| {
                             crate::Error::unknown("failed to calculate funding rate for short")
                         })?
                         .to_signed()?
                 } else {
-                    funding_value
-                        .checked_div(open_interest_for_short)
+                    funding_factor_per_second
+                        .checked_mul_div(&size_for_larger_side, &open_interest_for_short)
                         .ok_or_else(|| {
                             crate::Error::unknown("failed to calculate funding rate for short")
                         })?
