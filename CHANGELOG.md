@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-05-16
+
 ### Breaking Changes
 
 - programs: Renamed `mock_chainlink_verifier` to `gmsol_mock_chainlink_verifier`.
@@ -150,6 +152,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Provided SDK (`gmsol`) and other utility crates.
 - Provided a command-line interface (`gmsol`).
 
-[unreleased]: https://github.com/gmsol-labs/gmx-solana/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/gmsol-labs/gmx-solana/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/gmsol-labs/gmx-solana/releases/tag/v0.5.0
 [0.4.0]: https://github.com/gmsol-labs/gmx-solana/releases/tag/v0.4.0
 [0.3.0]: https://github.com/gmsol-labs/gmx-solana/releases/tag/v0.3.0
