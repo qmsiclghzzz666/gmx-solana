@@ -26,3 +26,7 @@ serde = { workspace = true, optional = true, features = ["derive"] }
 
 [dev-dependencies]
 num_enum = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

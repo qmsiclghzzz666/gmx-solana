@@ -14,6 +14,7 @@ crate-type = ["cdylib", "lib"]
 name = "gmsol_mock_chainlink_verifier"
 
 [features]
+doc = ["cpi"]
 default = []
 cpi = ["no-entrypoint"]
 no-entrypoint = []
@@ -33,3 +34,7 @@ anchor-lang = { workspace = true }
 chainlink-data-streams-report = { workspace = true }
 snap = { workspace = true }
 cfg-if = { workspace = true }
+
+[package.metadata.docs.rs]
+features = ["doc"]
+rustdoc-args = ["--cfg", "docsrs"]

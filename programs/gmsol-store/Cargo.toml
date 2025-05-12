@@ -69,3 +69,7 @@ gmsol-chainlink-datastreams = { workspace = true }
 rust_decimal = { workspace = true }
 switchboard-on-demand = { workspace = true }
 cfg-if = { workspace = true }
+
+[package.metadata.docs.rs]
+features = ["doc"]
+rustdoc-args = ["--cfg", "docsrs"]

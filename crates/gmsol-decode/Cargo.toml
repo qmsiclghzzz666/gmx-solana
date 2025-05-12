@@ -25,3 +25,7 @@ paste = { workspace = true }
 gmsol-store = { workspace = true, optional = true }
 solana-transaction-status = { workspace = true, optional = true }
 bs58 = { workspace = true, optional = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -20,3 +20,7 @@ thiserror = { workspace = true }
 snap = { workspace = true }
 chainlink-data-streams-report = { workspace = true }
 num-bigint = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
