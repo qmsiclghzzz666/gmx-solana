@@ -5,7 +5,7 @@ edition.workspace = true
 license-file.workspace = true
 description.workspace = true
 repository.workspace = true
-documentation = "https://docs.rs/gmsol"
+documentation = "https://gmsol-labs.github.io/gmx-solana/gmsol/index.html"
 readme.workspace = true
 keywords.workspace = true
 
