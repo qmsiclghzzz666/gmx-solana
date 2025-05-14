@@ -2414,11 +2414,16 @@ dependencies = [
  "anchor-lang",
  "bitmaps",
  "bytemuck",
+ "clap",
+ "derive_more",
  "num_enum",
  "paste",
  "ruint",
  "serde",
+ "serde_bytes",
+ "serde_with",
  "static_assertions",
+ "strum",
  "thiserror 1.0.69",
 ]
 
