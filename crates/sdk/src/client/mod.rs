@@ -988,7 +988,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .await?
             .and_then(|txn| {
                 let signature = txn
-                    .map(|txn| txn.signature.parse().map_err(crate::Error::unknown))
+                    .map(|txn| txn.signature.parse().map_err(crate::Error::custom))
                     .transpose();
                 async move { signature }
             });
@@ -1101,7 +1101,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         futures_util::pin_mut!(events);
         match events.next().await.transpose()? {
             Some(events) => Ok(events.into_value()),
-            None => Err(crate::Error::unknown(format!(
+            None => Err(crate::Error::custom(format!(
                 "events not found, slot={before_slot}"
             ))),
         }
@@ -1209,7 +1209,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
                 }
             }
         }
-        Err(crate::Error::unknown("the watch stream end"))
+        Err(crate::Error::custom("the watch stream end"))
     }
 
     /// Shutdown the client gracefully.

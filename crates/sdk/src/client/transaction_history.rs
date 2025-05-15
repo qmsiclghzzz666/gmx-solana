@@ -31,13 +31,13 @@ pub async fn fetch_transaction_history_with_config(
                 until,
                 limit,
                 commitment,
-            }).await.map_err(crate::Error::unknown)?;
+            }).await.map_err(crate::Error::custom)?;
             match txns.last() {
                 Some(next) => {
-                    let next = next.signature.parse().map_err(crate::Error::unknown)?;
+                    let next = next.signature.parse().map_err(crate::Error::custom)?;
                     for txn in txns {
                         let slot = txn.slot;
-                        let signature = txn.signature.parse().map_err(crate::Error::unknown)?;
+                        let signature = txn.signature.parse().map_err(crate::Error::custom)?;
                         yield WithSlot::new(slot, signature);
                     }
                     before = Some(next);
@@ -83,7 +83,7 @@ pub fn extract_cpi_events(
                             },
                         )
                         .await
-                        .map_err(crate::Error::unknown)?;
+                        .map_err(crate::Error::custom)?;
                     let mut decoder = TransactionDecoder::new(tx.slot, signature, &tx.transaction);
                     match decoder
                         .add_cpi_event_authority_and_program_id(event_authority, program_id)
