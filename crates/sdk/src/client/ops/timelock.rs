@@ -20,7 +20,7 @@ use crate::utils::zero_copy::ZeroCopy;
 
 /// Timelock instructions.
 pub trait TimelockOps<C> {
-    /// Initialize [`TimelockConfig`](crate::types::timelock::TimelockConfig) account.
+    /// Initialize [`TimelockConfig`](gmsol_programs::gmsol_timelock::accounts::TimelockConfig) account.
     fn initialize_timelock_config(
         &self,
         store: &Pubkey,

@@ -300,7 +300,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         self.bundle_with_options(Default::default())
     }
 
-    /// Find PDA for [`Store`](gmsol_store::states::Store) account.
+    /// Find PDA for [`Store`](gmsol_programs::gmsol_store::accounts::Store) account.
     pub fn find_store_address(&self, key: &str) -> Pubkey {
         crate::pda::find_store_address(key, self.store_program_id()).0
     }
@@ -641,7 +641,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(res.into_value())
     }
 
-    /// Fetch [`Store`](types::Store) account with its address.
+    /// Fetch [`Store`](store_accounts::Store) account with its address.
     pub async fn store(&self, address: &Pubkey) -> crate::Result<Arc<store_accounts::Store>> {
         Ok(self
             .account::<SharedZeroCopy<store_accounts::Store>>(address)
@@ -659,7 +659,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .0)
     }
 
-    /// Fetch the [`TokenMap`](types::TokenMap) address of the given store.
+    /// Fetch the [`TokenMap`] address of the given store.
     pub async fn authorized_token_map_address(
         &self,
         store: &Pubkey,
@@ -669,7 +669,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(optional_address(&token_map).copied())
     }
 
-    /// Fetch [`TokenMap`](types::TokenMap) account with its address.
+    /// Fetch [`TokenMap`] account with its address.
     pub async fn token_map(&self, address: &Pubkey) -> crate::Result<TokenMap> {
         self.account(address).await?.ok_or(crate::Error::NotFound)
     }
@@ -683,7 +683,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         self.token_map(&address).await
     }
 
-    /// Fetch all [`Market`](types::Market) accounts of the given store.
+    /// Fetch all [`Market`](store_accounts::Market) accounts of the given store.
     pub async fn markets_with_config(
         &self,
         store: &Pubkey,
@@ -708,7 +708,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(markets)
     }
 
-    /// Fetch all [`Market`](types::Market) accounts of the given store.
+    /// Fetch all [`Market`](store_accounts::Market) accounts of the given store.
     pub async fn markets(
         &self,
         store: &Pubkey,
@@ -720,7 +720,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(markets)
     }
 
-    /// Fetch [`Market`](types::Market) at the given address with config.
+    /// Fetch [`Market`](store_accounts::Market) at the given address with config.
     ///
     /// The value inside the returned context will be `None` if the account does not exist.
     pub async fn market_with_config<T>(
@@ -734,7 +734,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(market.map(|m| m.map(|m| m.0)))
     }
 
-    /// Fetch [`Market`](types::Market) account with its address.
+    /// Fetch [`Market`](store_accounts::Market) account with its address.
     pub async fn market(&self, address: &Pubkey) -> crate::Result<Arc<store_accounts::Market>> {
         Ok(self
             .account::<SharedZeroCopy<store_accounts::Market>>(address)
@@ -743,7 +743,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .0)
     }
 
-    /// Fetch all [`Glv`](types::Glv) accounts of the given store.
+    /// Fetch all [`Glv`](store_accounts::Glv) accounts of the given store.
     pub async fn glvs_with_config(
         &self,
         store: &Pubkey,
@@ -768,7 +768,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(glvs)
     }
 
-    /// Fetch all [`Glv`](types::Glv) accounts of the given store.
+    /// Fetch all [`Glv`](store_accounts::Glv) accounts of the given store.
     pub async fn glvs(
         &self,
         store: &Pubkey,
@@ -822,7 +822,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(price)
     }
 
-    /// Fetch all [`Position`](types::Position) accounts of the given owner of the given store.
+    /// Fetch all [`Position`](store_accounts::Position) accounts of the given owner of the given store.
     pub async fn positions(
         &self,
         store: &Pubkey,
@@ -862,7 +862,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(positions)
     }
 
-    /// Fetch [`Position`](types::Position) account with its address.
+    /// Fetch [`Position`](store_accounts::Position) account with its address.
     pub async fn position(&self, address: &Pubkey) -> crate::Result<store_accounts::Position> {
         let position = self
             .account::<ZeroCopy<store_accounts::Position>>(address)
@@ -871,7 +871,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(position.0)
     }
 
-    /// Fetch [`Order`](types::Order) account with its address.
+    /// Fetch [`Order`](store_accounts::Order) account with its address.
     pub async fn order(&self, address: &Pubkey) -> crate::Result<store_accounts::Order> {
         Ok(self
             .account::<ZeroCopy<store_accounts::Order>>(address)
@@ -880,7 +880,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .0)
     }
 
-    /// Fetch [`Order`](types::Order) account at the the given address with config.
+    /// Fetch [`Order`](store_accounts::Order) account at the the given address with config.
     ///
     /// The value inside the returned context will be `None` if the account does not exist.
     pub async fn order_with_config(
@@ -894,7 +894,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .map(|a| a.map(|a| a.0)))
     }
 
-    /// Fetch all [`Order`](types::Order) accounts of the given owner of the given store.
+    /// Fetch all [`Order`](store_accounts::Order) accounts of the given owner of the given store.
     pub async fn orders(
         &self,
         store: &Pubkey,
@@ -927,7 +927,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(orders)
     }
 
-    /// Fetch [`Depsoit`](types::Deposit) account with its address.
+    /// Fetch [`Depsoit`](store_accounts::Deposit) account with its address.
     pub async fn deposit(&self, address: &Pubkey) -> crate::Result<store_accounts::Deposit> {
         Ok(self
             .account::<ZeroCopy<_>>(address)
@@ -936,7 +936,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .0)
     }
 
-    /// Fetch [`Withdrawal`](types::Withdrawal) account with its address.
+    /// Fetch [`Withdrawal`](store_accounts::Withdrawal) account with its address.
     pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<store_accounts::Withdrawal> {
         Ok(self
             .account::<ZeroCopy<store_accounts::Withdrawal>>(address)
@@ -945,7 +945,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .0)
     }
 
-    /// Fetch [`PriceFeed`](types::PriceFeed) account with its address.
+    /// Fetch [`PriceFeed`](store_accounts::PriceFeed) account with its address.
     pub async fn price_feed(
         &self,
         address: &Pubkey,
@@ -967,7 +967,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(client)
     }
 
-    /// Subscribe to [`StoreCPIEvent`](crate::store::events::StoreCPIEvent)s from the store program.
+    /// Subscribe to [`GMSOLCPIEvent`]s from the store program.
     #[cfg(feature = "decode")]
     pub async fn subscribe_store_cpi_events(
         &self,
@@ -1017,7 +1017,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(events)
     }
 
-    /// Fetch historical [`StoreCPIEvent`](crate::store::events::StoreCPIEvent)s for the given account.
+    /// Fetch historical [`GMSOLCPIEvent`]s for the given account.
     #[cfg(feature = "decode")]
     pub async fn historical_store_cpi_events(
         &self,
