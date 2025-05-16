@@ -39,10 +39,12 @@ devnet = ["gmsol-utils/devnet"]
 test-only = []
 
 [dependencies]
-bytemuck = { workspace = true, features = ["min_const_generics"] }
-anchor-lang = { workspace = true, features = ["init-if-needed", "event-cpi"] }
 gmsol-model = { workspace = true, features = ["u128", "solana", "strum"] }
 gmsol-utils = { workspace = true }
+gmsol-callback = { workspace = true, features = ["interface"] }
+
+bytemuck = { workspace = true, features = ["min_const_generics"] }
+anchor-lang = { workspace = true, features = ["init-if-needed", "event-cpi"] }
 anchor-spl = { workspace = true, default-features = false, features = [
     "token",
     "token_2022",

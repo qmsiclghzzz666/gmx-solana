@@ -2240,7 +2240,7 @@ dependencies = [
 
 [[package]]
 name = "gmsol-callback"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "anchor-lang",
  "num_enum",
@@ -2419,6 +2419,7 @@ dependencies = [
  "cfg-if",
  "clap",
  "derive_more",
+ "gmsol-callback",
  "gmsol-chainlink-datastreams",
  "gmsol-model",
  "gmsol-utils",
