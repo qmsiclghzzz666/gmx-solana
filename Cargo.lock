@@ -2239,6 +2239,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gmsol-callback"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "num_enum",
+ "serde",
+ "strum",
+]
+
+[[package]]
 name = "gmsol-chainlink-datastreams"
 version = "0.6.0"
 dependencies = [

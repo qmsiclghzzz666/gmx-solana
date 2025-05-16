@@ -3,7 +3,7 @@ anchor_version = "0.31.1"
 solana_version = "2.1.21"
 
 [features]
-seeds = false
+resolution = true
 skip-lint = false
 
 [programs.localnet]
@@ -12,12 +12,13 @@ gmsol_store = "Gmso1uvJnLbawvw7yezdfCDcPydwW2s2iqG3w6MDucLo"
 gmsol_treasury = "GTuvYD5SxkTq4FLG6JV1FQ5dkczr1AfgDcBHaFsBdtBg"
 gmsol_timelock = "TimeBQ7gQyWyQMD3bTteAdy7hTVDNWSwELdSVZHfSXL"
 gmsol_mock_chainlink_verifier = "4nMxSRfeW7W2zFbN8FJ4YDvuTzEzCo1e6GzJxJLnDUoZ"
+gmsol_callback = "9JtQ9fBS91b2YxmHXNeGE8ipQYhLd2DRGGZSV8SPTJGw"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

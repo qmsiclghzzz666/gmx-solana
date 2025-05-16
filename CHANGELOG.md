@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Removed support for Chainlink data feeds.
 - sdk: Removed support for `spl-governance`.
 
+### Added
+
+- programs: Defined the callback interface and added an example `gmsol-callback` program.
+
 ## [0.5.0] - 2025-05-16
 
 ### Breaking Changes
