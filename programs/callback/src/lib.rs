@@ -66,7 +66,7 @@ pub mod gmsol_callback {
         extra_account_count: u8,
     ) -> Result<()> {
         Callback::invoke(
-            CallbackKind::OnCreated,
+            CallbackKind::OnExecuted,
             ctx,
             authority_bump,
             action_kind,
@@ -83,7 +83,7 @@ pub mod gmsol_callback {
         extra_account_count: u8,
     ) -> Result<()> {
         Callback::invoke(
-            CallbackKind::OnCreated,
+            CallbackKind::OnClosed,
             ctx,
             authority_bump,
             action_kind,
