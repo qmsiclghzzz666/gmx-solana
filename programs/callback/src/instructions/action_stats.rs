@@ -32,13 +32,12 @@ pub struct CreateActionStatsIdempotent<'info> {
 impl CreateActionStatsIdempotent<'_> {
     pub(crate) fn invoke(ctx: Context<Self>, action_kind: u8) -> Result<()> {
         let action_stats = &mut ctx.accounts.action_stats;
-        require!(!action_stats.initialized, ErrorCode::RequireViolated);
-
-        action_stats.initialized = true;
-        action_stats.bump = ctx.bumps.action_stats;
-        action_stats.action_kind = action_kind;
-        action_stats.owner = ctx.accounts.owner.key();
-
+        if !action_stats.initialized {
+            action_stats.initialized = true;
+            action_stats.bump = ctx.bumps.action_stats;
+            action_stats.action_kind = action_kind;
+            action_stats.owner = ctx.accounts.owner.key();
+        }
         Ok(())
     }
 }
