@@ -29,6 +29,7 @@ pub struct Config {
 /// Account that tracks lifecycle statistics of actions known to the program.
 #[account]
 #[derive(InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct ActionStats {
     /// Whether the account has been initialized.
     pub initialized: bool,

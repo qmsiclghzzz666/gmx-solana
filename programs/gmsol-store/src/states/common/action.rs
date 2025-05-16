@@ -1,12 +1,13 @@
 use anchor_lang::{prelude::*, ZeroCopy};
+use gmsol_callback::interface::ActionKind;
 use gmsol_utils::{
-    action::{ActionError, MAX_ACTION_FLAGS},
+    action::{ActionCallbackKind, ActionError, MAX_ACTION_FLAGS},
     InitSpace,
 };
 
 use crate::{
     events::Event,
-    states::{NonceBytes, Seed},
+    states::{callback::CallbackAuthority, NonceBytes, Seed},
     utils::pubkey::optional_address,
     CoreError,
 };
@@ -24,7 +25,8 @@ pub struct ActionHeader {
     /// The bump seed.
     pub(crate) bump: u8,
     flags: ActionFlagContainer,
-    padding_0: [u8; 4],
+    callback_kind: u8,
+    padding_0: [u8; 3],
     /// Action id.
     pub id: u64,
     /// Store.
@@ -47,8 +49,14 @@ pub struct ActionHeader {
     rent_receiver: Pubkey,
     /// The output funds receiver.
     receiver: Pubkey,
+    /// Callback program ID.
+    pub callback_program_id: Pubkey,
+    /// Callback config account.
+    pub callback_config: Pubkey,
+    /// Callback action stats account.
+    pub callback_action_stats: Pubkey,
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
-    reserved: [u8; 256],
+    reserved: [u8; 160],
 }
 
 impl Default for ActionHeader {
@@ -67,6 +75,56 @@ impl ActionHeader {
 
     fn set_action_state(&mut self, new_state: ActionState) {
         self.action_state = new_state.into();
+    }
+
+    /// Get callback kind.
+    pub fn callback_kind(&self) -> Result<ActionCallbackKind> {
+        ActionCallbackKind::try_from(self.callback_kind).map_err(|_| error!(CoreError::Internal))
+    }
+
+    /// Set general callback.
+    pub(crate) fn set_general_callback(
+        &mut self,
+        program_id: &Pubkey,
+        config: &Pubkey,
+        action_stats: &Pubkey,
+    ) -> Result<()> {
+        require_eq!(
+            self.callback_kind()?,
+            ActionCallbackKind::Disabled,
+            CoreError::PreconditionsAreNotMet
+        );
+        self.callback_kind = ActionCallbackKind::General.into();
+        self.callback_program_id = *program_id;
+        self.callback_config = *config;
+        self.callback_action_stats = *action_stats;
+        Ok(())
+    }
+
+    /// Validate callback.
+    pub(crate) fn validate_general_callback(
+        &self,
+        program_id: &Pubkey,
+        config: &Pubkey,
+        action_stats: &Pubkey,
+    ) -> Result<()> {
+        require_eq!(
+            self.callback_kind()?,
+            ActionCallbackKind::General,
+            CoreError::InvalidArgument
+        );
+        require_keys_eq!(
+            *program_id,
+            self.callback_program_id,
+            CoreError::InvalidArgument
+        );
+        require_keys_eq!(*config, self.callback_config, CoreError::InvalidArgument);
+        require_keys_eq!(
+            *action_stats,
+            self.callback_action_stats,
+            CoreError::InvalidArgument
+        );
+        Ok(())
     }
 
     /// Transition to Completed state.
@@ -340,5 +398,66 @@ impl From<ActionError> for CoreError {
         match err {
             ActionError::PreconditionsAreNotMet(_) => Self::PreconditionsAreNotMet,
         }
+    }
+}
+
+pub(crate) enum On {
+    Created(ActionKind),
+    #[allow(dead_code)]
+    Executed(ActionKind, bool),
+    Closed(ActionKind),
+}
+
+pub(crate) fn invoke_callback<'info>(
+    kind: On,
+    authority: &Account<'info, CallbackAuthority>,
+    program: &AccountInfo<'info>,
+    config: &AccountInfo<'info>,
+    action_stats: &AccountInfo<'info>,
+    owner: &AccountInfo<'info>,
+    action: &AccountInfo<'info>,
+    remaining_accounts: &[AccountInfo<'info>],
+) -> Result<()> {
+    use gmsol_callback::interface::{on_closed, on_created, on_executed, Callback};
+
+    let ctx = CpiContext::new(
+        program.clone(),
+        Callback {
+            authority: authority.to_account_info(),
+            config: config.clone(),
+            action_stats: action_stats.clone(),
+            owner: owner.clone(),
+            action: action.clone(),
+        },
+    )
+    .with_remaining_accounts(remaining_accounts.to_vec());
+
+    let authority_bump = authority.bump();
+    let extra_account_count = remaining_accounts
+        .len()
+        .try_into()
+        .map_err(|_| error!(CoreError::Internal))?;
+
+    let signer_seeds = authority.signer_seeds();
+    match kind {
+        On::Created(kind) => on_created(
+            ctx.with_signer(&[&signer_seeds]),
+            authority_bump,
+            kind.into(),
+            extra_account_count,
+        ),
+        On::Executed(kind, success) => on_executed(
+            ctx.with_signer(&[&signer_seeds]),
+            authority_bump,
+            kind.into(),
+            success,
+            extra_account_count,
+        ),
+        On::Closed(kind) => on_closed(
+            ctx.with_signer(&[&signer_seeds]),
+            authority_bump,
+            kind.into(),
+            extra_account_count,
+        ),
     }
 }

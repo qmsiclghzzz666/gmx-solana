@@ -98,6 +98,10 @@ pub struct Deployment {
     pub chainlink_access_controller: Pubkey,
     /// Chainlink Feed Index.
     pub chainlink_feed_index: u16,
+    /// Callback program.
+    pub callback_program: Pubkey,
+    /// Callback config.
+    pub callback_config: Pubkey,
 }
 
 impl fmt::Debug for Deployment {
@@ -203,6 +207,8 @@ impl Deployment {
             chainlink_verifier_program: Default::default(),
             chainlink_access_controller: Default::default(),
             chainlink_feed_index: 42,
+            callback_program: Default::default(),
+            callback_config: Default::default(),
         })
     }
 
@@ -302,6 +308,8 @@ impl Deployment {
         self.initialize_gt(7).await?;
 
         self.initialize_claim_fees_sleep().await?;
+
+        self.initialize_callback().await?;
 
         Ok(())
     }
@@ -922,6 +930,47 @@ impl Deployment {
         };
         self.claim_fees_enabled_at = Instant::now() + wait;
 
+        Ok(())
+    }
+
+    async fn initialize_callback(&mut self) -> eyre::Result<()> {
+        use gmsol_callback::{accounts, instruction, states::CONFIG_SEED, ID};
+        self.callback_program = ID;
+        self.callback_config = Pubkey::find_program_address(&[CONFIG_SEED], &ID).0;
+
+        let client = self.user_client(Self::DEFAULT_KEEPER)?;
+        let init = client
+            .store_transaction()
+            .anchor_args(gmsol_store::instruction::InitializeCallbackAuthority {})
+            .anchor_accounts(gmsol_store::accounts::InitializeCallbackAuthority {
+                payer: client.payer(),
+                callback_authority: client.find_callback_authority_address(),
+                system_program: system_program::ID,
+            });
+        let mut tx = client.bundle();
+        tx.push(init)?.push(
+            client
+                .store_transaction()
+                .program(ID)
+                .anchor_args(instruction::InitializeConfig {
+                    prefix: "anchor-test".to_string(),
+                })
+                .anchor_accounts(accounts::InitializeConfig {
+                    payer: client.payer(),
+                    config: self.callback_config,
+                    system_program: system_program::ID,
+                }),
+        )?;
+        tx.send_all(false)
+            .instrument(tracing::info_span!("initalize callback"))
+            .await
+            .inspect(|signatures| {
+                tracing::info!("initialized callback with txns: {signatures:#?}");
+            })
+            .inspect_err(|(signatures, err)| {
+                tracing::error!(%err, "failed to initialize callback, successful txns: {signatures:#?}");
+            })
+            .ok();
         Ok(())
     }
 

@@ -68,7 +68,10 @@ use gmsol_solana_utils::{
 };
 use gmsol_utils::oracle::PriceProviderKind;
 use instruction_buffer::InstructionBuffer;
-use ops::market::MarketOps;
+use ops::{
+    exchange::callback::{Callback, CallbackAddresses},
+    market::MarketOps,
+};
 use pubsub::{PubsubClient, SubscriptionConfig};
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
@@ -555,6 +558,23 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Find the wallet PDA for the given timelock executor.
     pub fn find_executor_wallet_address(&self, executor: &Pubkey) -> Pubkey {
         crate::pda::find_executor_wallet_address(executor, self.timelock_program_id()).0
+    }
+
+    /// Find the PDA for callback authority.
+    pub fn find_callback_authority_address(&self) -> Pubkey {
+        crate::pda::find_callback_authority(self.store_program_id()).0
+    }
+
+    pub(crate) fn get_callback_addresses(&self, callback: Option<&Callback>) -> CallbackAddresses {
+        match callback {
+            Some(callback) => CallbackAddresses {
+                callback_authority: Some(self.find_callback_authority_address()),
+                callback_program: Some(callback.program),
+                callback_config_account: Some(callback.config),
+                callback_action_stats_account: Some(callback.action_stats),
+            },
+            None => CallbackAddresses::default(),
+        }
     }
 
     /// Get latest slot.

@@ -101,7 +101,7 @@ impl ReferralCodeV2 {
 mod utils {
     use anchor_lang::prelude::Pubkey;
     use gmsol_utils::{
-        action::{ActionFlag, MAX_ACTION_FLAGS},
+        action::{ActionCallbackKind, ActionFlag, MAX_ACTION_FLAGS},
         impl_fixed_map, impl_flags, market,
         order::{self, PositionKind},
         pubkey::{self, optional_address},
@@ -112,9 +112,9 @@ mod utils {
     use crate::gmsol_store::{
         accounts::{Glv, Position},
         types::{
-            ActionFlagContainer, GlvMarketConfig, GlvMarkets, GlvMarketsEntry, MarketMeta,
-            OrderActionParams, OrderKind, SwapActionParams, TokenAndAccount, Tokens, TokensEntry,
-            UpdateTokenConfigParams,
+            ActionFlagContainer, ActionHeader, GlvMarketConfig, GlvMarkets, GlvMarketsEntry,
+            MarketMeta, OrderActionParams, OrderKind, SwapActionParams, TokenAndAccount, Tokens,
+            TokensEntry, UpdateTokenConfigParams,
         },
     };
 
@@ -292,6 +292,14 @@ mod utils {
                 timestamp_adjustments,
                 expected_provider,
             }
+        }
+    }
+
+    impl ActionHeader {
+        /// Get callback kind.
+        pub fn callback_kind(&self) -> crate::Result<ActionCallbackKind> {
+            ActionCallbackKind::try_from(self.callback_kind)
+                .map_err(|_| crate::Error::custom("unknown callback kind"))
         }
     }
 }

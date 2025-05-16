@@ -68,8 +68,8 @@ impl Callback<'_> {
 
         msg!(
             "{}: on_created, success={} calls={}",
-            success,
             self.config.prefix,
+            success,
             self.config.calls
         );
         Ok(())
@@ -82,8 +82,8 @@ impl Callback<'_> {
 
         msg!(
             "{}: on_executed, success={} calls={}",
-            success,
             self.config.prefix,
+            success,
             self.config.calls
         );
         Ok(())
@@ -96,8 +96,8 @@ impl Callback<'_> {
 
         msg!(
             "{}: on_closed, success={} calls={}",
-            success,
             self.config.prefix,
+            success,
             self.config.calls
         );
         Ok(())

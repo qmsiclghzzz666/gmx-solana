@@ -151,8 +151,11 @@ switchboard-on-demand-client = { workspace = true, optional = true }
 cfg_aliases = { workspace = true }
 
 [dev-dependencies]
-gmsol-mock-chainlink-verifier = { workspace = true }
+gmsol-mock-chainlink-verifier = { workspace = true, features = [
+    "no-entrypoint",
+] }
 gmsol-store = { workspace = true }
+gmsol-callback = { workspace = true, features = ["interface", "debug"] }
 
 rust_decimal_macros = { workspace = true }
 tracing = { workspace = true }

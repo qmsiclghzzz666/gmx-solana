@@ -44,7 +44,10 @@ use crate::{
     utils::{optional::fix_optional_account_metas, zero_copy::ZeroCopy},
 };
 
-use super::ExchangeOps;
+use super::{
+    callback::{Callback, CallbackAddresses},
+    ExchangeOps,
+};
 
 /// Compute unit limit for `execute_order`
 pub const EXECUTE_ORDER_COMPUTE_BUDGET: u32 = 400_000;
@@ -101,6 +104,7 @@ pub struct CreateOrderBuilder<'a, C> {
     short_token_account: Option<Pubkey>,
     should_unwrap_native_token: bool,
     receiver: Pubkey,
+    callback: Option<Callback>,
 }
 
 /// Create Order Hint.
@@ -138,6 +142,7 @@ where
             short_token_account: None,
             should_unwrap_native_token: true,
             receiver: client.payer(),
+            callback: None,
         }
     }
 
@@ -239,6 +244,12 @@ where
     /// Defaults to the payer.
     pub fn receiver(&mut self, receiver: Pubkey) -> &mut Self {
         self.receiver = receiver;
+        self
+    }
+
+    /// Set callback.
+    pub fn callback(&mut self, callback: Option<Callback>) -> &mut Self {
+        self.callback = callback;
         self
     }
 
@@ -566,11 +577,18 @@ where
             })
             .anchor_args(args::PrepareUser {});
 
+        let CallbackAddresses {
+            callback_authority,
+            callback_program,
+            callback_config_account,
+            callback_action_stats_account,
+        } = self.client.get_callback_addresses(self.callback.as_ref());
+
         let create = self
             .client
             .store_transaction()
             .accounts(fix_optional_account_metas(
-                accounts::CreateOrder {
+                accounts::CreateOrderV2 {
                     store: self.store,
                     order,
                     position,
@@ -591,11 +609,15 @@ where
                     system_program: system_program::ID,
                     token_program: anchor_spl::token::ID,
                     associated_token_program: anchor_spl::associated_token::ID,
+                    callback_authority,
+                    callback_program,
+                    callback_config_account,
+                    callback_action_stats_account,
                 },
                 &ID,
                 self.client.store_program_id(),
             ))
-            .anchor_args(args::CreateOrder { nonce, params })
+            .anchor_args(args::CreateOrderV2 { nonce, params })
             .accounts(
                 self.swap_path
                     .iter()
@@ -652,6 +674,7 @@ pub struct ExecuteOrderHint {
     pub feeds: TokensWithFeed,
     swap: SwapActionParams,
     should_unwrap_native_token: bool,
+    callback: Option<Callback>,
 }
 
 impl ExecuteOrderHint {
@@ -804,6 +827,7 @@ where
                 .header
                 .flags
                 .get_flag(ActionFlag::ShouldUnwrapNativeToken),
+            callback: Callback::from_header(&order.header)?,
         });
         Ok(self)
     }
@@ -1079,6 +1103,7 @@ where
                     referrer: hint.referrer,
                     rent_receiver: hint.rent_receiver,
                     should_unwrap_native_token: hint.should_unwrap_native_token,
+                    callback: hint.callback,
                 })
                 .build()
                 .await?;
@@ -1182,6 +1207,7 @@ pub struct CloseOrderHint {
     pub(super) referrer: Option<Pubkey>,
     pub(super) rent_receiver: Pubkey,
     pub(super) should_unwrap_native_token: bool,
+    pub(super) callback: Option<Callback>,
 }
 
 impl CloseOrderHint {
@@ -1212,6 +1238,7 @@ impl CloseOrderHint {
                 .header
                 .flags
                 .get_flag(ActionFlag::ShouldUnwrapNativeToken),
+            callback: Callback::from_header(&order.header)?,
         })
     }
 }
@@ -1285,11 +1312,17 @@ where
         let referrer_user = hint
             .referrer
             .map(|owner| self.client.find_user_address(&hint.store, &owner));
+        let CallbackAddresses {
+            callback_authority,
+            callback_program,
+            callback_config_account,
+            callback_action_stats_account,
+        } = self.client.get_callback_addresses(hint.callback.as_ref());
         Ok(self
             .client
             .store_transaction()
             .accounts(fix_optional_account_metas(
-                accounts::CloseOrder {
+                accounts::CloseOrderV2 {
                     store: hint.store,
                     store_wallet: self.client.find_store_wallet_address(&hint.store),
                     event_authority: self.client.store_event_authority(),
@@ -1335,11 +1368,15 @@ where
                     token_program: anchor_spl::token::ID,
                     system_program: system_program::ID,
                     program: *self.client.store_program_id(),
+                    callback_authority,
+                    callback_program,
+                    callback_config_account,
+                    callback_action_stats_account,
                 },
                 &ID,
                 self.client.store_program_id(),
             ))
-            .anchor_args(args::CloseOrder {
+            .anchor_args(args::CloseOrderV2 {
                 reason: self.reason.clone(),
             }))
     }
@@ -1844,6 +1881,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                     referrer: hint.referrer,
                     rent_receiver: if is_full_close { owner } else { payer },
                     should_unwrap_native_token: true,
+                    callback: None,
                 })
                 .reason("position cut")
                 .build()

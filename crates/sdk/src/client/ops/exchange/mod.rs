@@ -19,6 +19,9 @@ pub mod glv_withdrawal;
 /// Builders for transactions related to GLV shifts.
 pub mod glv_shift;
 
+/// Utils for callback.
+pub mod callback;
+
 use std::{future::Future, ops::Deref};
 
 use deposit::{CloseDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder};

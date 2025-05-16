@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - programs: Defined the callback interface and added an example `gmsol-callback` program.
+- programs: Added callback-enabled instructions for order.
+  - Added the `create_order_v2` instruction.
+  - Added the `close_order_v2` instrcution.
+
+### Changed
+
+- programs: Deprecated `create_order` and `close_order` instructions.
 
 ## [0.5.0] - 2025-05-16
 

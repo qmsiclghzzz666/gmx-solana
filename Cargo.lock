@@ -2341,6 +2341,7 @@ dependencies = [
  "eventsource-stream",
  "eyre",
  "futures-util",
+ "gmsol-callback",
  "gmsol-chainlink-datastreams",
  "gmsol-decode",
  "gmsol-mock-chainlink-verifier",

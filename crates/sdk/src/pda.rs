@@ -115,6 +115,9 @@ pub const TIMELOCK_EXECUTOR_SEED: &[u8] = b"timelock_executor";
 #[cfg(timelock)]
 pub const TIMELOCK_EXECUTOR_WALLET_SEED: &[u8] = b"wallet";
 
+/// Seed for callback authority.
+pub const CALLBACK_AUTHORITY_SEED: &[u8] = b"callback";
+
 fn to_seed(key: &str) -> [u8; 32] {
     use solana_sdk::hash::hash;
     hash(key.as_bytes()).to_bytes()
@@ -500,4 +503,9 @@ pub fn find_executor_wallet_address(
         &[TIMELOCK_EXECUTOR_WALLET_SEED, executor.as_ref()],
         timelock_program_id,
     )
+}
+
+/// Find PDA for callback authority.
+pub fn find_callback_authority(store_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[CALLBACK_AUTHORITY_SEED], store_program_id)
 }
