@@ -727,16 +727,16 @@ impl<'info> internal::Close<'info, Order> for CloseOrderV2<'info> {
     #[inline(never)]
     fn process(
         &self,
-        init_if_needed: bool,
+        is_caller_owner: bool,
         store_wallet_signer: &StoreWalletSigner,
         event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<internal::Success> {
-        let transfer_success = self.transfer_to_atas(init_if_needed, store_wallet_signer)?;
+        let transfer_success = self.transfer_to_atas(is_caller_owner, store_wallet_signer)?;
         let process_success = self.process_gt_reward(event_emitter)?;
         let success = transfer_success && process_success;
 
         if success {
-            self.handle_closed()?;
+            self.handle_closed(is_caller_owner)?;
         }
 
         Ok(success)
@@ -949,11 +949,11 @@ impl<'info> CloseOrderV2<'info> {
     }
 
     #[inline(never)]
-    fn handle_closed(&self) -> Result<()> {
-        if let Some(authority) = self.callback_authority.as_ref() {
-            match self.order.load()?.header.callback_kind()? {
-                ActionCallbackKind::Disabled => {}
-                ActionCallbackKind::General => {
+    fn handle_closed(&self, is_caller_owner: bool) -> Result<()> {
+        match self.order.load()?.header.callback_kind()? {
+            ActionCallbackKind::Disabled => {}
+            ActionCallbackKind::General => {
+                if let Some(authority) = self.callback_authority.as_ref() {
                     let program = self
                         .callback_program
                         .as_ref()
@@ -983,10 +983,13 @@ impl<'info> CloseOrderV2<'info> {
                         self.order.as_ref(),
                         &[],
                     )?;
+                } else if !is_caller_owner {
+                    msg!("[Callback] callback is specified, but required accounts are missing");
+                    return err!(CoreError::InvalidArgument);
                 }
-                kind => {
-                    msg!("[Callback] unsupported callback kind: {}", kind);
-                }
+            }
+            kind => {
+                msg!("[Callback] unsupported callback kind: {}", kind);
             }
         }
         Ok(())
@@ -1552,6 +1555,14 @@ mod deprecated {
                         ActionDisabledFlag::Cancel,
                     )?;
             }
+            require_eq!(
+                order.header().callback_kind()?,
+                ActionCallbackKind::Disabled,
+                {
+                    msg!("[Deprecated] use `close_order_v2` instead");
+                    CoreError::Deprecated
+                },
+            );
             Ok(())
         }
 

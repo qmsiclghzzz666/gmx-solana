@@ -3573,6 +3573,7 @@ pub enum CoreError {
     #[msg("internal error")]
     Internal,
     /// Unimplemented.
+    #[msg("unimplemented")]
     Unimplemented,
     /// Not an Admin.
     #[msg("not an admin")]
@@ -3725,6 +3726,7 @@ pub enum CoreError {
     #[msg("max price age exceeded")]
     MaxPriceAgeExceeded,
     /// Max prcie's timestamp exceeded.
+    #[msg("max price timestamp exceeded")]
     MaxPriceTimestampExceeded,
     /// Negative price.
     #[msg("negative price is not supported")]
@@ -3972,4 +3974,7 @@ pub enum CoreError {
     /// Price is stale.
     #[msg("Price is stale")]
     PriceIsStale,
+    /// Deprecated.
+    #[msg("deprecated")]
+    Deprecated,
 }

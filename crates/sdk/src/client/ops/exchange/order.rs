@@ -1191,6 +1191,7 @@ pub struct CloseOrderBuilder<'a, C> {
     order: Pubkey,
     hint: Option<CloseOrderHint>,
     reason: String,
+    skip_callback: bool,
 }
 
 /// Close Order Hint.
@@ -1254,6 +1255,7 @@ where
             order: *order,
             hint: None,
             reason: "cancelled".into(),
+            skip_callback: false,
         }
     }
 
@@ -1276,6 +1278,12 @@ where
     /// Set reason.
     pub fn reason(&mut self, reason: impl ToString) -> &mut Self {
         self.reason = reason.to_string();
+        self
+    }
+
+    /// Set whether to skip callback.
+    pub fn skip_callback(&mut self, skip: bool) -> &mut Self {
+        self.skip_callback = skip;
         self
     }
 
@@ -1317,7 +1325,11 @@ where
             callback_program,
             callback_config_account,
             callback_action_stats_account,
-        } = self.client.get_callback_addresses(hint.callback.as_ref());
+        } = self.client.get_callback_addresses(
+            (!self.skip_callback)
+                .then_some(hint.callback.as_ref())
+                .flatten(),
+        );
         Ok(self
             .client
             .store_transaction()
