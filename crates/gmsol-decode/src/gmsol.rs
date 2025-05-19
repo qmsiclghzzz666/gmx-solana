@@ -10,9 +10,10 @@ pub mod programs {
         },
         events::{
             BorrowingFeesUpdated, DepositExecuted, DepositRemoved, GlvDepositRemoved, GlvPricing,
-            GlvWithdrawalRemoved, GtUpdated, MarketFeesUpdated, MarketStateUpdated, OrderRemoved,
-            PositionDecreased, PositionIncreased, ShiftRemoved, SwapExecuted, TradeEvent,
-            WithdrawalExecuted, WithdrawalRemoved,
+            GlvWithdrawalRemoved, GtBuyback, GtUpdated, InsufficientFundingFeePayment,
+            MarketFeesUpdated, MarketStateUpdated, OrderRemoved, OrderUpdated, PositionDecreased,
+            PositionIncreased, ShiftRemoved, SwapExecuted, TradeEvent, WithdrawalExecuted,
+            WithdrawalRemoved,
         },
     };
 
@@ -35,8 +36,10 @@ pub mod programs {
     impl_decode_for_cpi_event!(GlvDepositRemoved);
     impl_decode_for_cpi_event!(GlvWithdrawalRemoved);
     impl_decode_for_cpi_event!(GlvPricing);
+    impl_decode_for_cpi_event!(OrderUpdated);
     impl_decode_for_cpi_event!(PositionIncreased);
     impl_decode_for_cpi_event!(PositionDecreased);
+    impl_decode_for_cpi_event!(InsufficientFundingFeePayment);
     impl_decode_for_cpi_event!(OrderRemoved);
     impl_decode_for_cpi_event!(TradeEvent);
     impl_decode_for_cpi_event!(MarketFeesUpdated);
@@ -44,6 +47,7 @@ pub mod programs {
     impl_decode_for_cpi_event!(MarketStateUpdated);
     impl_decode_for_cpi_event!(SwapExecuted);
     impl_decode_for_cpi_event!(GtUpdated);
+    impl_decode_for_cpi_event!(GtBuyback);
 
     untagged!(
         GMSOLAccountData,
@@ -75,8 +79,10 @@ pub mod programs {
             GlvDepositRemoved,
             GlvWithdrawalRemoved,
             GlvPricing,
+            OrderUpdated,
             PositionIncreased,
             PositionDecreased,
+            InsufficientFundingFeePayment,
             OrderRemoved,
             TradeEvent,
             MarketFeesUpdated,
@@ -84,6 +90,7 @@ pub mod programs {
             MarketStateUpdated,
             SwapExecuted,
             GtUpdated,
+            GtBuyback,
             UnknownOwnedData
         ]
     );
@@ -102,9 +109,10 @@ pub mod store {
     use gmsol_store::{
         events::{
             BorrowingFeesUpdated, DepositExecuted, DepositRemoved, GlvDepositRemoved, GlvPricing,
-            GlvWithdrawalRemoved, GtUpdated, MarketFeesUpdated, MarketStateUpdated, OrderRemoved,
-            PositionDecreased, PositionIncreased, ShiftRemoved, SwapExecuted, TradeEvent,
-            WithdrawalExecuted, WithdrawalRemoved,
+            GlvWithdrawalRemoved, GtBuyback, GtUpdated, InsufficientFundingFeePayment,
+            MarketFeesUpdated, MarketStateUpdated, OrderRemoved, OrderUpdated, PositionDecreased,
+            PositionIncreased, ShiftRemoved, SwapExecuted, TradeEvent, WithdrawalExecuted,
+            WithdrawalRemoved,
         },
         states::{
             Deposit, GlvDeposit, GlvShift, GlvWithdrawal, Market, Order, Position, Shift, Store,
@@ -131,8 +139,10 @@ pub mod store {
     impl_decode_for_cpi_event!(GlvDepositRemoved);
     impl_decode_for_cpi_event!(GlvWithdrawalRemoved);
     impl_decode_for_cpi_event!(GlvPricing);
+    impl_decode_for_cpi_event!(OrderUpdated);
     impl_decode_for_cpi_event!(PositionIncreased);
     impl_decode_for_cpi_event!(PositionDecreased);
+    impl_decode_for_cpi_event!(InsufficientFundingFeePayment);
     impl_decode_for_cpi_event!(OrderRemoved);
     impl_decode_for_cpi_event!(TradeEvent);
     impl_decode_for_cpi_event!(MarketFeesUpdated);
@@ -140,6 +150,7 @@ pub mod store {
     impl_decode_for_cpi_event!(MarketStateUpdated);
     impl_decode_for_cpi_event!(SwapExecuted);
     impl_decode_for_cpi_event!(GtUpdated);
+    impl_decode_for_cpi_event!(GtBuyback);
 
     untagged!(
         GMSOLAccountData,
@@ -171,8 +182,10 @@ pub mod store {
             GlvDepositRemoved,
             GlvWithdrawalRemoved,
             GlvPricing,
+            OrderUpdated,
             PositionIncreased,
             PositionDecreased,
+            InsufficientFundingFeePayment,
             OrderRemoved,
             TradeEvent,
             MarketFeesUpdated,
@@ -180,6 +193,7 @@ pub mod store {
             MarketStateUpdated,
             SwapExecuted,
             GtUpdated,
+            GtBuyback,
             UnknownOwnedData
         ]
     );

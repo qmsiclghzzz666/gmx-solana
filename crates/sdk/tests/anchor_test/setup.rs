@@ -2,6 +2,7 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     fmt,
     future::Future,
+    path::PathBuf,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
@@ -12,6 +13,7 @@ use std::{
 use event_listener::Event;
 use eyre::{eyre, OptionExt};
 
+use futures_util::StreamExt;
 use gmsol_sdk::{
     client::{
         chainlink::pull_oracle::ChainlinkPullOracleFactory,
@@ -47,6 +49,7 @@ use solana_sdk::{
     system_instruction, system_program,
 };
 use tokio::{
+    fs,
     sync::{Mutex, OnceCell, OwnedMutexGuard},
     time::sleep,
 };
@@ -61,6 +64,7 @@ const ENV_GMSOL_REFUND_WAIT: &str = "GMSOL_REFUND_WAIT";
 const ENV_GMSOL_CLAIM_FEES_WAIT: &str = "GMSOL_CLAIM_FEES_WAIT";
 const ENV_GMSOL_NO_MOCK: &str = "GMSOL_NO_MOCK";
 const ENV_CHAINLINK_ACCESS_CONTROLLER: &str = "CHAINLINK_ACCESS_CONTROLLER";
+const ENV_GMSOL_WRITE_OUTPUT: &str = "GMSOL_WRITE_OUTPUT";
 
 /// Deployment.
 pub struct Deployment {
@@ -1599,7 +1603,12 @@ pub async fn current_deployment() -> eyre::Result<&'static Deployment> {
 }
 
 #[tokio::test]
-async fn refund_payer() -> eyre::Result<()> {
+async fn teardown() -> eyre::Result<()> {
+    use std::io::Write;
+
+    let span = tracing::info_span!("teardown");
+    let _enter = span.enter();
+
     let wait = std::env::var(ENV_GMSOL_REFUND_WAIT)
         .ok()
         .and_then(|wait| wait.parse().ok())
@@ -1609,6 +1618,43 @@ async fn refund_payer() -> eyre::Result<()> {
     deployment
         .refund_payer_when_not_in_use(Duration::from_secs(wait))
         .await?;
+
+    let client = &deployment.client;
+    let store = &deployment.store;
+    let stream = client
+        .historical_store_cpi_events(store, Some(CommitmentConfig::confirmed()))
+        .await?;
+
+    futures_util::pin_mut!(stream);
+
+    let mut file = if std::env::var(ENV_GMSOL_WRITE_OUTPUT).is_ok() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path = fs::canonicalize(&path).await?;
+        path.push("target");
+        path.push("gmsol-output");
+        fs::create_dir_all(&path).await?;
+        let now = time::OffsetDateTime::now_utc().unix_timestamp();
+        path.push(format!("log-{now}.txt"));
+        let file = fs::File::create(&path)
+            .await?
+            .try_into_std()
+            .map_err(|_| eyre::eyre!("failed to convert into a std `File`"))?;
+        Some(file)
+    } else {
+        None
+    };
+
+    while let Some(events) = stream.next().await {
+        let events = events?;
+        let slot = events.slot();
+        let events = events.value();
+        if let Some(file) = file.as_mut() {
+            writeln!(file, "[{slot}]")?;
+            for event in events {
+                writeln!(file, "{event:#?}")?;
+            }
+        }
+    }
 
     Ok(())
 }

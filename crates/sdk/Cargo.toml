@@ -75,7 +75,7 @@ pyth = [
 ]
 switchboard = ["switchboard-on-demand-client"]
 
-anchor-test = ["client", "chainlink", "pyth"]
+anchor-test = ["client", "chainlink", "pyth", "decode"]
 
 [dependencies]
 gmsol-programs = { workspace = true, features = ["model"] }
