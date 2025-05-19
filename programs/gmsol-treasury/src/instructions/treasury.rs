@@ -851,9 +851,10 @@ impl<'info> ConfirmGtBuyback<'info> {
         }
 
         msg!(
-            "[Treasury] will buyback {} (unit) GT with value: {}",
-            buyback_price,
+            "[Treasury] will spend {} to buyback {} (unit) GT at a price of {}",
             buyback_value,
+            buyback_amount,
+            buyback_price,
         );
 
         // Reserve balances for buyback.

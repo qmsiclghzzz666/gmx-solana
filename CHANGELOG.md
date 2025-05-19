@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - programs: Deprecated `create_order`, `close_order`, `execute_increase_or_swap_order` and `execute_decrease_order` instructions.
 
+### Fixed
+
+- programs(treasury): Corrected data error in GT buyback message.
+
 ## [0.5.0] - 2025-05-16
 
 ### Breaking Changes
