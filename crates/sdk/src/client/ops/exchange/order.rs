@@ -613,6 +613,8 @@ where
                     callback_program,
                     callback_config_account,
                     callback_action_stats_account,
+                    event_authority: self.client.store_event_authority(),
+                    program: *self.client.store_program_id(),
                 },
                 &ID,
                 self.client.store_program_id(),

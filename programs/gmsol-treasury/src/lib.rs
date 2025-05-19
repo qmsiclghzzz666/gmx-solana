@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 /// States.
 pub mod states;
 
@@ -153,6 +155,7 @@ pub mod gmsol_treasury {
     }
 
     /// Create a swap.
+    #[deprecated(since = "0.6.0", note = "use `create_swap_v2` instead")]
     #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_KEEPER))]
     pub fn create_swap<'info>(
         ctx: Context<'_, '_, 'info, 'info, CreateSwap<'info>>,
@@ -162,6 +165,24 @@ pub mod gmsol_treasury {
         min_swap_out_amount: Option<u64>,
     ) -> Result<()> {
         instructions::unchecked_create_swap(
+            ctx,
+            nonce,
+            swap_path_length,
+            swap_in_amount,
+            min_swap_out_amount,
+        )
+    }
+
+    /// Create a swap.
+    #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_KEEPER))]
+    pub fn create_swap_v2<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CreateSwapV2<'info>>,
+        nonce: [u8; 32],
+        swap_path_length: u8,
+        swap_in_amount: u64,
+        min_swap_out_amount: Option<u64>,
+    ) -> Result<()> {
+        CreateSwapV2::invoke_unchecked(
             ctx,
             nonce,
             swap_path_length,

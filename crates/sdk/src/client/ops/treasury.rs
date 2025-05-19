@@ -31,7 +31,11 @@ use crate::{
     utils::{optional::fix_optional_account_metas, zero_copy::ZeroCopy},
 };
 
-use super::{gt::GtOps, token_account::TokenAccountOps};
+use super::{
+    exchange::callback::{Callback, CallbackAddresses},
+    gt::GtOps,
+    token_account::TokenAccountOps,
+};
 
 /// Operations for treasury.
 pub trait TreasuryOps<C> {
@@ -752,9 +756,16 @@ impl<C: Deref<Target = impl Signer> + Clone> TreasuryOps<C> for crate::Client<C>
             Some(&receiver),
         );
 
+        let CallbackAddresses {
+            callback_authority,
+            callback_program,
+            callback_config_account,
+            callback_action_stats_account,
+        } = self.get_callback_addresses(options.callback.as_ref());
+
         let create = self
             .treasury_transaction()
-            .anchor_args(args::CreateSwap {
+            .anchor_args(args::CreateSwapV2 {
                 nonce,
                 swap_path_length: swap_path
                     .len()
@@ -763,7 +774,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TreasuryOps<C> for crate::Client<C>
                 swap_in_amount: swap_in_token_amount,
                 min_swap_out_amount: options.min_swap_out_amount,
             })
-            .anchor_accounts(accounts::CreateSwap {
+            .anchor_accounts(accounts::CreateSwapV2 {
                 authority: self.payer(),
                 store: *store,
                 config,
@@ -781,6 +792,11 @@ impl<C: Deref<Target = impl Signer> + Clone> TreasuryOps<C> for crate::Client<C>
                 token_program: token_program_id,
                 associated_token_program: anchor_spl::associated_token::ID,
                 system_program: system_program::ID,
+                event_authority: self.store_event_authority(),
+                callback_authority,
+                callback_program,
+                callback_config_account,
+                callback_action_stats_account,
             })
             .accounts(swap_path);
 
@@ -879,6 +895,8 @@ pub struct CreateTreasurySwapOptions {
     pub min_swap_out_amount: Option<u64>,
     /// Hint for the treasury vault config address.
     pub treasury_vault_config_hint: Option<Pubkey>,
+    /// Callback.
+    pub callback: Option<Callback>,
 }
 
 /// Confirm GT buyback builder.

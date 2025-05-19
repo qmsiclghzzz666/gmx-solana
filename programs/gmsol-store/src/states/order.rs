@@ -674,7 +674,7 @@ pub struct OrderActionParams {
     #[cfg_attr(feature = "debug", debug(skip))]
     padding_1: [u8; 5],
     /// Collateral/Output token.
-    collateral_token: Pubkey,
+    pub(crate) collateral_token: Pubkey,
     /// Position address.
     position: Pubkey,
     /// Initial collateral delta amount.

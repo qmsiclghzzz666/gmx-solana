@@ -13,7 +13,10 @@ use gmsol_utils::action::ActionCallbackKind;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::{EventEmitter, MarketFeesUpdated, PositionDecreased, PositionIncreased, TradeData},
+    events::{
+        EventEmitter, MarketFeesUpdated, OrderUpdated, PositionDecreased, PositionIncreased,
+        TradeData,
+    },
     states::{
         callback::CallbackAuthority,
         common::{
@@ -42,8 +45,7 @@ use super::{execution_fee::TransferExecutionFeeOperation, market::MarketTransfer
 pub use gmsol_utils::order::PositionCutKind;
 
 /// Create Order Arguments.
-// #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, InitSpace)]
 pub struct CreateOrderParams {
     /// Order Kind.
     pub kind: OrderKind,
@@ -127,6 +129,8 @@ pub(crate) struct CreateOrderOperation<'a, 'info> {
     callback_program: Option<&'a AccountInfo<'info>>,
     callback_config_account: Option<&'a AccountInfo<'info>>,
     callback_action_stats_account: Option<&'a AccountInfo<'info>>,
+    #[builder(setter(into))]
+    event_emitter: Option<EventEmitter<'a, 'info>>,
 }
 
 impl<'a, 'info> CreateOrderOperation<'a, 'info> {
@@ -224,6 +228,8 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
 
     #[inline(never)]
     fn handle_created(&self, position: Option<&AccountInfo<'info>>) -> Result<()> {
+        // Ensure that the discriminator is written to the account data.
+        self.order.exit(&crate::ID)?;
         if let Some(authority) = self.callback_authority.as_ref() {
             let program = self
                 .callback_program
@@ -239,8 +245,6 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
                 .ok_or_else(|| error!(CoreError::InvalidArgument))?;
             let position = position.unwrap_or(program);
 
-            // Ensure that the discriminator is written to the account data.
-            self.order.exit(&crate::ID)?;
             self.order.load_mut()?.header.set_general_callback(
                 program.key,
                 config.key,
@@ -258,6 +262,15 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
                 &[position.clone()],
             )?;
         }
+
+        if let Some(event_emitter) = self.event_emitter {
+            event_emitter.emit_cpi(&OrderUpdated::new(
+                true,
+                &self.order.key(),
+                &*self.order.load()?,
+            )?)?;
+        }
+
         Ok(())
     }
 }
@@ -1873,6 +1886,7 @@ impl PositionCutOperation<'_, '_> {
             .callback_program(None)
             .callback_config_account(None)
             .callback_action_stats_account(None)
+            .event_emitter(self.event_emitter)
             .build()
             .decrease()
             .position(self.position)

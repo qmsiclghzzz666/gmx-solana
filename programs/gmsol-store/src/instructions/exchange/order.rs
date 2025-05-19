@@ -14,7 +14,7 @@ use gmsol_utils::{action::ActionCallbackKind, InitSpace};
 
 use crate::{
     constants,
-    events::{EventEmitter, GtUpdated, OrderCreated},
+    events::{EventEmitter, GtUpdated, OrderCreated, OrderUpdated},
     ops::{
         execution_fee::TransferExecutionFeeOperation,
         order::{CreateOrderOperation, CreateOrderParams},
@@ -184,6 +184,7 @@ fn validate_position(
 ///
 ///   - 0..M. `[]` M market accounts, where M represents the length of the
 ///     swap path for initial collateral token or final output token.
+#[event_cpi]
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32], params: CreateOrderParams)]
 pub struct CreateOrderV2<'info> {
@@ -368,6 +369,10 @@ impl<'info> internal::Create<'info, Order> for CreateOrderV2<'info> {
             .callback_program(self.callback_program.as_deref())
             .callback_config_account(self.callback_config_account.as_deref())
             .callback_action_stats_account(self.callback_action_stats_account.as_deref())
+            .event_emitter(Some(EventEmitter::new(
+                &self.event_authority,
+                bumps.event_authority,
+            )))
             .build();
 
         let kind = params.kind;
@@ -953,9 +958,10 @@ impl<'info> CloseOrderV2<'info> {
     }
 }
 
-/// The accounts definitions for [`update_order`](crate::gmsol_store::update_order).
+/// The accounts definitions for [`update_order_v2`](crate::gmsol_store::update_order_v2).
+#[event_cpi]
 #[derive(Accounts)]
-pub struct UpdateOrder<'info> {
+pub struct UpdateOrderV2<'info> {
     /// Owner.
     pub owner: Signer<'info>,
     /// Store.
@@ -973,33 +979,44 @@ pub struct UpdateOrder<'info> {
     pub order: AccountLoader<'info, Order>,
 }
 
-pub(crate) fn update_order(ctx: Context<UpdateOrder>, params: &UpdateOrderParams) -> Result<()> {
-    // Validate feature enabled.
-    {
-        let order = ctx.accounts.order.load()?;
-        ctx.accounts
-            .store
-            .load()?
-            .validate_not_restarted()?
-            .validate_feature_enabled(
-                order
-                    .params()
-                    .kind()?
-                    .try_into()
-                    .map_err(CoreError::from)
-                    .map_err(|err| error!(err))?,
-                ActionDisabledFlag::Update,
-            )?;
+impl UpdateOrderV2<'_> {
+    pub(crate) fn invoke(ctx: Context<Self>, params: &UpdateOrderParams) -> Result<()> {
+        // Validate feature enabled.
+        {
+            let order = ctx.accounts.order.load()?;
+            ctx.accounts
+                .store
+                .load()?
+                .validate_not_restarted()?
+                .validate_feature_enabled(
+                    order
+                        .params()
+                        .kind()?
+                        .try_into()
+                        .map_err(CoreError::from)
+                        .map_err(|err| error!(err))?,
+                    ActionDisabledFlag::Update,
+                )?;
+        }
+
+        let id = ctx
+            .accounts
+            .market
+            .load_mut()?
+            .indexer_mut()
+            .next_order_id()?;
+        ctx.accounts.order.load_mut()?.update(id, params)?;
+        ctx.accounts.emit_event(ctx.bumps.event_authority)?;
+        Ok(())
     }
 
-    let id = ctx
-        .accounts
-        .market
-        .load_mut()?
-        .indexer_mut()
-        .next_order_id()?;
-    ctx.accounts.order.load_mut()?.update(id, params)?;
-    Ok(())
+    fn emit_event(&self, bump: u8) -> Result<()> {
+        let event_emitter = EventEmitter::new(&self.event_authority, bump);
+        let order_address = self.order.key();
+        let order = self.order.load()?;
+        event_emitter.emit_cpi(&OrderUpdated::new(false, &order_address, &order)?)?;
+        Ok(())
+    }
 }
 
 /// The accounts definition for the [`cancel_order_if_no_position`](crate::gmsol_store::cancel_order_if_no_position)
@@ -1219,6 +1236,7 @@ mod deprecated {
                 .callback_program(None)
                 .callback_config_account(None)
                 .callback_action_stats_account(None)
+                .event_emitter(None)
                 .build();
 
             let kind = params.kind;
@@ -1748,5 +1766,57 @@ mod deprecated {
 
             Ok(())
         }
+    }
+
+    /// The accounts definitions for [`update_order`](crate::gmsol_store::update_order).
+    #[derive(Accounts)]
+    pub struct UpdateOrder<'info> {
+        /// Owner.
+        pub owner: Signer<'info>,
+        /// Store.
+        pub store: AccountLoader<'info, Store>,
+        /// Market.
+        #[account(mut, has_one = store)]
+        pub market: AccountLoader<'info, Market>,
+        /// Order to update.
+        #[account(
+        mut,
+        constraint = order.load()?.header.store == store.key() @ CoreError::StoreMismatched,
+        constraint = order.load()?.header.market == market.key() @ CoreError::MarketMismatched,
+        constraint = order.load()?.header.owner== owner.key() @ CoreError::OwnerMismatched,
+    )]
+        pub order: AccountLoader<'info, Order>,
+    }
+
+    pub(crate) fn update_order(
+        ctx: Context<UpdateOrder>,
+        params: &UpdateOrderParams,
+    ) -> Result<()> {
+        // Validate feature enabled.
+        {
+            let order = ctx.accounts.order.load()?;
+            ctx.accounts
+                .store
+                .load()?
+                .validate_not_restarted()?
+                .validate_feature_enabled(
+                    order
+                        .params()
+                        .kind()?
+                        .try_into()
+                        .map_err(CoreError::from)
+                        .map_err(|err| error!(err))?,
+                    ActionDisabledFlag::Update,
+                )?;
+        }
+
+        let id = ctx
+            .accounts
+            .market
+            .load_mut()?
+            .indexer_mut()
+            .next_order_id()?;
+        ctx.accounts.order.load_mut()?.update(id, params)?;
+        Ok(())
     }
 }

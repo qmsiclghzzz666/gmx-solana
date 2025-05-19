@@ -19,16 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Defined the callback interface and added an example `gmsol-callback` program.
 - programs: Added callback-enabled instructions for order.
   - Added the `create_order_v2` instruction.
+  - Added the `update_order_v2` instruction.
   - Added the `close_order_v2` instrcution.
   - Added the `execute_increase_or_swap_order_v2` instruction.
   - Added the `execute_decrease_order_v2` instruction.
 - programs(store): Added `InsufficientFundingFeePayment` CPI event to be emitted on insufficient funding fee payment.
 - programs(store): Added `GtBuyback` CPI event to be emitted on GT exchange vault confirmation.
 - programs(store): Added `confirm_gt_exchange_vault_v2` instruction, which requires the caller to provide buyback information.
+- programs(store): Added `OrderUpdated` CPI event to be emitted on order creation or update.
 
 ### Changed
 
-- programs: Deprecated `create_order`, `close_order`, `execute_increase_or_swap_order` and `execute_decrease_order` instructions.
+- programs: Deprecated `create_order`, `update_order`, `close_order`, `execute_increase_or_swap_order` and `execute_decrease_order` instructions.
 - programs(store): Deprecated `confirm_gt_exchange_vault` instruction.
 
 ### Fixed

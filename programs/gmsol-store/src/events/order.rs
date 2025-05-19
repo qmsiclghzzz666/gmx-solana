@@ -2,11 +2,16 @@ use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 
 use gmsol_model::action::{
-    decrease_position::DecreasePositionReport, increase_position::IncreasePositionReport,
+    decrease_position::{DecreasePositionReport, DecreasePositionSwapType},
+    increase_position::IncreasePositionReport,
 };
 use gmsol_utils::InitSpace;
 
-use crate::states::{common::action::ActionState, order::OrderKind};
+use crate::states::{
+    common::action::{Action, ActionState},
+    order::OrderKind,
+    Order, OrderActionParams,
+};
 
 use super::Event;
 
@@ -160,7 +165,7 @@ impl InitSpace for OrderRemoved {
 
 impl Event for OrderRemoved {}
 
-/// Event indicating that insufficient funding fee payment has occurred.
+/// An event indicating that insufficient funding fee payment has occurred.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(Clone, InitSpace)]
@@ -211,3 +216,99 @@ impl InitSpace for InsufficientFundingFeePayment {
 }
 
 impl Event for InsufficientFundingFeePayment {}
+
+/// Order parameters for event.
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+pub struct OrderParamsForEvent {
+    /// Order kind.
+    pub kind: OrderKind,
+    /// Order side.
+    pub is_long: bool,
+    /// Decrease position swap type.
+    pub decrease_position_swap_type: DecreasePositionSwapType,
+    /// Collateral token.
+    pub collateral_token: Pubkey,
+    /// Position address.
+    pub position: Option<Pubkey>,
+    /// Initial collateral delta amount.
+    pub initial_collateral_delta_amount: u64,
+    /// Size delta value.
+    pub size_delta_value: u128,
+    /// Min output.
+    pub min_output: u128,
+    /// Trigger price (in unit price).
+    pub trigger_price: u128,
+    /// Accetpable price (in unit price).
+    pub acceptable_price: u128,
+    /// Valid from this timestamp.
+    pub valid_from_ts: i64,
+}
+
+impl TryFrom<&OrderActionParams> for OrderParamsForEvent {
+    type Error = Error;
+
+    fn try_from(params: &OrderActionParams) -> std::result::Result<Self, Self::Error> {
+        Ok(Self {
+            kind: params.kind()?,
+            is_long: params.side()?.is_long(),
+            decrease_position_swap_type: params.decrease_position_swap_type()?,
+            collateral_token: params.collateral_token,
+            position: params.position().copied(),
+            initial_collateral_delta_amount: params.initial_collateral_delta_amount,
+            size_delta_value: params.size_delta_value,
+            min_output: params.min_output(),
+            trigger_price: params.trigger_price,
+            acceptable_price: params.acceptable_price,
+            valid_from_ts: params.valid_from_ts,
+        })
+    }
+}
+
+/// An event indicating that an order is updated.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Clone, InitSpace)]
+pub struct OrderUpdated {
+    /// Whether it is a create event.
+    pub is_create: bool,
+    /// Action id.
+    pub id: u64,
+    /// Timestamp.
+    pub ts: i64,
+    /// Slot.
+    pub slot: u64,
+    /// Store.
+    pub store: Pubkey,
+    /// Order.
+    pub order: Pubkey,
+    /// Market token.
+    pub market_token: Pubkey,
+    /// Owner.
+    pub owner: Pubkey,
+    /// Parameters.
+    pub params: OrderParamsForEvent,
+}
+
+impl OrderUpdated {
+    pub(crate) fn new(is_create: bool, address: &Pubkey, order: &Order) -> Result<Self> {
+        let clock = Clock::get()?;
+        Ok(Self {
+            is_create,
+            id: order.header().id(),
+            ts: clock.unix_timestamp,
+            slot: clock.slot,
+            store: *order.header().store(),
+            order: *address,
+            market_token: *order.market_token(),
+            owner: *order.header().owner(),
+            params: order.params().try_into()?,
+        })
+    }
+}
+
+impl InitSpace for OrderUpdated {
+    const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
+}
+
+impl Event for OrderUpdated {}

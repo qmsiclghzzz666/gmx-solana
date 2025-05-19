@@ -5598,6 +5598,138 @@
       "args": []
     },
     {
+      "name": "confirm_gt_exchange_vault_v2",
+      "docs": [
+        "Confirm GT exchange vault.",
+        "",
+        "# Accounts",
+        "*[See the documentation for the accounts.](ConfirmGtExchangeVault)*",
+        "",
+        "# Errors",
+        "- The [`authority`](ConfirmGtExchangeVault::authority) must be a signer and have the GT_CONTROLLER role in the `store`.",
+        "- The [`store`](ConfirmGtExchangeVault::store) must be properly initialized.",
+        "- The GT state of the `store` must be initialized.",
+        "- The [`vault`](ConfirmGtExchangeVault::vault) must be validly initialized and owned by",
+        "the `store`.",
+        "- The `vault` must be in a confirmable state (deposit window has passed but not yet confirmed)."
+      ],
+      "discriminator": [
+        248,
+        171,
+        118,
+        202,
+        159,
+        186,
+        236,
+        43
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "Authority."
+          ],
+          "signer": true
+        },
+        {
+          "name": "store",
+          "docs": [
+            "Store."
+          ],
+          "writable": true,
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  116,
+                  95,
+                  101,
+                  120,
+                  99,
+                  104,
+                  97,
+                  110,
+                  103,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "store"
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "buyback_value",
+          "type": "u128"
+        },
+        {
+          "name": "buyback_price",
+          "type": {
+            "option": "u128"
+          }
+        }
+      ]
+    },
+    {
       "name": "create_deposit",
       "docs": [
         "Create a deposit by the owner.",
@@ -8937,6 +9069,38 @@
           ],
           "writable": true,
           "optional": true
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
         }
       ],
       "args": [
@@ -22480,6 +22644,114 @@
       ]
     },
     {
+      "name": "update_order_v2",
+      "docs": [
+        "Update an order by the owner.",
+        "",
+        "# Accounts",
+        "*[See the documentation for the accounts.](UpdateOrderV2)*",
+        "",
+        "# Arguments",
+        "- `params`: Update Order Parameters.",
+        "",
+        "# Errors",
+        "- The [`owner`](UpdateOrderV2::owner) must be a signer and the owner of the `order`.",
+        "- The [`store`](UpdateOrderV2::store) must be initialized.",
+        "- The [`market`](UpdateOrderV2::market) must be initialized, enabled and owned by the `store`.",
+        "- The [`order`](UpdateOrderV2::order) must be:",
+        "- Initialized and owned by both the `store` and the `owner`",
+        "- Associated with the provided `market`",
+        "- In a pending state",
+        "- The order type must support updates",
+        "- The feature must be enabled in the `store` for updating the given kind of `order`.",
+        "- The updated parameters must be valid for the order type."
+      ],
+      "discriminator": [
+        195,
+        175,
+        207,
+        33,
+        171,
+        246,
+        41,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "docs": [
+            "Owner."
+          ],
+          "signer": true
+        },
+        {
+          "name": "store",
+          "docs": [
+            "Store."
+          ],
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "market",
+          "docs": [
+            "Market."
+          ],
+          "writable": true
+        },
+        {
+          "name": "order",
+          "docs": [
+            "Order to update."
+          ],
+          "writable": true
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "UpdateOrderParams"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "update_price_feed_with_chainlink",
       "docs": [
         "Updates the price data in a custom price feed account using a signed price report from",
@@ -23044,6 +23316,19 @@
       ]
     },
     {
+      "name": "GtBuyback",
+      "discriminator": [
+        155,
+        154,
+        99,
+        138,
+        235,
+        56,
+        240,
+        100
+      ]
+    },
+    {
       "name": "GtUpdated",
       "discriminator": [
         133,
@@ -23054,6 +23339,19 @@
         161,
         244,
         21
+      ]
+    },
+    {
+      "name": "InsufficientFundingFeePayment",
+      "discriminator": [
+        247,
+        151,
+        12,
+        203,
+        116,
+        59,
+        165,
+        140
       ]
     },
     {
@@ -23106,6 +23404,19 @@
         235,
         144,
         23
+      ]
+    },
+    {
+      "name": "OrderUpdated",
+      "discriminator": [
+        172,
+        140,
+        210,
+        241,
+        108,
+        117,
+        122,
+        145
       ]
     },
     {
@@ -27204,6 +27515,77 @@
       }
     },
     {
+      "name": "GtBuyback",
+      "docs": [
+        "Event indicating that a GT buyback has occurred."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ts",
+            "docs": [
+              "Timestamp."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "slot",
+            "docs": [
+              "Slot."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "store",
+            "docs": [
+              "Store."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "gt_exchange_vault",
+            "docs": [
+              "GT exchange vault."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "Authority."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "buyback_amount",
+            "docs": [
+              "Total buyback amount."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buyback_value",
+            "docs": [
+              "Buyback value."
+            ],
+            "type": {
+              "option": "u128"
+            }
+          },
+          {
+            "name": "buyback_price",
+            "docs": [
+              "Buyback price."
+            ],
+            "type": {
+              "option": "u128"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "GtExchange",
       "docs": [
         "GT Exchange Account."
@@ -27879,6 +28261,73 @@
           },
           {
             "name": "Diff"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InsufficientFundingFeePayment",
+      "docs": [
+        "An event indicating that insufficient funding fee payment has occurred."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ts",
+            "docs": [
+              "Timestamp."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "slot",
+            "docs": [
+              "Slot."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "store",
+            "docs": [
+              "Store."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "market_token",
+            "docs": [
+              "Market token."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "cost_amount",
+            "docs": [
+              "Funding fee amount to pay."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "paid_in_collateral_amount",
+            "docs": [
+              "Paid collateral token amount."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "paid_in_secondary_output_amount",
+            "docs": [
+              "Paid secondary token amount."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "is_collateral_token_long",
+            "docs": [
+              "Whether the collateral token is long token."
+            ],
+            "type": "bool"
           }
         ]
       }
@@ -29177,6 +29626,104 @@
       }
     },
     {
+      "name": "OrderParamsForEvent",
+      "docs": [
+        "Order parameters for event."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "kind",
+            "docs": [
+              "Order kind."
+            ],
+            "type": {
+              "defined": {
+                "name": "OrderKind"
+              }
+            }
+          },
+          {
+            "name": "is_long",
+            "docs": [
+              "Order side."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "decrease_position_swap_type",
+            "docs": [
+              "Decrease position swap type."
+            ],
+            "type": {
+              "defined": {
+                "name": "DecreasePositionSwapType"
+              }
+            }
+          },
+          {
+            "name": "collateral_token",
+            "docs": [
+              "Collateral token."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "position",
+            "docs": [
+              "Position address."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "initial_collateral_delta_amount",
+            "docs": [
+              "Initial collateral delta amount."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "size_delta_value",
+            "docs": [
+              "Size delta value."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "min_output",
+            "docs": [
+              "Min output."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "trigger_price",
+            "docs": [
+              "Trigger price (in unit price)."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "acceptable_price",
+            "docs": [
+              "Accetpable price (in unit price)."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "valid_from_ts",
+            "docs": [
+              "Valid from this timestamp."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "OrderRemoved",
       "docs": [
         "Order removed event."
@@ -29328,6 +29875,84 @@
                 "u8",
                 128
               ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderUpdated",
+      "docs": [
+        "An event indicating that an order is updated."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "is_create",
+            "docs": [
+              "Whether it is a create event."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "id",
+            "docs": [
+              "Action id."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "docs": [
+              "Timestamp."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "slot",
+            "docs": [
+              "Slot."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "store",
+            "docs": [
+              "Store."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "order",
+            "docs": [
+              "Order."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "market_token",
+            "docs": [
+              "Market token."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "docs": [
+              "Owner."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "params",
+            "docs": [
+              "Parameters."
+            ],
+            "type": {
+              "defined": {
+                "name": "OrderParamsForEvent"
+              }
             }
           }
         ]

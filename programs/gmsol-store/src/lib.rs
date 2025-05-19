@@ -2160,8 +2160,32 @@ pub mod gmsol_store {
     ///   - The order type must support updates
     /// - The feature must be enabled in the `store` for updating the given kind of `order`.
     /// - The updated parameters must be valid for the order type.
+    #[deprecated(since = "0.6.0", note = "use `update_order_v2` instead")]
     pub fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
         instructions::update_order(ctx, &params)
+    }
+
+    /// Update an order by the owner.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](UpdateOrderV2)*
+    ///
+    /// # Arguments
+    /// - `params`: Update Order Parameters.
+    ///
+    /// # Errors
+    /// - The [`owner`](UpdateOrderV2::owner) must be a signer and the owner of the `order`.
+    /// - The [`store`](UpdateOrderV2::store) must be initialized.
+    /// - The [`market`](UpdateOrderV2::market) must be initialized, enabled and owned by the `store`.
+    /// - The [`order`](UpdateOrderV2::order) must be:
+    ///   - Initialized and owned by both the `store` and the `owner`
+    ///   - Associated with the provided `market`
+    ///   - In a pending state
+    ///   - The order type must support updates
+    /// - The feature must be enabled in the `store` for updating the given kind of `order`.
+    /// - The updated parameters must be valid for the order type.
+    pub fn update_order_v2(ctx: Context<UpdateOrderV2>, params: UpdateOrderParams) -> Result<()> {
+        UpdateOrderV2::invoke(ctx, &params)
     }
 
     /// Execute an increase/swap order by keepers.

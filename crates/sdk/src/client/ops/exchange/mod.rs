@@ -513,13 +513,15 @@ impl<C: Deref<Target = impl Signer> + Clone> ExchangeOps<C> for Client<C> {
     ) -> crate::Result<TransactionBuilder<C>> {
         Ok(self
             .store_transaction()
-            .anchor_accounts(accounts::UpdateOrder {
+            .anchor_accounts(accounts::UpdateOrderV2 {
                 owner: self.payer(),
                 store: *store,
                 market: self.find_market_address(store, market_token),
                 order: *order,
+                event_authority: self.store_event_authority(),
+                program: *self.store_program_id(),
             })
-            .anchor_args(args::UpdateOrder { params }))
+            .anchor_args(args::UpdateOrderV2 { params }))
     }
 
     fn execute_order(
