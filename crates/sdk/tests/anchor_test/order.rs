@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use gmsol_programs::gmsol_store::types::DecreasePositionSwapType;
+use gmsol_programs::gmsol_store::types::{DecreasePositionSwapType, UpdateOrderParams};
 use gmsol_sdk::{
     client::ops::{ExchangeOps, MarketOps},
     constants::MARKET_USD_UNIT,
@@ -689,6 +689,75 @@ async fn liquidation() -> eyre::Result<()> {
             .await?;
         tracing::info!(%signature, %market_token, "restore min collateral factor");
     }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn update_order() -> eyre::Result<()> {
+    let deployment = current_deployment().await?;
+    let _guard = deployment.use_accounts().await?;
+    let span = tracing::info_span!("update_order");
+    let _enter = span.enter();
+
+    let client = deployment.user_client(Deployment::DEFAULT_USER)?;
+    let store = &deployment.store;
+    let fbtc = deployment.token("fBTC").expect("must exist");
+
+    let long_token_amount = 1_000_011;
+    let short_token_amount = 6_000_000_000_007;
+
+    let market_token = deployment
+        .prepare_market(
+            ["fBTC", "fBTC", "USDG"],
+            long_token_amount,
+            short_token_amount,
+            true,
+        )
+        .await?;
+
+    let long_collateral_amount = 100_000;
+
+    deployment
+        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, long_collateral_amount)
+        .await?;
+
+    let size = 5_000 * 100_000_000_000_000_000_000;
+    let price_1 = 400_000 * MARKET_USD_UNIT / 10u128.pow(fbtc.config.decimals as u32);
+    let (rpc, order) = client
+        .limit_increase(
+            store,
+            market_token,
+            false,
+            size,
+            price_1,
+            true,
+            long_collateral_amount,
+        )
+        .build_with_address()
+        .await?;
+    let signature = rpc.send().await?;
+    tracing::info!(%order, %signature, %price_1, %size, "created a limit order");
+
+    let price_2 = price_1 / 2;
+    let signature = client
+        .update_order(
+            store,
+            market_token,
+            &order,
+            UpdateOrderParams {
+                trigger_price: Some(price_2),
+                ..Default::default()
+            },
+        )?
+        .send()
+        .await?;
+
+    tracing::info!(%order, %signature, %price_2, %size, "updated a limit order");
+
+    let signature = client.close_order(&order)?.build().await?.send().await?;
+
+    tracing::info!(%order, %signature, "cancelled a limit order");
 
     Ok(())
 }
