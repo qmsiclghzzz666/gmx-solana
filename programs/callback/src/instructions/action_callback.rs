@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{ActionStats, CallbackKind, Config, ACTION_STATS_SEED, CALLER_PROGRAM_ID},
+    states::{ActionStats, Config, On, ACTION_STATS_SEED, CALLER_PROGRAM_ID},
     CALLBACK_AUTHORITY_SEED,
 };
 
@@ -43,7 +43,7 @@ pub struct Callback<'info> {
 
 impl Callback<'_> {
     pub(crate) fn invoke(
-        kind: CallbackKind,
+        kind: On,
         ctx: Context<Self>,
         _authority_bump: u8,
         _action_kind: u8,
@@ -55,9 +55,10 @@ impl Callback<'_> {
             usize::from(extra_account_count)
         );
         match kind {
-            CallbackKind::OnCreated => ctx.accounts.handle_created(success),
-            CallbackKind::OnExecuted => ctx.accounts.handle_executed(success),
-            CallbackKind::OnClosed => ctx.accounts.handle_closed(success),
+            On::Created => ctx.accounts.handle_created(success),
+            On::Updated => ctx.accounts.handle_updated(success),
+            On::Executed => ctx.accounts.handle_executed(success),
+            On::Closed => ctx.accounts.handle_closed(success),
         }
     }
 
@@ -68,6 +69,20 @@ impl Callback<'_> {
 
         msg!(
             "{}: on_created, success={} calls={}",
+            self.config.prefix,
+            success,
+            self.config.calls
+        );
+        Ok(())
+    }
+
+    fn handle_updated(&mut self, success: bool) -> Result<()> {
+        self.config.calls += 1;
+        self.action_stats.update_count += 1;
+        self.action_stats.last_updated_at = Clock::get()?.unix_timestamp;
+
+        msg!(
+            "{}: on_updated, success={} calls={}",
             self.config.prefix,
             success,
             self.config.calls

@@ -27,7 +27,7 @@ pub const CALLBACK_AUTHORITY_SEED: &[u8] = b"callback";
 
 #[program]
 pub mod gmsol_callback {
-    use states::CallbackKind;
+    use states::On;
 
     use super::*;
 
@@ -52,7 +52,24 @@ pub mod gmsol_callback {
         extra_account_count: u8,
     ) -> Result<()> {
         Callback::invoke(
-            CallbackKind::OnCreated,
+            On::Created,
+            ctx,
+            authority_bump,
+            action_kind,
+            true,
+            extra_account_count,
+        )
+    }
+
+    /// Callback expected to be invoked when an action is updated.
+    pub fn on_updated(
+        ctx: Context<Callback>,
+        authority_bump: u8,
+        action_kind: u8,
+        extra_account_count: u8,
+    ) -> Result<()> {
+        Callback::invoke(
+            On::Updated,
             ctx,
             authority_bump,
             action_kind,
@@ -70,7 +87,7 @@ pub mod gmsol_callback {
         extra_account_count: u8,
     ) -> Result<()> {
         Callback::invoke(
-            CallbackKind::OnExecuted,
+            On::Executed,
             ctx,
             authority_bump,
             action_kind,
@@ -87,7 +104,7 @@ pub mod gmsol_callback {
         extra_account_count: u8,
     ) -> Result<()> {
         Callback::invoke(
-            CallbackKind::OnClosed,
+            On::Closed,
             ctx,
             authority_bump,
             action_kind,

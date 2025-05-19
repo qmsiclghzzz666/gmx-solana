@@ -13,11 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs: Removed support for Chainlink data feeds.
 - model: Added `paid_in_secondary_output_amount` and `is_collateral_token_long` parameters to the `on_insufficient_funding_fee_payment` function.
 - sdk: Removed support for `spl-governance`.
+- sdk(sdk): Updated the `ExchangeOps::update_order` function to include a `hint` parameter and return a future.
 
 ### Added
 
 - programs: Defined the callback interface and added an example `gmsol-callback` program.
-- programs: Added callback-enabled instructions for order.
+- programs(store): Added callback-enabled instructions for order.
   - Added the `create_order_v2` instruction.
   - Added the `update_order_v2` instruction.
   - Added the `close_order_v2` instrcution.
@@ -27,10 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs(store): Added `GtBuyback` CPI event to be emitted on GT exchange vault confirmation.
 - programs(store): Added `confirm_gt_exchange_vault_v2` instruction, which requires the caller to provide buyback information.
 - programs(store): Added `OrderUpdated` CPI event to be emitted on order creation or update.
+- sdk(sdk): Added `callback` option to `ops::CreateOrderBuilder`.
+- sdk(sdk): Added `callback` field to `ExecuteOrderHint` and `CloseOrderHint`.
 
 ### Changed
 
-- programs: Deprecated `create_order`, `update_order`, `close_order`, `execute_increase_or_swap_order` and `execute_decrease_order` instructions.
+- programs(store): Deprecated `create_order`, `update_order`, `close_order`, `execute_increase_or_swap_order` and `execute_decrease_order` instructions.
 - programs(store): Deprecated `confirm_gt_exchange_vault` instruction.
 
 ### Fixed

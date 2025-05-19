@@ -1,4 +1,5 @@
 use gmsol_callback::{accounts, instruction, interface::ActionKind, states::ACTION_STATS_SEED};
+use gmsol_programs::gmsol_store::types::UpdateOrderParams;
 use gmsol_sdk::{
     client::ops::ExchangeOps, constants::MARKET_USD_UNIT, ops::exchange::callback::Callback,
 };
@@ -48,6 +49,7 @@ async fn callback() -> eyre::Result<()> {
     //     .await?;
 
     let size = 5_000 * MARKET_USD_UNIT;
+    let price = 400_000 * MARKET_USD_UNIT / 10u128.pow(fbtc.config.decimals as u32);
 
     let action_kind = ActionKind::Order.into();
     let owner = client.payer();
@@ -102,13 +104,14 @@ async fn callback() -> eyre::Result<()> {
 
     // Create order.
     let (mut rpc, order) = client
-        .market_increase(
+        .limit_increase(
             store,
             market_token,
             true,
-            long_collateral_amount,
-            true,
             size,
+            price,
+            true,
+            long_collateral_amount,
         )
         .callback(Some(Callback {
             program: deployment.callback_program,
@@ -134,6 +137,27 @@ async fn callback() -> eyre::Result<()> {
         .await?
         .expect("must exist");
     tracing::info!(%order, %signature, ?stats, "created an increase position order");
+
+    // Update order.
+    let signature = client
+        .update_order(
+            store,
+            market_token,
+            &order,
+            UpdateOrderParams {
+                trigger_price: Some(price / 2),
+                ..Default::default()
+            },
+            None,
+        )
+        .await?
+        .send()
+        .await?;
+    let stats = client
+        .account::<gmsol_callback::states::ActionStats>(&action_stats)
+        .await?
+        .expect("must exist");
+    tracing::info!(%order, %signature, ?stats, "updated increase position order");
 
     // Cancel order without callback.
     let signature = client

@@ -749,7 +749,9 @@ async fn update_order() -> eyre::Result<()> {
                 trigger_price: Some(price_2),
                 ..Default::default()
             },
-        )?
+            None,
+        )
+        .await?
         .send()
         .await?;
 

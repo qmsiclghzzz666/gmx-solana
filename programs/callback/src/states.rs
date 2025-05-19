@@ -41,12 +41,16 @@ pub struct ActionStats {
     pub owner: Pubkey,
     /// Total number of actions that have ever been created.
     pub total_created: u64,
+    /// Updated times.
+    pub update_count: u64,
     /// Total number of actions that have been executed.
     pub total_executed: u64,
     /// Total number of actions that have been closed.
     pub total_closed: u64,
     /// Timestamp of the last created action.
     pub last_created_at: i64,
+    /// Timestamp of the last created action.
+    pub last_updated_at: i64,
     /// Timestamp of the last executed action.
     pub last_executed_at: i64,
     /// Timestamp of the last closed action.
@@ -54,11 +58,13 @@ pub struct ActionStats {
 }
 
 /// Callback kind.
-pub enum CallbackKind {
+pub(crate) enum On {
     /// On created.
-    OnCreated,
+    Created,
+    /// On updated.
+    Updated,
     /// On executed.
-    OnExecuted,
+    Executed,
     /// On closed.
-    OnClosed,
+    Closed,
 }

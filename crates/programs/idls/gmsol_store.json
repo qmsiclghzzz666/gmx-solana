@@ -22708,6 +22708,53 @@
           "writable": true
         },
         {
+          "name": "callback_authority",
+          "docs": [
+            "Callback authority."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  108,
+                  108,
+                  98,
+                  97,
+                  99,
+                  107
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "callback_program",
+          "docs": [
+            "Callback program."
+          ],
+          "optional": true
+        },
+        {
+          "name": "callback_config_account",
+          "docs": [
+            "Config account for callback."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "callback_action_stats_account",
+          "docs": [
+            "Action stats account for callback."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
           "name": "event_authority",
           "pda": {
             "seeds": [

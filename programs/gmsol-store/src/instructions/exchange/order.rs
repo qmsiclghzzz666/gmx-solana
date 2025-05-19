@@ -977,6 +977,22 @@ pub struct UpdateOrderV2<'info> {
         constraint = order.load()?.header.owner== owner.key() @ CoreError::OwnerMismatched,
     )]
     pub order: AccountLoader<'info, Order>,
+    /// Callback authority.
+    #[account(
+        seeds = [CALLBACK_AUTHORITY_SEED],
+        bump = callback_authority.bump(),
+    )]
+    pub callback_authority: Option<Account<'info, CallbackAuthority>>,
+    /// Callback program.
+    pub callback_program: Option<Interface<'info, CallbackInterface>>,
+    /// Config account for callback.
+    /// CHECK: expected to be checked by the callback program.
+    #[account(mut)]
+    pub callback_config_account: Option<UncheckedAccount<'info>>,
+    /// Action stats account for callback.
+    /// CHECK: expected to be checked by the callback program.
+    #[account(mut)]
+    pub callback_action_stats_account: Option<UncheckedAccount<'info>>,
 }
 
 impl UpdateOrderV2<'_> {
@@ -1007,6 +1023,7 @@ impl UpdateOrderV2<'_> {
             .next_order_id()?;
         ctx.accounts.order.load_mut()?.update(id, params)?;
         ctx.accounts.emit_event(ctx.bumps.event_authority)?;
+        ctx.accounts.hanlde_updated()?;
         Ok(())
     }
 
@@ -1015,6 +1032,47 @@ impl UpdateOrderV2<'_> {
         let order_address = self.order.key();
         let order = self.order.load()?;
         event_emitter.emit_cpi(&OrderUpdated::new(false, &order_address, &order)?)?;
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn hanlde_updated(&self) -> Result<()> {
+        match self.order.load()?.header.callback_kind()? {
+            ActionCallbackKind::Disabled => {}
+            ActionCallbackKind::General => {
+                if let Some(authority) = self.callback_authority.as_ref() {
+                    let program = self
+                        .callback_program
+                        .as_ref()
+                        .ok_or_else(|| error!(CoreError::InvalidArgument))?;
+                    let config = self
+                        .callback_config_account
+                        .as_ref()
+                        .ok_or_else(|| error!(CoreError::InvalidArgument))?;
+                    let action_stats = self
+                        .callback_action_stats_account
+                        .as_ref()
+                        .ok_or_else(|| error!(CoreError::InvalidArgument))?;
+
+                    self.order.load()?.header.invoke_general_callback(
+                        On::Updated(ActionKind::Order),
+                        authority,
+                        program,
+                        config,
+                        action_stats,
+                        &self.owner,
+                        self.order.as_ref(),
+                        &[],
+                    )?;
+                } else {
+                    msg!("[Callback] callback is specified, but required accounts are missing");
+                    return err!(CoreError::InvalidArgument);
+                }
+            }
+            kind => {
+                msg!("[Callback] unsupported callback kind: {}", kind);
+            }
+        }
         Ok(())
     }
 }

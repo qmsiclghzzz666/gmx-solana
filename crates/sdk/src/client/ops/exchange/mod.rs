@@ -24,6 +24,7 @@ pub mod callback;
 
 use std::{future::Future, ops::Deref};
 
+use callback::{Callback, CallbackAddresses};
 use deposit::{CloseDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder};
 use glv_deposit::{CloseGlvDepositBuilder, CreateGlvDepositBuilder, ExecuteGlvDepositBuilder};
 use glv_shift::{CloseGlvShiftBuilder, CreateGlvShiftBuilder, ExecuteGlvShiftBuilder};
@@ -318,7 +319,8 @@ pub trait ExchangeOps<C> {
         market_token: &Pubkey,
         order: &Pubkey,
         params: UpdateOrderParams,
-    ) -> crate::Result<TransactionBuilder<C>>;
+        hint: Option<Option<Callback>>,
+    ) -> impl Future<Output = crate::Result<TransactionBuilder<C>>>;
 
     /// Execute an order.
     fn execute_order(
@@ -504,13 +506,27 @@ impl<C: Deref<Target = impl Signer> + Clone> ExchangeOps<C> for Client<C> {
         CreateOrderBuilder::new(self, store, market_token, params, is_output_token_long)
     }
 
-    fn update_order(
+    async fn update_order(
         &self,
         store: &Pubkey,
         market_token: &Pubkey,
         order: &Pubkey,
         params: UpdateOrderParams,
+        hint: Option<Option<Callback>>,
     ) -> crate::Result<TransactionBuilder<C>> {
+        let callback = match hint {
+            Some(callback) => callback,
+            None => {
+                let order = self.order(order).await?;
+                Callback::from_header(&order.header)?
+            }
+        };
+        let CallbackAddresses {
+            callback_authority,
+            callback_program,
+            callback_config_account,
+            callback_action_stats_account,
+        } = self.get_callback_addresses(callback.as_ref());
         Ok(self
             .store_transaction()
             .anchor_accounts(accounts::UpdateOrderV2 {
@@ -520,6 +536,10 @@ impl<C: Deref<Target = impl Signer> + Clone> ExchangeOps<C> for Client<C> {
                 order: *order,
                 event_authority: self.store_event_authority(),
                 program: *self.store_program_id(),
+                callback_authority,
+                callback_program,
+                callback_config_account,
+                callback_action_stats_account,
             })
             .anchor_args(args::UpdateOrderV2 { params }))
     }

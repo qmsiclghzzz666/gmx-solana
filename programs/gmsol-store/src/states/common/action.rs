@@ -1,5 +1,5 @@
 use anchor_lang::{prelude::*, ZeroCopy};
-use gmsol_callback::interface::ActionKind;
+use gmsol_callback::{cpi::on_updated, interface::ActionKind};
 use gmsol_utils::{
     action::{ActionCallbackKind, ActionError, MAX_ACTION_FLAGS},
     InitSpace,
@@ -167,6 +167,12 @@ impl ActionHeader {
         let signer_seeds = authority.signer_seeds();
         match kind {
             On::Created(kind) => on_created(
+                ctx.with_signer(&[&signer_seeds]),
+                authority_bump,
+                kind.into(),
+                extra_account_count,
+            ),
+            On::Updated(kind) => on_updated(
                 ctx.with_signer(&[&signer_seeds]),
                 authority_bump,
                 kind.into(),
@@ -464,7 +470,7 @@ impl From<ActionError> for CoreError {
 
 pub(crate) enum On {
     Created(ActionKind),
-    #[allow(dead_code)]
+    Updated(ActionKind),
     Executed(ActionKind, bool),
     Closed(ActionKind),
 }
