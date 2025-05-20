@@ -156,6 +156,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
         let mut ix = txn.instructions_with_options(true, None);
         let incoming_lookup_table = txn.get_complete_lookup_table();
         if transaction_size(
+            txn.get_payer(),
             &ix,
             true,
             Some(&incoming_lookup_table),
@@ -185,6 +186,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
             lookup_table_addresses.extend(txn.get_luts().keys());
 
             let size_after_merge = transaction_size(
+                last.get_payer(),
                 &ixs_after_merge,
                 true,
                 Some(&lookup_table),

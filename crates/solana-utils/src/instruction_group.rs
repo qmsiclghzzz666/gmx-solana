@@ -146,6 +146,7 @@ impl AtomicGroup {
     ) -> usize {
         let addresses = luts.as_ref().map(|luts| luts.addresses());
         crate::utils::transaction_size(
+            self.payer,
             &self.instructions_with_options(options).collect::<Vec<_>>(),
             is_versioned_transaction,
             addresses.as_ref(),
@@ -163,6 +164,7 @@ impl AtomicGroup {
     ) -> usize {
         let addresses = luts.as_ref().map(|luts| luts.addresses());
         crate::utils::transaction_size(
+            self.payer,
             &self
                 .instructions_with_options(options)
                 .chain(other.instructions_with_options(GetInstructionsOptions {

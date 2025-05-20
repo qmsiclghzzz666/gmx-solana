@@ -589,6 +589,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> TransactionBuilder<'a, C, T>
     pub fn transaction_size(&self, is_versioned_transaction: bool) -> usize {
         let lookup_table = self.get_complete_lookup_table();
         crate::utils::transaction_size(
+            self.get_payer(),
             &self.instructions(),
             is_versioned_transaction,
             Some(&lookup_table),

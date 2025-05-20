@@ -7,6 +7,7 @@ use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 /// Based on the docs of [Solana Transactions](https://solana.com/docs/core/transactions),
 /// and referring to the implementation of `@pythnetwork/solana-utils`.
 pub fn transaction_size<T: Borrow<Instruction>>(
+    payer: Pubkey,
     ixs: &[T],
     is_versioned_transaction: bool,
     lookup_table: Option<&HashSet<Pubkey>>,
@@ -23,8 +24,8 @@ pub fn transaction_size<T: Borrow<Instruction>>(
     }
 
     let mut programs = HashSet::<Pubkey>::default();
-    let mut accounts = HashSet::<Pubkey>::default();
-    let mut signers = HashSet::<Pubkey>::default();
+    let mut accounts = HashSet::<Pubkey>::from([payer]);
+    let mut signers = HashSet::<Pubkey>::from([payer]);
 
     let ixs_size = ixs.iter().fold(0, |size, ix| {
         let ix = ix.borrow();
