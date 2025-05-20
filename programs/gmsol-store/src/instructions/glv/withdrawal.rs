@@ -154,7 +154,12 @@ impl<'info> internal::Create<'info, GlvWithdrawal> for CreateGlvWithdrawal<'info
         nonce: &NonceBytes,
         bumps: &Self::Bumps,
         remaining_accounts: &'info [AccountInfo<'info>],
+        callback_version: Option<u8>,
     ) -> Result<()> {
+        require_eq!(callback_version.is_none(), true, {
+            msg!("[Callback] callback is not supported by this instruction.");
+            CoreError::InvalidArgument
+        });
         self.transfer_glv_tokens(params)?;
         CreateGlvWithdrawalOperation::builder()
             .glv_withdrawal(self.glv_withdrawal.clone())

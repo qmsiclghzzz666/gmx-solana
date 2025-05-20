@@ -49,16 +49,17 @@ impl OnCallback<'_> {
         ctx: Context<Self>,
         _authority_bump: u8,
         action_kind: u8,
-        extra_account_count: u8,
+        callback_version: u8,
+        _extra_account_count: u8,
     ) -> Result<()> {
+        // Only callback version `0` is supported.
+        require_eq!(callback_version, 0);
         // Only setup callback for orders.
         require_eq!(
             action_kind,
             ActionKind::Order as u8,
             CompetitionError::InvalidActionKind
         );
-        // Validate the extra account count.
-        require_gte!(extra_account_count, 1);
 
         ctx.accounts.validate_competition()?;
         Ok(())
@@ -121,10 +122,12 @@ impl OnExecuted<'_> {
         ctx: Context<Self>,
         _authority_bump: u8,
         action_kind: u8,
+        callback_version: u8,
         success: bool,
         extra_account_count: u8,
     ) -> Result<()> {
         // Validate callback parameters.
+        require_eq!(callback_version, 0);
         require_eq!(
             action_kind,
             ActionKind::Order as u8,

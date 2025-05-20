@@ -352,6 +352,7 @@ impl<'info> internal::Create<'info, Order> for CreateOrderV2<'info> {
         nonce: &NonceBytes,
         bumps: &Self::Bumps,
         remaining_accounts: &'info [AccountInfo<'info>],
+        callback_version: Option<u8>,
     ) -> Result<()> {
         self.transfer_tokens(params)?;
 
@@ -365,6 +366,7 @@ impl<'info> internal::Create<'info, Order> for CreateOrderV2<'info> {
             .bump(bumps.order)
             .params(params)
             .swap_path(remaining_accounts)
+            .callback_version(callback_version)
             .callback_authority(self.callback_authority.as_ref())
             .callback_program(self.callback_program.as_deref())
             .callback_config_account(self.callback_config_account.as_deref())
@@ -1277,7 +1279,13 @@ mod deprecated {
             nonce: &NonceBytes,
             bumps: &Self::Bumps,
             remaining_accounts: &'info [AccountInfo<'info>],
+            callback_version: Option<u8>,
         ) -> Result<()> {
+            require_eq!(callback_version.is_none(), true, {
+                msg!("[Callback] callback is not supported by this instruction, use `create_order_v2` instead");
+                CoreError::InvalidArgument
+            });
+
             self.transfer_tokens(params)?;
 
             let ops = CreateOrderOperation::builder()
@@ -1290,6 +1298,7 @@ mod deprecated {
                 .bump(bumps.order)
                 .params(params)
                 .swap_path(remaining_accounts)
+                .callback_version(None)
                 .callback_authority(None)
                 .callback_program(None)
                 .callback_config_account(None)

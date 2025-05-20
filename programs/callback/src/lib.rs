@@ -49,6 +49,7 @@ pub mod gmsol_callback {
         ctx: Context<OnCallback>,
         authority_bump: u8,
         action_kind: u8,
+        callback_version: u8,
         extra_account_count: u8,
     ) -> Result<()> {
         OnCallback::invoke(
@@ -56,6 +57,7 @@ pub mod gmsol_callback {
             ctx,
             authority_bump,
             action_kind,
+            callback_version,
             true,
             extra_account_count,
         )
@@ -66,6 +68,7 @@ pub mod gmsol_callback {
         ctx: Context<OnCallback>,
         authority_bump: u8,
         action_kind: u8,
+        callback_version: u8,
         extra_account_count: u8,
     ) -> Result<()> {
         OnCallback::invoke(
@@ -73,6 +76,7 @@ pub mod gmsol_callback {
             ctx,
             authority_bump,
             action_kind,
+            callback_version,
             true,
             extra_account_count,
         )
@@ -83,6 +87,7 @@ pub mod gmsol_callback {
         ctx: Context<OnCallback>,
         authority_bump: u8,
         action_kind: u8,
+        callback_version: u8,
         success: bool,
         extra_account_count: u8,
     ) -> Result<()> {
@@ -91,6 +96,7 @@ pub mod gmsol_callback {
             ctx,
             authority_bump,
             action_kind,
+            callback_version,
             success,
             extra_account_count,
         )
@@ -101,6 +107,7 @@ pub mod gmsol_callback {
         ctx: Context<OnCallback>,
         authority_bump: u8,
         action_kind: u8,
+        callback_version: u8,
         extra_account_count: u8,
     ) -> Result<()> {
         OnCallback::invoke(
@@ -108,6 +115,7 @@ pub mod gmsol_callback {
             ctx,
             authority_bump,
             action_kind,
+            callback_version,
             true,
             extra_account_count,
         )

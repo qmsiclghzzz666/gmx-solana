@@ -26,7 +26,8 @@ pub struct ActionHeader {
     pub(crate) bump: u8,
     flags: ActionFlagContainer,
     callback_kind: u8,
-    padding_0: [u8; 3],
+    callback_version: u8,
+    padding_0: [u8; 2],
     /// Action id.
     pub id: u64,
     /// Store.
@@ -86,6 +87,7 @@ impl ActionHeader {
     pub(crate) fn set_general_callback(
         &mut self,
         program_id: &Pubkey,
+        callback_version: u8,
         config: &Pubkey,
         action_stats: &Pubkey,
     ) -> Result<()> {
@@ -94,6 +96,7 @@ impl ActionHeader {
             ActionCallbackKind::Disabled,
             CoreError::PreconditionsAreNotMet
         );
+        self.callback_version = callback_version;
         self.callback_kind = ActionCallbackKind::General.into();
         self.callback_program_id = *program_id;
         self.callback_config = *config;
@@ -101,7 +104,7 @@ impl ActionHeader {
         Ok(())
     }
 
-    /// Validate callback.
+    /// Validate the callback parameters.
     pub(crate) fn validate_general_callback(
         &self,
         program_id: &Pubkey,
@@ -144,6 +147,7 @@ impl ActionHeader {
     ) -> Result<()> {
         use gmsol_callback::interface::{on_closed, on_created, on_executed, OnCallback};
 
+        let callback_version = self.callback_version;
         self.validate_general_callback(program.key, config.key, action_stats.key)?;
 
         let ctx = CpiContext::new(
@@ -170,18 +174,21 @@ impl ActionHeader {
                 ctx.with_signer(&[&signer_seeds]),
                 authority_bump,
                 kind.into(),
+                callback_version,
                 extra_account_count,
             ),
             On::Updated(kind) => on_updated(
                 ctx.with_signer(&[&signer_seeds]),
                 authority_bump,
                 kind.into(),
+                callback_version,
                 extra_account_count,
             ),
             On::Executed(kind, success) => on_executed(
                 ctx.with_signer(&[&signer_seeds]),
                 authority_bump,
                 kind.into(),
+                callback_version,
                 success,
                 extra_account_count,
             ),
@@ -189,6 +196,7 @@ impl ActionHeader {
                 ctx.with_signer(&[&signer_seeds]),
                 authority_bump,
                 kind.into(),
+                callback_version,
                 extra_account_count,
             ),
         }

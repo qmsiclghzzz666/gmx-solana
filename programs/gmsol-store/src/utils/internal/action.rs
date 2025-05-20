@@ -40,6 +40,7 @@ pub(crate) trait Create<'info, A>: Sized + anchor_lang::Bumps {
         nonce: &NonceBytes,
         bumps: &Self::Bumps,
         remaining_accounts: &'info [AccountInfo<'info>],
+        callback_version: Option<u8>,
     ) -> Result<()>;
 
     /// Create Action.
@@ -47,11 +48,18 @@ pub(crate) trait Create<'info, A>: Sized + anchor_lang::Bumps {
         ctx: &mut Context<'_, '_, 'info, 'info, Self>,
         nonce: &NonceBytes,
         params: &Self::CreateParams,
+        callback_version: Option<u8>,
     ) -> Result<()> {
         let accounts = &mut ctx.accounts;
         accounts.validate(params)?;
         accounts.transfer_execution_lamports(params)?;
-        accounts.create_impl(params, nonce, &ctx.bumps, ctx.remaining_accounts)?;
+        accounts.create_impl(
+            params,
+            nonce,
+            &ctx.bumps,
+            ctx.remaining_accounts,
+            callback_version,
+        )?;
         Ok(())
     }
 

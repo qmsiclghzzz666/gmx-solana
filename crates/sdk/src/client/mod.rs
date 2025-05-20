@@ -565,7 +565,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_callback_authority(self.store_program_id()).0
     }
 
-    pub(crate) fn get_callback_addresses(&self, callback: Option<&Callback>) -> CallbackAddresses {
+    pub(crate) fn get_callback_params(&self, callback: Option<&Callback>) -> CallbackAddresses {
         match callback {
             Some(callback) => CallbackAddresses {
                 callback_authority: Some(self.find_callback_authority_address()),

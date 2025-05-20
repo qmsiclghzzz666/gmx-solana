@@ -761,7 +761,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TreasuryOps<C> for crate::Client<C>
             callback_program,
             callback_config_account,
             callback_action_stats_account,
-        } = self.get_callback_addresses(options.callback.as_ref());
+        } = self.get_callback_params(options.callback.as_ref());
 
         let create = self
             .treasury_transaction()
@@ -773,6 +773,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TreasuryOps<C> for crate::Client<C>
                     .map_err(|_| crate::Error::custom("swap path is too long"))?,
                 swap_in_amount: swap_in_token_amount,
                 min_swap_out_amount: options.min_swap_out_amount,
+                callback_version: options.callback.as_ref().map(|c| c.version),
             })
             .anchor_accounts(accounts::CreateSwapV2 {
                 authority: self.payer(),

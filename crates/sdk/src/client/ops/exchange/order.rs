@@ -582,7 +582,7 @@ where
             callback_program,
             callback_config_account,
             callback_action_stats_account,
-        } = self.client.get_callback_addresses(self.callback.as_ref());
+        } = self.client.get_callback_params(self.callback.as_ref());
 
         let create = self
             .client
@@ -619,7 +619,11 @@ where
                 &ID,
                 self.client.store_program_id(),
             ))
-            .anchor_args(args::CreateOrderV2 { nonce, params })
+            .anchor_args(args::CreateOrderV2 {
+                nonce,
+                params,
+                callback_version: self.callback.as_ref().map(|c| c.version),
+            })
             .accounts(
                 self.swap_path
                     .iter()
@@ -934,7 +938,7 @@ where
             callback_program,
             callback_config_account,
             callback_action_stats_account,
-        } = self.client.get_callback_addresses(hint.callback.as_ref());
+        } = self.client.get_callback_params(hint.callback.as_ref());
 
         let mut execute_order = match kind {
             OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
@@ -1340,7 +1344,7 @@ where
             callback_program,
             callback_config_account,
             callback_action_stats_account,
-        } = self.client.get_callback_addresses(
+        } = self.client.get_callback_params(
             (!self.skip_callback)
                 .then_some(hint.callback.as_ref())
                 .flatten(),

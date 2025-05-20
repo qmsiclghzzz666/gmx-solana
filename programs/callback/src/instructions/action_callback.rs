@@ -47,6 +47,7 @@ impl OnCallback<'_> {
         ctx: Context<Self>,
         _authority_bump: u8,
         _action_kind: u8,
+        _callback_version: u8,
         success: bool,
         extra_account_count: u8,
     ) -> Result<()> {

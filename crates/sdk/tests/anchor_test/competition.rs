@@ -114,6 +114,7 @@ async fn competition() -> eyre::Result<()> {
             size,
         )
         .callback(Some(Callback {
+            version: 0,
             program: COMPETITION_PROGRAM_ID,
             config: competition,
             action_stats: participant,

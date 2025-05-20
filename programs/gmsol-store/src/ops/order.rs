@@ -125,6 +125,7 @@ pub(crate) struct CreateOrderOperation<'a, 'info> {
     bump: u8,
     params: &'a CreateOrderParams,
     swap_path: &'info [AccountInfo<'info>],
+    callback_version: Option<u8>,
     callback_authority: Option<&'a Account<'info, CallbackAuthority>>,
     callback_program: Option<&'a AccountInfo<'info>>,
     callback_config_account: Option<&'a AccountInfo<'info>>,
@@ -230,7 +231,16 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
     fn handle_created(&self, position: Option<&AccountInfo<'info>>) -> Result<()> {
         // Ensure that the discriminator is written to the account data.
         self.order.exit(&crate::ID)?;
-        if let Some(authority) = self.callback_authority.as_ref() {
+        if let Some(version) = self.callback_version.as_ref() {
+            require_eq!(*version, 0, {
+                msg!("[Callback] orders currently support only callback version `0`");
+                CoreError::InvalidArgument
+            });
+
+            let authority = self
+                .callback_authority
+                .as_ref()
+                .ok_or_else(|| error!(CoreError::InvalidArgument))?;
             let program = self
                 .callback_program
                 .as_ref()
@@ -247,6 +257,7 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
 
             self.order.load_mut()?.header.set_general_callback(
                 program.key,
+                *version,
                 config.key,
                 action_stats.key,
             )?;
@@ -1882,6 +1893,7 @@ impl PositionCutOperation<'_, '_> {
             .bump(self.order_bump)
             .params(&params)
             .swap_path(&[])
+            .callback_version(None)
             .callback_authority(None)
             .callback_program(None)
             .callback_config_account(None)

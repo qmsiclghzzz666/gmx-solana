@@ -131,7 +131,13 @@ impl<'info> internal::Create<'info, Deposit> for CreateDeposit<'info> {
         nonce: &NonceBytes,
         bumps: &Self::Bumps,
         remaining_accounts: &'info [AccountInfo<'info>],
+        callback_version: Option<u8>,
     ) -> Result<()> {
+        require_eq!(callback_version.is_none(), true, {
+            msg!("[Callback] callback is not supported by this instruction.");
+            CoreError::InvalidArgument
+        });
+
         self.transfer_tokens(params)?;
         CreateDepositOperation::builder()
             .deposit(self.deposit.clone())

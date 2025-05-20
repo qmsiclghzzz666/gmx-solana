@@ -181,6 +181,7 @@ pub mod gmsol_treasury {
         swap_path_length: u8,
         swap_in_amount: u64,
         min_swap_out_amount: Option<u64>,
+        callback_version: Option<u8>,
     ) -> Result<()> {
         CreateSwapV2::invoke_unchecked(
             ctx,
@@ -188,6 +189,7 @@ pub mod gmsol_treasury {
             swap_path_length,
             swap_in_amount,
             min_swap_out_amount,
+            callback_version,
         )
     }
 

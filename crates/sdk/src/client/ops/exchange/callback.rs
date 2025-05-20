@@ -5,6 +5,8 @@ use solana_sdk::pubkey::Pubkey;
 /// Callback.
 #[derive(Debug, Clone, Copy)]
 pub struct Callback {
+    /// Callback version.
+    pub version: u8,
     /// Callback program ID.
     pub program: Pubkey,
     /// The address of config account.
@@ -18,6 +20,7 @@ impl Callback {
         let callback = match header.callback_kind()? {
             ActionCallbackKind::Disabled => None,
             ActionCallbackKind::General => Some(Self {
+                version: header.callback_version,
                 program: header.callback_program_id,
                 config: header.callback_config,
                 action_stats: header.callback_action_stats,

@@ -140,6 +140,7 @@ impl<'info> CreateSwapV2<'info> {
         swap_path_length: u8,
         swap_in_amount: u64,
         min_swap_out_amount: Option<u64>,
+        callback_version: Option<u8>,
     ) -> Result<()> {
         let signer = ReceiverSigner::new(ctx.accounts.config.key(), ctx.bumps.receiver);
 
@@ -170,6 +171,7 @@ impl<'info> CreateSwapV2<'info> {
                 .with_remaining_accounts(ctx.remaining_accounts.to_vec()),
             nonce,
             params,
+            callback_version,
         )?;
         Ok(())
     }

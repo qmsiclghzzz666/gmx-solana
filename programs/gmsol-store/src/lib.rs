@@ -1727,7 +1727,7 @@ pub mod gmsol_store {
         nonce: [u8; 32],
         params: CreateDepositParams,
     ) -> Result<()> {
-        internal::Create::create(&mut ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params, None)
     }
 
     /// Close a deposit, either by the owner or by keepers.
@@ -1831,7 +1831,7 @@ pub mod gmsol_store {
         nonce: [u8; 32],
         params: CreateWithdrawalParams,
     ) -> Result<()> {
-        internal::Create::create(&mut ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params, None)
     }
 
     /// Close a withdrawal, either by the owner or by keepers.
@@ -1980,7 +1980,7 @@ pub mod gmsol_store {
         nonce: [u8; 32],
         params: CreateOrderParams,
     ) -> Result<()> {
-        internal::Create::create(&mut ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params, None)
     }
 
     /// Create an order by the owner.
@@ -2032,8 +2032,9 @@ pub mod gmsol_store {
         mut ctx: Context<'_, '_, 'info, 'info, CreateOrderV2<'info>>,
         nonce: [u8; 32],
         params: CreateOrderParams,
+        callback_version: Option<u8>,
     ) -> Result<()> {
-        internal::Create::create(&mut ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params, callback_version)
     }
 
     /// Close an order, either by the owner or by keepers.
@@ -2644,7 +2645,7 @@ pub mod gmsol_store {
         nonce: [u8; 32],
         params: CreateShiftParams,
     ) -> Result<()> {
-        internal::Create::create(&mut ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params, None)
     }
 
     /// Execute a shift by keepers.
@@ -3308,7 +3309,7 @@ pub mod gmsol_store {
         nonce: [u8; 32],
         params: CreateGlvDepositParams,
     ) -> Result<()> {
-        internal::Create::create(&mut ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params, None)
     }
 
     /// Close GLV deposit.
@@ -3461,7 +3462,7 @@ pub mod gmsol_store {
         nonce: [u8; 32],
         params: CreateGlvWithdrawalParams,
     ) -> Result<()> {
-        internal::Create::create(&mut ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params, None)
     }
 
     /// Close GLV withdrawal.
@@ -3612,7 +3613,7 @@ pub mod gmsol_store {
         nonce: [u8; 32],
         params: CreateShiftParams,
     ) -> Result<()> {
-        internal::Create::create(&mut ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params, None)
     }
 
     /// Close a GLV shift.

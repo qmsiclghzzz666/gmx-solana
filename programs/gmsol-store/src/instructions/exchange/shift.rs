@@ -116,7 +116,12 @@ impl<'info> internal::Create<'info, Shift> for CreateShift<'info> {
         nonce: &NonceBytes,
         bumps: &Self::Bumps,
         _remaining_accounts: &'info [AccountInfo<'info>],
+        callback_version: Option<u8>,
     ) -> Result<()> {
+        require_eq!(callback_version.is_none(), true, {
+            msg!("[Callback] callback is not supported by this instruction.");
+            CoreError::InvalidArgument
+        });
         self.transfer_tokens(params)?;
         CreateShiftOperation::builder()
             .store(&self.store)

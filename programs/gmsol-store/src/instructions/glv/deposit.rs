@@ -163,7 +163,12 @@ impl<'info> internal::Create<'info, GlvDeposit> for CreateGlvDeposit<'info> {
         nonce: &NonceBytes,
         bumps: &Self::Bumps,
         remaining_accounts: &'info [AccountInfo<'info>],
+        callback_version: Option<u8>,
     ) -> Result<()> {
+        require_eq!(callback_version.is_none(), true, {
+            msg!("[Callback] callback is not supported by this instruction.");
+            CoreError::InvalidArgument
+        });
         self.transfer_tokens(params)?;
         CreateGlvDepositOperation::builder()
             .glv_deposit(self.glv_deposit.clone())

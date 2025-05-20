@@ -526,7 +526,7 @@ impl<C: Deref<Target = impl Signer> + Clone> ExchangeOps<C> for Client<C> {
             callback_program,
             callback_config_account,
             callback_action_stats_account,
-        } = self.get_callback_addresses(callback.as_ref());
+        } = self.get_callback_params(callback.as_ref());
         Ok(self
             .store_transaction()
             .anchor_accounts(accounts::UpdateOrderV2 {

@@ -39,9 +39,16 @@ pub mod gmsol_competition {
         ctx: Context<OnCallback>,
         authority_bump: u8,
         action_kind: u8,
+        callback_version: u8,
         extra_account_count: u8,
     ) -> Result<()> {
-        OnCallback::invoke_on_created(ctx, authority_bump, action_kind, extra_account_count)
+        OnCallback::invoke_on_created(
+            ctx,
+            authority_bump,
+            action_kind,
+            callback_version,
+            extra_account_count,
+        )
     }
 
     /// Triggered when an order is updated.  
@@ -49,6 +56,8 @@ pub mod gmsol_competition {
     pub fn on_updated(
         _ctx: Context<OnCallback>,
         _authority_bump: u8,
+        _action_kind: u8,
+        _callback_version: u8,
         _extra_account_count: u8,
     ) -> Result<()> {
         Ok(())
@@ -60,6 +69,7 @@ pub mod gmsol_competition {
         ctx: Context<OnExecuted>,
         authority_bump: u8,
         action_kind: u8,
+        callback_version: u8,
         success: bool,
         extra_account_count: u8,
     ) -> Result<()> {
@@ -67,6 +77,7 @@ pub mod gmsol_competition {
             ctx,
             authority_bump,
             action_kind,
+            callback_version,
             success,
             extra_account_count,
         )
@@ -77,6 +88,8 @@ pub mod gmsol_competition {
     pub fn on_closed(
         _ctx: Context<OnCallback>,
         _authority_bump: u8,
+        _action_kind: u8,
+        _callback_version: u8,
         _extra_account_count: u8,
     ) -> Result<()> {
         Ok(())

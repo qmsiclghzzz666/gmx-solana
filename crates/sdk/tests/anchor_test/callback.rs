@@ -70,6 +70,7 @@ async fn callback() -> eyre::Result<()> {
             size,
         )
         .callback(Some(Callback {
+            version: 0,
             program: deployment.callback_program,
             config: deployment.callback_config,
             action_stats,
@@ -114,6 +115,7 @@ async fn callback() -> eyre::Result<()> {
             long_collateral_amount,
         )
         .callback(Some(Callback {
+            version: 0,
             program: deployment.callback_program,
             config: deployment.callback_config,
             action_stats,
@@ -184,6 +186,7 @@ async fn callback() -> eyre::Result<()> {
             size,
         )
         .callback(Some(Callback {
+            version: 0,
             program: deployment.callback_program,
             config: deployment.callback_config,
             action_stats,
@@ -238,6 +241,7 @@ async fn callback() -> eyre::Result<()> {
             [market_token],
         )
         .callback(Some(Callback {
+            version: 0,
             program: deployment.callback_program,
             config: deployment.callback_config,
             action_stats,
@@ -285,6 +289,7 @@ async fn callback() -> eyre::Result<()> {
     let (mut rpc, order) = client
         .market_decrease(store, market_token, true, 0, true, size / 2)
         .callback(Some(Callback {
+            version: 0,
             program: deployment.callback_program,
             config: deployment.callback_config,
             action_stats,
@@ -332,6 +337,7 @@ async fn callback() -> eyre::Result<()> {
     let (mut rpc, order) = client
         .market_decrease(store, market_token, true, 0, true, size / 2)
         .callback(Some(Callback {
+            version: 0,
             program: deployment.callback_program,
             config: deployment.callback_config,
             action_stats,

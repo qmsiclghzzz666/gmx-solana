@@ -9120,6 +9120,12 @@
               "name": "CreateOrderParams"
             }
           }
+        },
+        {
+          "name": "callback_version",
+          "type": {
+            "option": "u8"
+          }
         }
       ]
     },
@@ -24265,11 +24271,15 @@
             "type": "u8"
           },
           {
+            "name": "callback_version",
+            "type": "u8"
+          },
+          {
             "name": "padding_0",
             "type": {
               "array": [
                 "u8",
-                3
+                2
               ]
             }
           },
