@@ -5,6 +5,7 @@ use crate::{
     market::{BaseMarketExt, BaseMarketMutExt, PerpMarketExt, PositionImpactMarketMutExt},
     num::Unsigned,
     params::fee::PositionFees,
+    pool::delta::PriceImpact,
     position::{CollateralDelta, Position, PositionExt},
     price::{Price, Prices},
     BorrowingFeeMarketExt, PerpMarketMut, PoolExt, PositionMut, PositionMutExt,
@@ -257,26 +258,28 @@ where
         Ok(())
     }
 
-    fn get_execution_params(
-        &self,
-    ) -> crate::Result<ExecutionParams<P::Num, <P::Num as Unsigned>::Signed>> {
+    fn get_execution_params(&self) -> crate::Result<ExecutionParamsWithPriceImpact<P::Num>> {
         let index_token_price = &self.params.prices.index_token_price;
         if self.params.size_delta_usd.is_zero() {
-            return Ok(ExecutionParams {
-                price_impact_value: Zero::zero(),
-                price_impact_amount: Zero::zero(),
-                size_delta_in_tokens: Zero::zero(),
-                execution_price: index_token_price
-                    .pick_price(self.position.is_long())
-                    .clone(),
+            return Ok(ExecutionParamsWithPriceImpact {
+                execution: ExecutionParams {
+                    price_impact_value: Zero::zero(),
+                    price_impact_amount: Zero::zero(),
+                    size_delta_in_tokens: Zero::zero(),
+                    execution_price: index_token_price
+                        .pick_price(self.position.is_long())
+                        .clone(),
+                },
+                price_impact: Default::default(),
             });
         }
 
-        let price_impact_value = self.position.capped_positive_position_price_impact(
+        let price_impact = self.position.capped_positive_position_price_impact(
             index_token_price,
             &self.params.size_delta_usd.to_signed()?,
         )?;
 
+        let price_impact_value = &price_impact.value;
         let price_impact_amount = if price_impact_value.is_positive() {
             let price: P::Signed = self
                 .params
@@ -298,7 +301,7 @@ where
                 .prices
                 .index_token_price
                 .pick_price(false)
-                .as_divisor_to_round_up_magnitude_div(&price_impact_value)
+                .as_divisor_to_round_up_magnitude_div(price_impact_value)
                 .ok_or(crate::Error::Computation("calculating price impact amount"))?
         };
 
@@ -342,11 +345,14 @@ where
             self.position.is_long(),
         )?;
 
-        Ok(ExecutionParams {
-            price_impact_value,
-            price_impact_amount,
-            size_delta_in_tokens,
-            execution_price,
+        Ok(ExecutionParamsWithPriceImpact {
+            execution: ExecutionParams {
+                price_impact_value: price_impact.value.clone(),
+                price_impact_amount,
+                size_delta_in_tokens,
+                execution_price,
+            },
+            price_impact,
         })
     }
 
@@ -357,7 +363,7 @@ where
 
     fn process_collateral(
         &mut self,
-        price_impact_value: &P::Signed,
+        price_impact: &PriceImpact<P::Signed>,
     ) -> crate::Result<(P::Signed, PositionFees<P::Num>)> {
         use num_traits::CheckedSub;
 
@@ -366,7 +372,7 @@ where
         let fees = self.position.position_fees(
             self.collateral_price(),
             &self.params.size_delta_usd,
-            price_impact_value.is_positive(),
+            price_impact.balance_change,
             false,
         )?;
 
@@ -440,10 +446,12 @@ where
     fn execute(mut self) -> crate::Result<Self::Report> {
         self.initialize_position_if_empty()?;
 
-        let execution = self.get_execution_params()?;
+        let ExecutionParamsWithPriceImpact {
+            execution,
+            price_impact,
+        } = self.get_execution_params()?;
 
-        let (collateral_delta_amount, fees) =
-            self.process_collateral(&execution.price_impact_value)?;
+        let (collateral_delta_amount, fees) = self.process_collateral(&price_impact)?;
 
         let is_collateral_delta_positive = collateral_delta_amount.is_positive();
         *self.position.collateral_amount_mut() = self
@@ -545,6 +553,11 @@ where
             fees,
         ))
     }
+}
+
+struct ExecutionParamsWithPriceImpact<T: Unsigned> {
+    execution: ExecutionParams<T, T::Signed>,
+    price_impact: PriceImpact<T::Signed>,
 }
 
 #[cfg(test)]

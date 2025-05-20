@@ -7,6 +7,7 @@ use crate::{
     },
     num::{MulDiv, Unsigned, UnsignedAbs},
     params::Fees,
+    pool::delta::{BalanceChange, PriceImpact},
     price::{Price, Prices},
     utils, BalanceExt, PnlFactorKind, PoolExt,
 };
@@ -109,14 +110,14 @@ where
 {
     fn new(
         params: DepositParams<T>,
-        price_impact: T::Signed,
+        price_impact: PriceImpact<T::Signed>,
         minted: T,
         fees: [Fees<T>; 2],
     ) -> Self {
         Self {
             params,
             minted,
-            price_impact,
+            price_impact: price_impact.value,
             fees,
         }
     }
@@ -169,7 +170,7 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
     }
 
     /// Get the price impact USD value.
-    fn price_impact(&self) -> crate::Result<(M::Signed, M::Num, M::Num)> {
+    fn price_impact(&self) -> crate::Result<PriceImpactWithDeltas<M::Num>> {
         let delta = self.market.liquidity_pool()?.pool_delta_with_amounts(
             &self
                 .params
@@ -190,11 +191,11 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
         let delta = delta.delta();
         debug_assert!(!delta.long_value().is_negative(), "must be non-negative");
         debug_assert!(!delta.short_value().is_negative(), "must be non-negative");
-        Ok((
+        Ok(PriceImpactWithDeltas {
             price_impact,
-            delta.long_value().unsigned_abs(),
-            delta.short_value().unsigned_abs(),
-        ))
+            long_token_usd_value: delta.long_value().unsigned_abs(),
+            short_token_usd_value: delta.short_value().unsigned_abs(),
+        })
     }
 
     /// Charge swap fees.
@@ -202,13 +203,13 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
     /// The `amount` will become the amount after fees.
     fn charge_fees(
         &self,
-        is_positive_impact: bool,
+        balance_change: BalanceChange,
         amount: &mut M::Num,
     ) -> crate::Result<Fees<M::Num>> {
         let (amount_after_fees, fees) = self
             .market
             .swap_fee_params()?
-            .apply_fees(is_positive_impact, amount)
+            .apply_fees(balance_change, amount)
             .ok_or(crate::Error::Computation("apply fees"))?;
         *amount = amount_after_fees;
         Ok(fees)
@@ -218,7 +219,10 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
         &mut self,
         is_long_token: bool,
         pool_value: M::Num,
-        mut price_impact: M::Signed,
+        PriceImpact {
+            value: mut price_impact,
+            balance_change,
+        }: PriceImpact<M::Signed>,
     ) -> Result<(M::Num, Fees<M::Num>), crate::Error> {
         let mut mint_amount: M::Num = Zero::zero();
         let supply = self.market.total_supply();
@@ -233,7 +237,7 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
             opposite_price,
         } = self.params.reassign_values(is_long_token);
 
-        let fees = self.charge_fees(price_impact.is_positive(), &mut amount)?;
+        let fees = self.charge_fees(balance_change, &mut amount)?;
         self.market.claimable_fee_pool_mut()?.apply_delta_amount(
             is_long_token,
             &fees
@@ -340,8 +344,11 @@ where
         )?;
 
         let report = {
-            let (price_impact, long_token_usd_value, short_token_usd_value) =
-                self.price_impact()?;
+            let PriceImpactWithDeltas {
+                price_impact,
+                long_token_usd_value,
+                short_token_usd_value,
+            } = self.price_impact()?;
             let mut market_token_to_mint: M::Num = Zero::zero();
             let pool_value = self.market.pool_value(
                 &self.params.prices,
@@ -355,34 +362,46 @@ where
             }
             let mut all_fees = [Default::default(), Default::default()];
             if !self.params.long_token_amount.is_zero() {
-                let price_impact = long_token_usd_value
+                let adjusted_price_impact = long_token_usd_value
                     .clone()
                     .checked_mul_div_with_signed_numerator(
-                        &price_impact,
+                        &price_impact.value,
                         &long_token_usd_value
                             .checked_add(&short_token_usd_value)
                             .ok_or(crate::Error::Overflow)?,
                     )
                     .ok_or(crate::Error::Computation("price impact for long"))?;
-                let (mint_amount, fees) =
-                    self.execute_deposit(true, pool_value.unsigned_abs(), price_impact)?;
+                let (mint_amount, fees) = self.execute_deposit(
+                    true,
+                    pool_value.unsigned_abs(),
+                    PriceImpact {
+                        value: adjusted_price_impact,
+                        balance_change: price_impact.balance_change,
+                    },
+                )?;
                 market_token_to_mint = market_token_to_mint
                     .checked_add(&mint_amount)
                     .ok_or(crate::Error::Overflow)?;
                 all_fees[0] = fees;
             }
             if !self.params.short_token_amount.is_zero() {
-                let price_impact = short_token_usd_value
+                let adjusted_price_impact = short_token_usd_value
                     .clone()
                     .checked_mul_div_with_signed_numerator(
-                        &price_impact,
+                        &price_impact.value,
                         &long_token_usd_value
                             .checked_add(&short_token_usd_value)
                             .ok_or(crate::Error::Overflow)?,
                     )
                     .ok_or(crate::Error::Computation("price impact for short"))?;
-                let (mint_amount, fees) =
-                    self.execute_deposit(false, pool_value.unsigned_abs(), price_impact)?;
+                let (mint_amount, fees) = self.execute_deposit(
+                    false,
+                    pool_value.unsigned_abs(),
+                    PriceImpact {
+                        value: adjusted_price_impact,
+                        balance_change: price_impact.balance_change,
+                    },
+                )?;
                 market_token_to_mint = market_token_to_mint
                     .checked_add(&mint_amount)
                     .ok_or(crate::Error::Overflow)?;
@@ -399,6 +418,12 @@ struct ReassignedValues<'a, T> {
     amount: T,
     price: &'a Price<T>,
     opposite_price: &'a Price<T>,
+}
+
+struct PriceImpactWithDeltas<T: Unsigned> {
+    price_impact: PriceImpact<T::Signed>,
+    long_token_usd_value: T,
+    short_token_usd_value: T,
 }
 
 #[cfg(test)]

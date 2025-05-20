@@ -2,6 +2,7 @@ use crate::{
     market::{BaseMarket, BaseMarketExt, LiquidityMarketExt, LiquidityMarketMut},
     num::{MulDiv, Unsigned, UnsignedAbs},
     params::Fees,
+    pool::delta::BalanceChange,
     price::{Price, Prices},
     utils, BalanceExt, PnlFactorKind, PoolExt,
 };
@@ -175,7 +176,7 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Withdrawal<M, DECIMALS
         let (amount_after_fees, fees) = self
             .market
             .swap_fee_params()?
-            .apply_fees(false, amount)
+            .apply_fees(BalanceChange::Worsened, amount)
             .ok_or(crate::Error::Computation("apply fees"))?;
         *amount = amount_after_fees;
         Ok(fees)

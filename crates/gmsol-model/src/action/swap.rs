@@ -4,6 +4,7 @@ use crate::{
     market::{BaseMarket, BaseMarketExt},
     num::{MulDiv, Unsigned, UnsignedAbs},
     params::Fees,
+    pool::delta::BalanceChange,
     price::{Price, Prices},
     BalanceExt, Delta, PnlFactorKind, Pool, SwapMarketExt, SwapMarketMut,
 };
@@ -83,10 +84,10 @@ impl<const DECIMALS: u8, M: SwapMarketMut<DECIMALS>> Swap<M, DECIMALS> {
         }
     }
 
-    fn charge_fees(&self, is_positive_impact: bool) -> crate::Result<(M::Num, Fees<M::Num>)> {
+    fn charge_fees(&self, balance_change: BalanceChange) -> crate::Result<(M::Num, Fees<M::Num>)> {
         self.market
             .swap_fee_params()?
-            .apply_fees(is_positive_impact, &self.params.token_in_amount)
+            .apply_fees(balance_change, &self.params.token_in_amount)
             .ok_or(crate::Error::Computation("apply fees"))
     }
 
@@ -120,7 +121,7 @@ impl<const DECIMALS: u8, M: SwapMarketMut<DECIMALS>> Swap<M, DECIMALS> {
             )?
             .price_impact(&self.market.swap_impact_params()?)?;
 
-        let (amount_after_fees, fees) = self.charge_fees(price_impact.is_positive())?;
+        let (amount_after_fees, fees) = self.charge_fees(price_impact.balance_change)?;
 
         let claimable_fee =
             self.market
@@ -136,6 +137,7 @@ impl<const DECIMALS: u8, M: SwapMarketMut<DECIMALS>> Swap<M, DECIMALS> {
         let pool_amount_out;
         let price_impact_amount;
         let swap_impact;
+        let price_impact = price_impact.value;
         if price_impact.is_positive() {
             token_in_amount = amount_after_fees;
 

@@ -1,8 +1,39 @@
-use num_traits::{CheckedAdd, CheckedMul, CheckedNeg, CheckedSub};
+use std::cmp::Ordering;
+
+use num_traits::{CheckedAdd, CheckedMul, CheckedNeg, CheckedSub, Zero};
 
 use crate::{
     fixed::FixedPointOps, num::Unsigned, params::PriceImpactParams, utils, Balance, BalanceExt,
 };
+
+/// Represents the change of balance.
+#[derive(Debug, Clone, Copy)]
+pub enum BalanceChange {
+    /// Balance was improved.
+    Improved,
+    /// Balance was worsened.
+    Worsened,
+    /// Balance was unchanged.
+    Unchanged,
+}
+
+/// Represents the effect caused by balance change.
+#[derive(Debug, Clone, Copy)]
+pub struct PriceImpact<T> {
+    /// Price impact value.
+    pub value: T,
+    /// Balance change.
+    pub balance_change: BalanceChange,
+}
+
+impl<T: Zero> Default for PriceImpact<T> {
+    fn default() -> Self {
+        Self {
+            value: Zero::zero(),
+            balance_change: BalanceChange::Unchanged,
+        }
+    }
+}
 
 /// Delta Amounts.
 #[derive(Debug, Clone, Copy)]
@@ -208,27 +239,37 @@ impl<T: Unsigned + Clone + Ord> PoolDelta<T> {
     pub fn price_impact<const DECIMALS: u8>(
         &self,
         params: &PriceImpactParams<T>,
-    ) -> crate::Result<T::Signed>
-    where
-        T: FixedPointOps<DECIMALS>,
-    {
-        if self.is_same_side_rebalance() {
-            self.price_impact_for_same_side_rebalance(params)
-        } else {
-            self.price_impact_for_cross_over_rebalance(params)
-        }
-    }
-
-    #[inline]
-    fn price_impact_for_same_side_rebalance<const DECIMALS: u8>(
-        &self,
-        params: &PriceImpactParams<T>,
-    ) -> crate::Result<T::Signed>
+    ) -> crate::Result<PriceImpact<T::Signed>>
     where
         T: FixedPointOps<DECIMALS>,
     {
         let initial = self.initial_diff_value();
         let next = self.next_diff_value();
+        let balance_change = match next.cmp(&initial) {
+            Ordering::Equal => BalanceChange::Unchanged,
+            Ordering::Greater => BalanceChange::Worsened,
+            Ordering::Less => BalanceChange::Improved,
+        };
+        let price_impact = if self.is_same_side_rebalance() {
+            Self::price_impact_for_same_side_rebalance(initial, next, params)?
+        } else {
+            Self::price_impact_for_cross_over_rebalance(initial, next, params)?
+        };
+        Ok(PriceImpact {
+            value: price_impact,
+            balance_change,
+        })
+    }
+
+    #[inline]
+    fn price_impact_for_same_side_rebalance<const DECIMALS: u8>(
+        initial: T,
+        next: T,
+        params: &PriceImpactParams<T>,
+    ) -> crate::Result<T::Signed>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
         let has_positive_impact = next < initial;
         let (positive_factor, negative_factor) = params.adjusted_factors();
 
@@ -256,14 +297,13 @@ impl<T: Unsigned + Clone + Ord> PoolDelta<T> {
 
     #[inline]
     fn price_impact_for_cross_over_rebalance<const DECIMALS: u8>(
-        &self,
+        initial: T,
+        next: T,
         params: &PriceImpactParams<T>,
     ) -> crate::Result<T::Signed>
     where
         T: FixedPointOps<DECIMALS>,
     {
-        let initial = self.initial_diff_value();
-        let next = self.next_diff_value();
         let (positive_factor, negative_factor) = params.adjusted_factors();
         let exponent_factor = params.exponent();
         let positive_impact =

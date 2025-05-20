@@ -77,8 +77,9 @@ impl PositionCalculations for PositionModel {
 
         // net value = collateral value +  pending pnl - pending borrowing fee value - nagetive pending funding fee value - close order fee value let mut price_impact_value = self.position_price_impact(&size_delta_usd)?;
         let size_delta_usd = position_size_in_usd.to_opposite_signed()?;
-        let mut price_impact_value = self.position_price_impact(&size_delta_usd)?;
-        let has_positive_impact = price_impact_value.is_positive();
+        let price_impact = self.position_price_impact(&size_delta_usd)?;
+
+        let mut price_impact_value = price_impact.value;
         if price_impact_value.is_negative() {
             self.market().cap_negative_position_price_impact(
                 &size_delta_usd,
@@ -92,7 +93,7 @@ impl PositionCalculations for PositionModel {
         let total_position_fees = self.position_fees(
             &collateral_token_price,
             position_size_in_usd,
-            has_positive_impact,
+            price_impact.balance_change,
             // Should not account for liquidation fees to determine if position should be liquidated.
             false,
         )?;

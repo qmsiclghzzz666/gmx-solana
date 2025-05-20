@@ -1,7 +1,7 @@
 use num_traits::{CheckedAdd, CheckedSub, Zero};
 use typed_builder::TypedBuilder;
 
-use crate::{fixed::FixedPointOps, num::Unsigned, price::Price, utils};
+use crate::{fixed::FixedPointOps, num::Unsigned, pool::delta::BalanceChange, price::Price, utils};
 
 /// Fee Parameters.
 #[derive(Debug, Clone, Copy, TypedBuilder)]
@@ -28,11 +28,10 @@ impl<T> FeeParams<T> {
     }
 
     #[inline]
-    fn factor(&self, is_positive_impact: bool) -> &T {
-        if is_positive_impact {
-            &self.positive_impact_fee_factor
-        } else {
-            &self.negative_impact_fee_factor
+    fn factor(&self, balance_change: BalanceChange) -> &T {
+        match balance_change {
+            BalanceChange::Improved => &self.positive_impact_fee_factor,
+            BalanceChange::Unchanged | BalanceChange::Worsened => &self.negative_impact_fee_factor,
         }
     }
 
@@ -48,11 +47,11 @@ impl<T> FeeParams<T> {
 
     /// Get basic fee.
     #[inline]
-    pub fn fee<const DECIMALS: u8>(&self, is_positive_impact: bool, amount: &T) -> Option<T>
+    pub fn fee<const DECIMALS: u8>(&self, balance_change: BalanceChange, amount: &T) -> Option<T>
     where
         T: FixedPointOps<DECIMALS>,
     {
-        let factor = self.factor(is_positive_impact);
+        let factor = self.factor(balance_change);
         let fee = utils::apply_factor(amount, factor)?;
         let discount = utils::apply_factor(&fee, &self.discount_factor())?;
         fee.checked_sub(&discount)
@@ -73,13 +72,13 @@ impl<T> FeeParams<T> {
     /// Returns `None` if the computation fails, otherwise `amount` after fees and the fees are returned.
     pub fn apply_fees<const DECIMALS: u8>(
         &self,
-        is_positive_impact: bool,
+        balance_change: BalanceChange,
         amount: &T,
     ) -> Option<(T, Fees<T>)>
     where
         T: FixedPointOps<DECIMALS>,
     {
-        let fee_amount = self.fee(is_positive_impact, amount)?;
+        let fee_amount = self.fee(balance_change, amount)?;
         let fee_receiver_amount = self.receiver_fee(&fee_amount)?;
         let fees = Fees {
             fee_amount_for_pool: fee_amount.checked_sub(&fee_receiver_amount)?,
@@ -93,7 +92,7 @@ impl<T> FeeParams<T> {
         &self,
         collateral_token_price: &Price<T>,
         size_delta_usd: &T,
-        is_positive_impact: bool,
+        balance_change: BalanceChange,
     ) -> crate::Result<OrderFees<T>>
     where
         T: FixedPointOps<DECIMALS>,
@@ -103,7 +102,7 @@ impl<T> FeeParams<T> {
         }
 
         let fee_value = self
-            .fee(is_positive_impact, size_delta_usd)
+            .fee(balance_change, size_delta_usd)
             .ok_or(crate::Error::Computation("calculating order fee value"))?;
         let fee_amount = fee_value
             .checked_div(collateral_token_price.pick_price(false))
@@ -128,13 +127,12 @@ impl<T> FeeParams<T> {
         &self,
         collateral_token_price: &Price<T>,
         size_delta_usd: &T,
-        is_positive_impact: bool,
+        balance_change: BalanceChange,
     ) -> crate::Result<PositionFees<T>>
     where
         T: FixedPointOps<DECIMALS>,
     {
-        let order_fees =
-            self.order_fees(collateral_token_price, size_delta_usd, is_positive_impact)?;
+        let order_fees = self.order_fees(collateral_token_price, size_delta_usd, balance_change)?;
         Ok(PositionFees {
             paid_order_fee_value: order_fees.fee_value.clone(),
             order: order_fees,

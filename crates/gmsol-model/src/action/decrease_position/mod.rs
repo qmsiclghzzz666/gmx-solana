@@ -4,6 +4,7 @@ use crate::{
     market::{PerpMarket, PerpMarketExt, SwapMarketMutExt},
     num::{MulDiv, Unsigned},
     params::fee::PositionFees,
+    pool::delta::PriceImpact,
     position::{
         CollateralDelta, Position, PositionExt, PositionMut, PositionMutExt, PositionStateExt,
         WillCollateralBeSufficient,
@@ -340,13 +341,14 @@ where
 
     #[allow(clippy::type_complexity)]
     fn process_collateral(&mut self) -> crate::Result<ProcessCollateralResult<P::Num>> {
-        use num_traits::Signed;
-
         // is_insolvent_close_allowed => is_full_close
         debug_assert!(!self.params.is_insolvent_close_allowed() || self.is_full_close());
 
-        let (price_impact_value, price_impact_diff, execution_price) =
-            self.get_execution_params()?;
+        let ExecutionParams {
+            price_impact,
+            price_impact_diff,
+            execution_price,
+        } = self.get_execution_params()?;
 
         // Calculate position pnl usd.
         let (base_pnl_usd, uncapped_base_pnl_usd, size_delta_in_tokens) = self
@@ -363,7 +365,7 @@ where
                 .prices
                 .collateral_token_price(is_output_token_long),
             &self.size_delta_usd,
-            price_impact_value.is_positive(),
+            price_impact.balance_change,
             self.params.is_liquidation_order(),
         )?;
 
@@ -383,9 +385,10 @@ where
             let ty = self.params.swap;
             let mut swap_result = None;
 
+            let price_impact_value = &price_impact.value;
             let result = processor.process(|mut ctx| {
                 ctx.add_pnl_if_positive(&base_pnl_usd)?
-                    .add_price_impact_if_positive(&price_impact_value)?
+                    .add_price_impact_if_positive(price_impact_value)?
                     .swap_profit_to_collateral_tokens(self.params.swap, |error| {
                         swap_result = Some(error);
                         Ok(())
@@ -393,7 +396,7 @@ where
                     .pay_for_funding_fees(fees.funding_fees())?
                     .pay_for_pnl_if_negative(&base_pnl_usd)?
                     .pay_for_fees_excluding_funding(&mut fees)?
-                    .pay_for_price_impact_if_negative(&price_impact_value)?
+                    .pay_for_price_impact_if_negative(price_impact_value)?
                     .pay_for_price_impact_diff(&price_impact_diff)?;
                 Ok(())
             })?;
@@ -453,7 +456,7 @@ where
         }
 
         Ok(ProcessCollateralResult {
-            price_impact_value,
+            price_impact_value: price_impact.value,
             price_impact_diff,
             execution_price,
             size_delta_in_tokens,
@@ -465,37 +468,40 @@ where
         })
     }
 
-    fn get_execution_params(&self) -> crate::Result<(P::Signed, P::Num, P::Num)> {
+    fn get_execution_params(&self) -> crate::Result<ExecutionParams<P::Num>> {
         let index_token_price = &self.params.prices.index_token_price;
         let size_delta_usd = &self.size_delta_usd;
 
         if size_delta_usd.is_zero() {
-            return Ok((
-                Zero::zero(),
-                Zero::zero(),
-                index_token_price
+            return Ok(ExecutionParams {
+                price_impact: Default::default(),
+                price_impact_diff: Zero::zero(),
+                execution_price: index_token_price
                     .pick_price(!self.position.is_long())
                     .clone(),
-            ));
+            });
         }
 
-        let (price_impact_value, price_impact_diff_usd) =
-            self.position.capped_position_price_impact(
-                index_token_price,
-                &self.size_delta_usd.to_opposite_signed()?,
-            )?;
+        let (price_impact, price_impact_diff_usd) = self.position.capped_position_price_impact(
+            index_token_price,
+            &self.size_delta_usd.to_opposite_signed()?,
+        )?;
 
         let execution_price = utils::get_execution_price_for_decrease(
             index_token_price,
             self.position.size_in_usd(),
             self.position.size_in_tokens(),
             size_delta_usd,
-            &price_impact_value,
+            &price_impact.value,
             self.params.acceptable_price.as_ref(),
             self.position.is_long(),
         )?;
 
-        Ok((price_impact_value, price_impact_diff_usd, execution_price))
+        Ok(ExecutionParams {
+            price_impact,
+            price_impact_diff: price_impact_diff_usd,
+            execution_price,
+        })
     }
 
     /// Swap the secondary output tokens to output tokens if needed.
@@ -710,6 +716,12 @@ where
 
         Ok(report)
     }
+}
+
+struct ExecutionParams<T: Unsigned> {
+    price_impact: PriceImpact<T::Signed>,
+    price_impact_diff: T,
+    execution_price: T,
 }
 
 #[cfg(test)]

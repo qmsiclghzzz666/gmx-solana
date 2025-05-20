@@ -16,6 +16,7 @@ use crate::{
     },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
+    pool::delta::{BalanceChange, PriceImpact},
     price::{Price, Prices},
     Balance, BalanceExt, BaseMarket, PerpMarketMut, PnlFactorKind, Pool, PoolExt,
 };
@@ -468,9 +469,10 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
 
         let size_delta_usd = size_in_usd.to_opposite_signed()?;
 
-        let mut price_impact_value = self.position_price_impact(&size_delta_usd)?;
-
-        let has_positive_impact = price_impact_value.is_positive();
+        let PriceImpact {
+            value: mut price_impact_value,
+            balance_change,
+        } = self.position_price_impact(&size_delta_usd)?;
 
         if price_impact_value.is_negative() {
             self.market().cap_negative_position_price_impact(
@@ -485,7 +487,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         let fees = self.position_fees(
             collateral_price,
             size_in_usd,
-            has_positive_impact,
+            balance_change,
             // Should not account for liquidation fees to determine if position should be liquidated.
             false,
         )?;
@@ -529,7 +531,10 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
     }
 
     /// Get position price impact.
-    fn position_price_impact(&self, size_delta_usd: &Self::Signed) -> crate::Result<Self::Signed> {
+    fn position_price_impact(
+        &self,
+        size_delta_usd: &Self::Signed,
+    ) -> crate::Result<PriceImpact<Self::Signed>> {
         struct ReassignedValues<T> {
             delta_long_usd_value: T,
             delta_short_usd_value: T,
@@ -579,12 +584,12 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         &self,
         index_token_price: &Price<Self::Num>,
         size_delta_usd: &Self::Signed,
-    ) -> crate::Result<Self::Signed> {
+    ) -> crate::Result<PriceImpact<Self::Signed>> {
         let mut impact = self.position_price_impact(size_delta_usd)?;
         self.market().cap_positive_position_price_impact(
             index_token_price,
             size_delta_usd,
-            &mut impact,
+            &mut impact.value,
         )?;
         Ok(impact)
     }
@@ -598,12 +603,14 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         &self,
         index_token_price: &Price<Self::Num>,
         size_delta_usd: &Self::Signed,
-    ) -> crate::Result<(Self::Signed, Self::Num)> {
+    ) -> crate::Result<(PriceImpact<Self::Signed>, Self::Num)> {
         let mut impact =
             self.capped_positive_position_price_impact(index_token_price, size_delta_usd)?;
-        let impact_diff =
-            self.market()
-                .cap_negative_position_price_impact(size_delta_usd, false, &mut impact)?;
+        let impact_diff = self.market().cap_negative_position_price_impact(
+            size_delta_usd,
+            false,
+            &mut impact.value,
+        )?;
         Ok((impact, impact_diff))
     }
 
@@ -674,7 +681,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         &self,
         collateral_token_price: &Price<Self::Num>,
         size_delta_usd: &Self::Num,
-        is_positive_impact: bool,
+        balance_change: BalanceChange,
         is_liquidation: bool,
     ) -> crate::Result<PositionFees<Self::Num>> {
         debug_assert!(!collateral_token_price.has_zero(), "must be non-zero");
@@ -692,7 +699,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         let fees = self
             .market()
             .order_fee_params()?
-            .base_position_fees(collateral_token_price, size_delta_usd, is_positive_impact)?
+            .base_position_fees(collateral_token_price, size_delta_usd, balance_change)?
             .set_borrowing_fees(
                 self.market().borrowing_fee_params()?.receiver_factor(),
                 collateral_token_price,
