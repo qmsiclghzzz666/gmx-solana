@@ -82,13 +82,7 @@ async fn competition() -> eyre::Result<()> {
     // Create and execute order
     let size = 5_000 * MARKET_USD_UNIT;
 
-    // let action_kind = ActionKind::Order.into();
     let owner = client.payer();
-    // let action_stats = Pubkey::find_program_address(
-    //     &[ACTION_STATS_SEED, owner.as_ref(), &[action_kind]],
-    //     &deployment.callback_program,
-    // )
-    // .0;
 
     // Create participant account first
     let participant = Pubkey::find_program_address(
@@ -108,9 +102,6 @@ async fn competition() -> eyre::Result<()> {
             trader: owner,
             system_program: system_program::ID,
         });
-
-    // let signature = create_participant.send().await?;
-    // tracing::info!(%signature, "created participant account");
 
     // Create order
     let (mut rpc, order) = client
@@ -154,7 +145,7 @@ async fn competition() -> eyre::Result<()> {
         .account::<Participant>(&participant)
         .await?
         .expect("must exist");
-    assert_eq!(participant_account.owner, owner);
+    assert_eq!(participant_account.trader, owner);
     assert_eq!(participant_account.competition, competition);
 
     // Verify leaderboard update

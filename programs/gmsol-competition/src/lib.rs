@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use gmsol_callback::interface::ActionKind;
 
 pub mod error;
 pub mod instructions;
@@ -37,17 +36,12 @@ pub mod gmsol_competition {
     /// The competition logic is unaffected, so this is a no‑op kept only
     /// for interface compatibility.
     pub fn on_created(
-        _ctx: Context<OnCallback>,
-        _authority_bump: u8,
+        ctx: Context<OnCallback>,
+        authority_bump: u8,
         action_kind: u8,
-        _extra_account_count: u8,
+        extra_account_count: u8,
     ) -> Result<()> {
-        // Only setup callback for orders.
-        require!(
-            action_kind == ActionKind::Order as u8,
-            CompetitionError::InvalidActionKind
-        );
-        Ok(())
+        OnCallback::invoke_on_created(ctx, authority_bump, action_kind, extra_account_count)
     }
 
     /// Triggered when an order is updated.  

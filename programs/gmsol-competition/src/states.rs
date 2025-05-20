@@ -1,16 +1,5 @@
 use anchor_lang::prelude::*;
 
-/// Competition-specific errors.
-#[error_code]
-pub enum CompetitionError {
-    /// The competition is not active.
-    CompetitionNotActive,
-    /// The current time is outside the competition time window.
-    OutsideCompetitionTime,
-    /// Invalid trade event data.
-    InvalidTradeEvent,
-}
-
 /// The expected program ID of the caller.
 pub const EXPECTED_STORE_PROGRAM_ID: Pubkey = gmsol_programs::gmsol_store::ID_CONST;
 
@@ -32,7 +21,7 @@ pub struct LeaderEntry {
     /// The trader address.
     pub address: Pubkey,
     /// The cumulative traded volume.
-    pub volume: u64,
+    pub volume: u128,
 }
 
 /// The global competition data.
@@ -58,12 +47,14 @@ pub struct Competition {
 #[account]
 #[derive(InitSpace)]
 pub struct Participant {
+    /// Bump seed.
+    pub bump: u8,
     /// The competition account this entry belongs to.
     pub competition: Pubkey,
     /// The trader address.
-    pub owner: Pubkey,
+    pub trader: Pubkey,
     /// The cumulative traded volume.
-    pub volume: u64,
+    pub volume: u128,
     /// The last update timestamp.
     pub last_updated_at: i64,
 }

@@ -1,6 +1,9 @@
-use crate::states::{
-    Competition, CompetitionError, LeaderEntry, Participant, EXPECTED_STORE_PROGRAM_ID,
-    MAX_LEADERBOARD_LEN, PARTICIPANT_SEED,
+use crate::{
+    states::{
+        Competition, LeaderEntry, Participant, EXPECTED_STORE_PROGRAM_ID, MAX_LEADERBOARD_LEN,
+        PARTICIPANT_SEED,
+    },
+    CompetitionError,
 };
 use anchor_lang::prelude::*;
 use gmsol_callback::{interface::ActionKind, CALLBACK_AUTHORITY_SEED};
@@ -28,7 +31,9 @@ pub struct OnCallback<'info> {
             competition.key().as_ref(),
             trader.key().as_ref(),
         ],
-        bump
+        bump = participant.bump,
+        has_one = trader,
+        has_one = competition,
     )]
     pub participant: Account<'info, Participant>,
     /// The trader public key.
@@ -37,6 +42,38 @@ pub struct OnCallback<'info> {
     /// The action account.
     /// CHECK: this is just a placeholder.
     pub action: UncheckedAccount<'info>,
+}
+
+impl OnCallback<'_> {
+    pub(crate) fn invoke_on_created(
+        ctx: Context<Self>,
+        _authority_bump: u8,
+        action_kind: u8,
+        extra_account_count: u8,
+    ) -> Result<()> {
+        // Only setup callback for orders.
+        require_eq!(
+            action_kind,
+            ActionKind::Order as u8,
+            CompetitionError::InvalidActionKind
+        );
+        // Validate the extra account count.
+        require_gte!(extra_account_count, 1);
+
+        ctx.accounts.validate_competition()?;
+        Ok(())
+    }
+
+    fn validate_competition(&self) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let comp = &self.competition;
+        require!(comp.is_active, CompetitionError::CompetitionNotActive);
+        require!(
+            now >= comp.start_time && now <= comp.end_time,
+            CompetitionError::OutsideCompetitionTime
+        );
+        Ok(())
+    }
 }
 
 /// Accounts for `on_executed`.
@@ -61,7 +98,9 @@ pub struct OnExecuted<'info> {
             competition.key().as_ref(),
             trader.key().as_ref(),
         ],
-        bump
+        bump = participant.bump,
+        has_one = trader,
+        has_one = competition,
     )]
     pub participant: Account<'info, Participant>,
     /// The trader public key.
@@ -83,10 +122,19 @@ impl OnExecuted<'_> {
         _authority_bump: u8,
         action_kind: u8,
         success: bool,
-        _extra_account_count: u8,
+        extra_account_count: u8,
     ) -> Result<()> {
-        // Only process successful Order actions
-        if !success || action_kind != ActionKind::Order as u8 {
+        // Validate callback parameters.
+        require_eq!(
+            action_kind,
+            ActionKind::Order as u8,
+            CompetitionError::InvalidActionKind
+        );
+        require_gte!(extra_account_count, 2);
+
+        // Only process successful order actions.
+        if !success {
+            msg!("competition: ignore failed order");
             return Ok(());
         }
 
@@ -95,36 +143,28 @@ impl OnExecuted<'_> {
 
         let comp = &mut ctx.accounts.competition;
 
-        require!(comp.is_active, CompetitionError::CompetitionNotActive);
-        require!(
-            now >= comp.start_time && now <= comp.end_time,
-            CompetitionError::OutsideCompetitionTime
-        );
-
-        let part = &mut ctx.accounts.participant;
-
-        // First‑time init fields.
-        if part.volume == 0 {
-            part.competition = comp.key();
-            part.owner = ctx.accounts.trader.key();
+        if !comp.is_active {
+            msg!("competition: the competition is not active");
+            return Ok(());
+        }
+        if !(now >= comp.start_time && now <= comp.end_time) {
+            msg!("competition: outside of the competition time");
+            return Ok(());
         }
 
         // Get volume from the trade event
-        let volume = if let Some(trade_event) = &ctx.accounts.trade_event {
-            let trade_event = trade_event.load()?;
-
-            // Calculate volume as the absolute difference between after and before size_in_usd
-            let volume = trade_event
-                .after
-                .size_in_usd
-                .abs_diff(trade_event.before.size_in_usd);
-
-            // Convert to u64, saturating if the value is too large
-            volume.min(u64::MAX as u128) as u64
-        } else {
-            // Skip if no trade event
+        let Some(trade_event) = &ctx.accounts.trade_event else {
+            msg!("competition: no trade event");
             return Ok(());
         };
+        let trade_event = trade_event.load()?;
+        let part = &mut ctx.accounts.participant;
+
+        // Calculate volume as the absolute difference between after and before size_in_usd
+        let volume = trade_event
+            .after
+            .size_in_usd
+            .abs_diff(trade_event.before.size_in_usd);
 
         part.volume = part.volume.saturating_add(volume);
         part.last_updated_at = now;
@@ -133,7 +173,7 @@ impl OnExecuted<'_> {
 
         msg!(
             "competition: trader={} new_volume={} volume_delta={}",
-            part.owner,
+            part.trader,
             part.volume,
             volume
         );
@@ -145,12 +185,12 @@ impl OnExecuted<'_> {
         if let Some(entry) = comp
             .leaderboard
             .iter_mut()
-            .find(|e| e.address == part.owner)
+            .find(|e| e.address == part.trader)
         {
             entry.volume = part.volume;
         } else if comp.leaderboard.len() < MAX_LEADERBOARD_LEN.into() {
             comp.leaderboard.push(LeaderEntry {
-                address: part.owner,
+                address: part.trader,
                 volume: part.volume,
             });
         } else if let Some((idx, weakest)) = comp
@@ -161,7 +201,7 @@ impl OnExecuted<'_> {
         {
             if part.volume > weakest.volume {
                 comp.leaderboard[idx] = LeaderEntry {
-                    address: part.owner,
+                    address: part.trader,
                     volume: part.volume,
                 };
             }
