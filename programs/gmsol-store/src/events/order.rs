@@ -10,7 +10,7 @@ use gmsol_utils::InitSpace;
 use crate::states::{
     common::action::{Action, ActionState},
     order::OrderKind,
-    Order, OrderActionParams,
+    Order,
 };
 
 use super::Event;
@@ -227,10 +227,12 @@ pub struct OrderParamsForEvent {
     pub is_long: bool,
     /// Decrease position swap type.
     pub decrease_position_swap_type: DecreasePositionSwapType,
-    /// Collateral token.
-    pub collateral_token: Pubkey,
     /// Position address.
     pub position: Option<Pubkey>,
+    /// Collateral token.
+    pub collateral_token: Pubkey,
+    /// Initial collateral token.
+    pub initial_collateral_token: Option<Pubkey>,
     /// Initial collateral delta amount.
     pub initial_collateral_delta_amount: u64,
     /// Size delta value.
@@ -245,16 +247,18 @@ pub struct OrderParamsForEvent {
     pub valid_from_ts: i64,
 }
 
-impl TryFrom<&OrderActionParams> for OrderParamsForEvent {
+impl TryFrom<&Order> for OrderParamsForEvent {
     type Error = Error;
 
-    fn try_from(params: &OrderActionParams) -> std::result::Result<Self, Self::Error> {
+    fn try_from(order: &Order) -> std::result::Result<Self, Self::Error> {
+        let params = order.params();
         Ok(Self {
             kind: params.kind()?,
             is_long: params.side()?.is_long(),
             decrease_position_swap_type: params.decrease_position_swap_type()?,
-            collateral_token: params.collateral_token,
             position: params.position().copied(),
+            collateral_token: params.collateral_token,
+            initial_collateral_token: order.tokens.initial_collateral.token(),
             initial_collateral_delta_amount: params.initial_collateral_delta_amount,
             size_delta_value: params.size_delta_value,
             min_output: params.min_output(),
@@ -302,7 +306,7 @@ impl OrderUpdated {
             order: *address,
             market_token: *order.market_token(),
             owner: *order.header().owner(),
-            params: order.params().try_into()?,
+            params: order.try_into()?,
         })
     }
 }
