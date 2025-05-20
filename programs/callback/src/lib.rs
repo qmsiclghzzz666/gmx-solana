@@ -46,12 +46,12 @@ pub mod gmsol_callback {
 
     /// Callback expected to be invoked when an action is created.
     pub fn on_created(
-        ctx: Context<Callback>,
+        ctx: Context<OnCallback>,
         authority_bump: u8,
         action_kind: u8,
         extra_account_count: u8,
     ) -> Result<()> {
-        Callback::invoke(
+        OnCallback::invoke(
             On::Created,
             ctx,
             authority_bump,
@@ -63,12 +63,12 @@ pub mod gmsol_callback {
 
     /// Callback expected to be invoked when an action is updated.
     pub fn on_updated(
-        ctx: Context<Callback>,
+        ctx: Context<OnCallback>,
         authority_bump: u8,
         action_kind: u8,
         extra_account_count: u8,
     ) -> Result<()> {
-        Callback::invoke(
+        OnCallback::invoke(
             On::Updated,
             ctx,
             authority_bump,
@@ -80,13 +80,13 @@ pub mod gmsol_callback {
 
     /// Callback expected to be invoked when an action is executed.
     pub fn on_executed(
-        ctx: Context<Callback>,
+        ctx: Context<OnCallback>,
         authority_bump: u8,
         action_kind: u8,
         success: bool,
         extra_account_count: u8,
     ) -> Result<()> {
-        Callback::invoke(
+        OnCallback::invoke(
             On::Executed,
             ctx,
             authority_bump,
@@ -98,12 +98,12 @@ pub mod gmsol_callback {
 
     /// Callback expected to be invoked when an action is closed.
     pub fn on_closed(
-        ctx: Context<Callback>,
+        ctx: Context<OnCallback>,
         authority_bump: u8,
         action_kind: u8,
         extra_account_count: u8,
     ) -> Result<()> {
-        Callback::invoke(
+        OnCallback::invoke(
             On::Closed,
             ctx,
             authority_bump,

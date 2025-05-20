@@ -1,7 +1,7 @@
 use anchor_lang::CheckId;
 
 pub use crate::{
-    cpi::{accounts::Callback, on_closed, on_created, on_executed},
+    cpi::{accounts::OnCallback, on_closed, on_created, on_executed},
     types::ActionKind,
     CALLBACK_AUTHORITY_SEED,
 };

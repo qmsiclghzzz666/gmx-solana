@@ -8,7 +8,7 @@ use crate::{
 /// Callback accounts.
 #[derive(Accounts)]
 #[instruction(authority_bump: u8, action_kind: u8)]
-pub struct Callback<'info> {
+pub struct OnCallback<'info> {
     /// The callback authority.
     #[account(
         seeds = [CALLBACK_AUTHORITY_SEED],
@@ -41,7 +41,7 @@ pub struct Callback<'info> {
     pub action: UncheckedAccount<'info>,
 }
 
-impl Callback<'_> {
+impl OnCallback<'_> {
     pub(crate) fn invoke(
         kind: On,
         ctx: Context<Self>,

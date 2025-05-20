@@ -142,13 +142,13 @@ impl ActionHeader {
         action: &AccountInfo<'info>,
         remaining_accounts: &[AccountInfo<'info>],
     ) -> Result<()> {
-        use gmsol_callback::interface::{on_closed, on_created, on_executed, Callback};
+        use gmsol_callback::interface::{on_closed, on_created, on_executed, OnCallback};
 
         self.validate_general_callback(program.key, config.key, action_stats.key)?;
 
         let ctx = CpiContext::new(
             program.clone(),
-            Callback {
+            OnCallback {
                 authority: authority.to_account_info(),
                 config: config.clone(),
                 action_stats: action_stats.clone(),
