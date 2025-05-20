@@ -160,6 +160,7 @@ async fn competition() -> eyre::Result<()> {
     assert_eq!(leader_entry.address, owner);
     assert!(leader_entry.volume > 0);
 
+    // Test with extra users.
     let mut rng = rand::thread_rng();
     for idx in 0..deployment.extra_user_count {
         let client = deployment.extra_user_client(idx)?;
