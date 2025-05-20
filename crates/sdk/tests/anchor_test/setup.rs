@@ -65,6 +65,7 @@ const ENV_GMSOL_CLAIM_FEES_WAIT: &str = "GMSOL_CLAIM_FEES_WAIT";
 const ENV_GMSOL_NO_MOCK: &str = "GMSOL_NO_MOCK";
 const ENV_CHAINLINK_ACCESS_CONTROLLER: &str = "CHAINLINK_ACCESS_CONTROLLER";
 const ENV_GMSOL_WRITE_OUTPUT: &str = "GMSOL_WRITE_OUTPUT";
+const ENV_GMSOL_EXTRA_USERS: &str = "GMSOL_EXTRA_USERS";
 
 /// Deployment.
 pub struct Deployment {
@@ -77,6 +78,8 @@ pub struct Deployment {
     pub client: Client<SignerRef>,
     /// Users.
     pub users: Users,
+    /// Extra user count.
+    pub extra_user_count: usize,
     /// Store key.
     pub store_key: String,
     /// Store.
@@ -130,6 +133,9 @@ impl Deployment {
 
     /// User 1.
     pub const USER_1: &'static str = "user_1";
+
+    /// Extra user prefix.
+    pub const EXTRA_USER_PREFIX: &'static str = "extra";
 
     /// Default keeper.
     pub const DEFAULT_KEEPER: &'static str = "keeper";
@@ -187,6 +193,7 @@ impl Deployment {
 
         Ok(Self {
             users: Users::new(&mut rng),
+            extra_user_count: 0,
             rng,
             hermes: Default::default(),
             pyth: PythPullOracle::try_new(&client)?,
@@ -286,7 +293,7 @@ impl Deployment {
                 precision: 4,
             },
         )]);
-        self.create_token_accounts().await?;
+        // self.create_token_accounts().await?;
         self.initialize_store().await?;
         self.initialize_token_map().await?;
         self.initialize_markets([
@@ -422,7 +429,20 @@ impl Deployment {
         self.users.add_user(Self::USER_1, &mut self.rng)?;
         self.users.add_user(Self::DEFAULT_KEEPER, &mut self.rng)?;
 
+        if let Ok(num) = std::env::var(ENV_GMSOL_EXTRA_USERS) {
+            let num: usize = num.parse()?;
+            self.extra_user_count = num;
+            for idx in 0..self.extra_user_count {
+                self.users
+                    .add_user(&self.extra_user_name(idx), &mut self.rng)?;
+            }
+        }
+
         Ok(())
+    }
+
+    fn extra_user_name(&self, idx: usize) -> String {
+        format!("{}_{}", Self::EXTRA_USER_PREFIX, idx)
     }
 
     fn add_synthetic_tokens<T: ToString>(
@@ -525,7 +545,7 @@ impl Deployment {
             .collect())
     }
 
-    async fn create_token_accounts(&self) -> eyre::Result<()> {
+    async fn _create_token_accounts(&self) -> eyre::Result<()> {
         use anchor_spl::{associated_token::spl_associated_token_account::instruction, token::ID};
 
         let client = self.client.store_program().rpc();
@@ -1185,6 +1205,18 @@ impl Deployment {
         Ok(self.client.try_clone_with_payer(signer.clone())?)
     }
 
+    pub(crate) fn extra_user_client(&self, idx: usize) -> eyre::Result<Client<SignerRef>> {
+        if idx < self.extra_user_count {
+            let name = self.extra_user_name(idx);
+            self.user_client(&name)
+        } else {
+            Err(eyre::eyre!(
+                "index out of range, idx={idx}, extra_user_count={}",
+                self.extra_user_count
+            ))
+        }
+    }
+
     pub(crate) async fn get_ata_amount(
         &self,
         token: &Pubkey,
@@ -1223,7 +1255,10 @@ impl Deployment {
         amount: u64,
     ) -> eyre::Result<Signature> {
         use anchor_spl::{
-            associated_token::spl_associated_token_account::get_associated_token_address,
+            associated_token::{
+                spl_associated_token_account,
+                spl_associated_token_account::get_associated_token_address,
+            },
             token::{
                 spl_token::{instruction, native_mint},
                 ID,
@@ -1234,9 +1269,18 @@ impl Deployment {
         let account = get_associated_token_address(user, &token.address);
         let payer = self.client.payer();
 
+        let prepare =
+            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+                &payer,
+                user,
+                &token.address,
+                &ID,
+            );
+
         let signature = if token.address == native_mint::ID {
             self.client
                 .store_transaction()
+                .pre_instruction(prepare)
                 .pre_instruction(system_instruction::transfer(&payer, &account, amount))
                 .pre_instruction(instruction::sync_native(&ID, &account)?)
                 .send()
@@ -1244,6 +1288,7 @@ impl Deployment {
         } else {
             self.client
                 .store_transaction()
+                .pre_instruction(prepare)
                 .pre_instruction(instruction::mint_to_checked(
                     &ID,
                     &token.address,

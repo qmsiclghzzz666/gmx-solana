@@ -17,6 +17,7 @@ pub const MAX_LEADERBOARD_LEN: u8 = 5;
 
 /// A single leaderboard record.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq, Eq, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct LeaderEntry {
     /// The trader address.
     pub address: Pubkey,
@@ -27,6 +28,7 @@ pub struct LeaderEntry {
 /// The global competition data.
 #[account]
 #[derive(InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Competition {
     /// The keeper that initialised the competition.
     pub authority: Pubkey,
@@ -46,6 +48,7 @@ pub struct Competition {
 /// The per-trader statistics.
 #[account]
 #[derive(InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Participant {
     /// Bump seed.
     pub bump: u8,

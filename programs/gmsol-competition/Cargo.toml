@@ -27,6 +27,7 @@ multi-store = []
 devnet = []
 test-only = []
 migration = []
+debug = []
 
 [dependencies]
 anchor-lang = { workspace = true }

@@ -1,12 +1,13 @@
 use gmsol_competition::{
     instruction::InitializeCompetition,
-    states::{Competition, Participant, PARTICIPANT_SEED},
+    states::{Competition, Participant, COMPETITION_SEED, PARTICIPANT_SEED},
     ID as COMPETITION_PROGRAM_ID,
 };
 use gmsol_programs::anchor_lang::Key;
 use gmsol_sdk::{
     client::ops::ExchangeOps, constants::MARKET_USD_UNIT, ops::exchange::callback::Callback,
 };
+use rand::Rng;
 use solana_sdk::{pubkey::Pubkey, system_program};
 use time::OffsetDateTime;
 
@@ -42,7 +43,7 @@ async fn competition() -> eyre::Result<()> {
         .await?;
 
     // Initialize competition
-    let competition = Pubkey::find_program_address(&[b"competition"], &COMPETITION_PROGRAM_ID).0;
+    let competition = Pubkey::find_program_address(&[COMPETITION_SEED], &COMPETITION_PROGRAM_ID).0;
 
     let slot = client.rpc().get_slot().await?;
     let start_time = client
@@ -80,7 +81,7 @@ async fn competition() -> eyre::Result<()> {
     assert_eq!(competition_account.store_program, store.key());
 
     // Create and execute order
-    let size = 5_000 * MARKET_USD_UNIT;
+    let size = 50 * MARKET_USD_UNIT;
 
     let owner = client.payer();
 
@@ -159,9 +160,75 @@ async fn competition() -> eyre::Result<()> {
     assert_eq!(leader_entry.address, owner);
     assert!(leader_entry.volume > 0);
 
-    // // Cancel order
-    // let signature = client.close_order(&order)?.build().await?.send().await?;
-    // tracing::info!(%order, %signature, "cancelled increase position order");
+    let mut rng = rand::thread_rng();
+    for idx in 0..deployment.extra_user_count {
+        let client = deployment.extra_user_client(idx)?;
+        let owner = client.payer();
+
+        deployment
+            .mint_or_transfer_to("fBTC", &owner, long_collateral_amount)
+            .await?;
+
+        let participant = Pubkey::find_program_address(
+            &[PARTICIPANT_SEED, competition.as_ref(), owner.as_ref()],
+            &COMPETITION_PROGRAM_ID,
+        )
+        .0;
+        let create_participant = client
+            .store_transaction()
+            .program(COMPETITION_PROGRAM_ID)
+            .anchor_args(gmsol_competition::instruction::CreateParticipantIdempotent {})
+            .anchor_accounts(gmsol_competition::accounts::CreateParticipantIdempotent {
+                payer: client.payer(),
+                competition,
+                participant,
+                trader: owner,
+                system_program: system_program::ID,
+            });
+
+        let random_size = rng.gen_range(10, 50) * MARKET_USD_UNIT;
+        let (mut rpc, order) = client
+            .market_increase(
+                store,
+                market_token,
+                true,
+                long_collateral_amount,
+                true,
+                size + random_size,
+            )
+            .callback(Some(Callback {
+                version: 0,
+                program: COMPETITION_PROGRAM_ID,
+                config: competition,
+                action_stats: participant,
+            }))
+            .build_with_address()
+            .await?;
+
+        rpc = create_participant.merge(rpc);
+        let signature = rpc.send().await?;
+        tracing::info!(extra_user=%idx, %order, %signature, "created order");
+
+        let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+        // Ignore errors.
+        _ = deployment
+            .execute_with_pyth(
+                builder
+                    .add_alt(deployment.common_alt().clone())
+                    .add_alt(deployment.market_alt().clone()),
+                None,
+                true,
+                true,
+            )
+            .await;
+    }
+
+    let competition_account = client
+        .account::<Competition>(&competition)
+        .await?
+        .expect("must exist");
+
+    tracing::info!("competition result: {competition_account:?}");
 
     Ok(())
 }
