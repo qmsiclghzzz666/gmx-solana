@@ -20855,6 +20855,95 @@
       ]
     },
     {
+      "name": "set_feed_config_v2",
+      "docs": [
+        "Set the feed config of the given provider for the given token.",
+        "",
+        "# Accounts",
+        "[*See the documentation for the accounts*](SetFeedConfig).",
+        "",
+        "# Arguments",
+        "- `token`: The token whose config will be updated.",
+        "- `provider`: The index of the provider whose feed config will be updated.",
+        "Must be a valid [`PriceProviderKind`] value.",
+        "- `feed`: The new feed address.",
+        "- `timestamp_adjustment`: The new timestamp adjustment in seconds.",
+        "",
+        "# Errors",
+        "- The [`authority`](SetFeedConfig::authority) must be a signer",
+        "and a MARKET_KEEPER in the given store.",
+        "- The [`store`](SetFeedConfig::store) must be an initialized [`Store`](states::Store)",
+        "account owned by the store program.",
+        "- The [`token_map`](SetFeedConfig::token_map) must be an initialized token map account",
+        "owned by the `store`.",
+        "- The given `token` must exist in the token map.",
+        "- The `provider` index must correspond to a valid [`PriceProviderKind`]."
+      ],
+      "discriminator": [
+        137,
+        164,
+        163,
+        145,
+        66,
+        101,
+        139,
+        77
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "The authority of the instruction."
+          ],
+          "signer": true
+        },
+        {
+          "name": "store",
+          "docs": [
+            "The store that owns the token map."
+          ],
+          "relations": [
+            "token_map"
+          ]
+        },
+        {
+          "name": "token_map",
+          "docs": [
+            "The token map to update."
+          ],
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "token",
+          "type": "pubkey"
+        },
+        {
+          "name": "provider",
+          "type": "u8"
+        },
+        {
+          "name": "feed",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "timestamp_adjustment",
+          "type": {
+            "option": "u32"
+          }
+        },
+        {
+          "name": "max_deviation_factor",
+          "type": {
+            "option": "u128"
+          }
+        }
+      ]
+    },
+    {
       "name": "set_market_config_buffer_authority",
       "docs": [
         "Transfer ownership of a market config buffer account to a new authority.",
@@ -21537,6 +21626,73 @@
         81,
         114,
         51
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "The authority of the instruction."
+          ],
+          "signer": true
+        },
+        {
+          "name": "store",
+          "docs": [
+            "The store that owns the token map."
+          ],
+          "relations": [
+            "token_map"
+          ]
+        },
+        {
+          "name": "token_map",
+          "docs": [
+            "The token map to update."
+          ],
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "token",
+          "type": "pubkey"
+        },
+        {
+          "name": "enable",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "toggle_token_price_adjustment",
+      "docs": [
+        "Enable or disable price adjustment for the token.",
+        "",
+        "# Accounts",
+        "[*See the documentation for the accounts*](ToggleTokenConfig).",
+        "",
+        "# Arguments",
+        "- `token`: The token whose config will be updated.",
+        "- `enable`: Enable or disable.",
+        "",
+        "# Errors",
+        "- The [`authority`](ToggleTokenConfig::authority) must be a signer",
+        "and a MARKET_KEEPER in the given store.",
+        "- The [`store`](ToggleTokenConfig::store) must be an initialized [`Store`](states::Store)",
+        "account owned by the store program .",
+        "- The [`token_map`](ToggleTokenConfig::token_map) must be an initialized token map account",
+        "owned by the `store`.",
+        "- The given `token` must exist in the token map."
+      ],
+      "discriminator": [
+        114,
+        128,
+        20,
+        220,
+        204,
+        29,
+        111,
+        189
       ],
       "accounts": [
         {
@@ -29720,6 +29876,15 @@
             }
           },
           {
+            "name": "position",
+            "docs": [
+              "Position address."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
             "name": "collateral_token",
             "docs": [
               "Collateral token."
@@ -29727,9 +29892,9 @@
             "type": "pubkey"
           },
           {
-            "name": "position",
+            "name": "initial_collateral_token",
             "docs": [
-              "Position address."
+              "Initial collateral token."
             ],
             "type": {
               "option": "pubkey"

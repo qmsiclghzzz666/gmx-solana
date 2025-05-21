@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, ops::Div};
 
 use anchor_lang::{
     prelude::{borsh, AnchorDeserialize, AnchorSerialize},
@@ -23,9 +23,29 @@ impl Decimal {
     /// which should satisfy `u32::MAX * 10^{MAX_DECIMAL_MULTIPLIER} <= u128::MAX`.
     pub const MAX_DECIMAL_MULTIPLIER: u8 = 20;
 
+    fn multiplier(&self) -> u128 {
+        10u128.pow(self.decimal_multiplier as u32)
+    }
+
     /// Returns the price of one unit (with decimals to be [`MAX_DECIMALS`](Self::MAX_DECIMALS)).
     pub fn to_unit_price(&self) -> u128 {
-        self.value as u128 * 10u128.pow(self.decimal_multiplier as u32)
+        self.value as u128 * self.multiplier()
+    }
+
+    /// Creates a new [`Decimal`] with the given unit price, keeping `decimal_multiplier` unchanged.
+    /// Returns `None` if the price is too big.
+    pub fn with_unit_price(&self, price: u128, round_up: bool) -> Option<Self> {
+        let multiplier = self.multiplier();
+        debug_assert!(multiplier != 0);
+        let value = if round_up {
+            price.div_ceil(multiplier)
+        } else {
+            price.div(multiplier)
+        };
+        Some(Self {
+            value: value.try_into().ok()?,
+            decimal_multiplier: self.decimal_multiplier,
+        })
     }
 
     /// Create price decimal from the given `price` with `decimals`,

@@ -1,9 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
+use gmsol_utils::token_config::TokenConfigFlag;
 
 use crate::{
     states::{
-        FeedConfig, PriceProviderKind, Store, TokenConfigExt, TokenMapAccess, TokenMapAccessMut,
+        PriceProviderKind, Store, TokenConfigExt, TokenMapAccess, TokenMapAccessMut,
         TokenMapHeader, TokenMapLoader, UpdateTokenConfigParams,
     },
     utils::internal,
@@ -166,22 +167,33 @@ pub struct ToggleTokenConfig<'info> {
     pub token_map: AccountLoader<'info, TokenMapHeader>,
 }
 
-/// Toggle the config for the given token.
-///
-/// ## CHECK
-/// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
-pub(crate) fn unchecked_toggle_token_config(
-    ctx: Context<ToggleTokenConfig>,
-    token: Pubkey,
-    enable: bool,
-) -> Result<()> {
-    ctx.accounts
-        .token_map
-        .load_token_map_mut()?
-        .get_mut(&token)
-        .ok_or_else(|| error!(CoreError::NotFound))?
-        .set_enabled(enable);
-    Ok(())
+impl ToggleTokenConfig<'_> {
+    /// Toggle the config for the given token.
+    ///
+    /// ## CHECK
+    /// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
+    pub(crate) fn invoke_unchecked(
+        ctx: Context<Self>,
+        token: Pubkey,
+        flag: TokenConfigFlag,
+        enable: bool,
+    ) -> Result<()> {
+        // Only these flags are permitted to change.
+        require!(
+            matches!(
+                flag,
+                TokenConfigFlag::Enabled | TokenConfigFlag::AllowPriceAdjustment
+            ),
+            CoreError::Internal
+        );
+        ctx.accounts
+            .token_map
+            .load_token_map_mut()?
+            .get_mut(&token)
+            .ok_or_else(|| error!(CoreError::NotFound))?
+            .set_flag(flag, enable);
+        Ok(())
+    }
 }
 
 impl<'info> internal::Authentication<'info> for ToggleTokenConfig<'info> {
@@ -243,9 +255,9 @@ impl<'info> internal::Authentication<'info> for SetExpectedProvider<'info> {
     }
 }
 
-/// The accounts definition for [`set_feed_config`](crate::gmsol_store::set_feed_config).
+/// The accounts definition for [`set_feed_config_v2`](crate::gmsol_store::set_feed_config_v2).
 ///
-/// [*See also the documentation for the instruction.*](crate::gmsol_store::set_feed_config)
+/// [*See also the documentation for the instruction.*](crate::gmsol_store::set_feed_config_v2)
 #[derive(Accounts)]
 pub struct SetFeedConfig<'info> {
     /// The authority of the instruction.
@@ -257,28 +269,61 @@ pub struct SetFeedConfig<'info> {
     pub token_map: AccountLoader<'info, TokenMapHeader>,
 }
 
-/// Set feed config for the given token.
-///
-/// ## CHECK
-/// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
-pub(crate) fn unchecked_set_feed_config(
-    ctx: Context<SetFeedConfig>,
-    token: Pubkey,
-    provider: &PriceProviderKind,
-    feed: Pubkey,
-    timestamp_adjustment: u32,
-) -> Result<()> {
-    ctx.accounts
-        .token_map
-        .load_token_map_mut()?
-        .get_mut(&token)
-        .ok_or_else(|| error!(CoreError::NotFound))?
-        .set_feed_config(
-            provider,
-            FeedConfig::new(feed).with_timestamp_adjustment(timestamp_adjustment),
-        )
-        .map_err(CoreError::from)
-        .map_err(|err| error!(err))
+impl SetFeedConfig<'_> {
+    /// Set feed config for the given token.
+    ///
+    /// ## CHECK
+    /// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
+    pub(crate) fn invoke_unchecked(
+        ctx: Context<SetFeedConfig>,
+        token: Pubkey,
+        provider: &PriceProviderKind,
+        feed: Option<Pubkey>,
+        timestamp_adjustment: Option<u32>,
+        max_deviation_factor: Option<u128>,
+    ) -> Result<()> {
+        require_eq!(
+            feed.is_some() || timestamp_adjustment.is_some() || max_deviation_factor.is_some(),
+            true,
+            {
+                msg!("[Set Feed Config] empty update");
+                CoreError::InvalidArgument
+            }
+        );
+
+        let mut map = ctx.accounts.token_map.load_token_map_mut()?;
+        let feed_config = map
+            .get_mut(&token)
+            .ok_or_else(|| error!(CoreError::NotFound))?
+            .get_feed_config_mut(provider)
+            .map_err(CoreError::from)
+            .map_err(|err| error!(err))?;
+
+        let mut new_config = *feed_config;
+
+        if let Some(feed) = feed {
+            new_config = new_config.with_feed(feed);
+        }
+
+        if let Some(timestamp_adjustment) = timestamp_adjustment {
+            new_config = new_config.with_timestamp_adjustment(timestamp_adjustment);
+        }
+
+        if let Some(max_deviation_factor) = max_deviation_factor {
+            new_config = new_config
+                .with_max_deviation_factor(if max_deviation_factor == 0 {
+                    None
+                } else {
+                    Some(max_deviation_factor)
+                })
+                .map_err(CoreError::from)
+                .map_err(|err| error!(err))?;
+        }
+
+        *feed_config = new_config;
+
+        Ok(())
+    }
 }
 
 impl<'info> internal::Authentication<'info> for SetFeedConfig<'info> {

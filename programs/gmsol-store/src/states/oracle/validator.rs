@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use gmsol_utils::price::Price;
 
 use crate::{
+    constants,
     states::{Amount, Store, TokenConfig},
     CoreError,
 };
@@ -33,8 +34,11 @@ impl PriceValidator {
         provider: &PriceProviderKind,
         oracle_ts: i64,
         oracle_slot: u64,
-        _price: &Price,
+        price: &Price,
     ) -> Result<()> {
+        use gmsol_model::utils::apply_factor;
+
+        // Validate timestamp.
         let timestamp_adjustment = token_config
             .timestamp_adjustment(provider)
             .map_err(CoreError::from)?
@@ -42,13 +46,10 @@ impl PriceValidator {
         let ts = oracle_ts
             .checked_sub_unsigned(timestamp_adjustment)
             .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
-
         let expiration_ts = ts
             .checked_add_unsigned(self.max_age)
             .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
-
         let current_ts = self.clock.unix_timestamp;
-
         require_gte!(expiration_ts, current_ts, CoreError::MaxPriceAgeExceeded);
         require_gte!(
             current_ts.saturating_add_unsigned(self.max_future_timestamp_excess),
@@ -56,7 +57,40 @@ impl PriceValidator {
             CoreError::MaxPriceTimestampExceeded
         );
 
-        // Note: we may add ref price validation here in the future.
+        // Validate price deviation.
+        if let Some(max_deviation_factor) = token_config
+            .max_deviation_factor(provider)
+            .map_err(CoreError::from)
+            .map_err(|err| error!(err))?
+        {
+            let unit_prices = gmsol_model::price::Price::<u128>::from(price);
+            let mid_price = unit_prices.checked_mid().ok_or_else(|| {
+                msg!("[Price Validator] failed to calculate mid price for validation");
+                CoreError::InvalidArgument
+            })?;
+            let max_deviation = apply_factor::<_, { constants::MARKET_DECIMALS }>(
+                &mid_price,
+                &max_deviation_factor,
+            )
+            .ok_or_else(|| {
+                msg!("[Price Validator] failed to calculate max deviation for validation");
+                CoreError::InvalidArgument
+            })?;
+            let max_deviation = price.max.with_unit_price(max_deviation, true).ok_or_else(|| {
+                msg!("[Price Validator] failed to calculate rounded max deviation for validation");
+                CoreError::InvalidArgument
+            })?.to_unit_price();
+            require_gte!(
+                max_deviation,
+                unit_prices.max.abs_diff(mid_price),
+                CoreError::InvalidPriceFeedPrice
+            );
+            require_gte!(
+                max_deviation,
+                unit_prices.min.abs_diff(mid_price),
+                CoreError::InvalidPriceFeedPrice
+            );
+        }
 
         self.merge_range(Some(oracle_slot), ts, ts);
 

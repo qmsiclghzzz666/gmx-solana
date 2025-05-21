@@ -19,6 +19,16 @@ impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for Price<T> {
     const INIT_SPACE: usize = 2 * T::INIT_SPACE;
 }
 
+#[cfg(feature = "gmsol-utils")]
+impl<'a> From<&'a gmsol_utils::price::Price> for Price<u128> {
+    fn from(value: &'a gmsol_utils::price::Price) -> Self {
+        Self {
+            min: value.min.to_unit_price(),
+            max: value.max.to_unit_price(),
+        }
+    }
+}
+
 impl<T: Clone> Price<T> {
     /// Set prices for test.
     #[cfg(test)]

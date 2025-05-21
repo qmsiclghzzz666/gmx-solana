@@ -26,6 +26,7 @@ use gmsol_sdk::{
         ClientOptions,
     },
     constants::MARKET_USD_UNIT,
+    ops::token_config::UpdateFeedConfig,
     Client,
 };
 use gmsol_solana_utils::{
@@ -66,6 +67,8 @@ const ENV_GMSOL_NO_MOCK: &str = "GMSOL_NO_MOCK";
 const ENV_CHAINLINK_ACCESS_CONTROLLER: &str = "CHAINLINK_ACCESS_CONTROLLER";
 const ENV_GMSOL_WRITE_OUTPUT: &str = "GMSOL_WRITE_OUTPUT";
 const ENV_GMSOL_EXTRA_USERS: &str = "GMSOL_EXTRA_USERS";
+
+const MAX_DEVIATION_FACTOR: u128 = MARKET_USD_UNIT / 100_000;
 
 /// Deployment.
 pub struct Deployment {
@@ -252,6 +255,7 @@ impl Deployment {
                     decimals: 6,
                     feed_id: Pubkey::new_from_array(Self::BTC_PYTH_FEED_ID),
                     precision: 3,
+                    max_deviation_factor: Some(MAX_DEVIATION_FACTOR),
                 },
             ),
             (
@@ -261,6 +265,7 @@ impl Deployment {
                     decimals: 8,
                     feed_id: Pubkey::new_from_array(Self::USDC_PYTH_FEED_ID),
                     precision: 6,
+                    max_deviation_factor: Some(MAX_DEVIATION_FACTOR),
                 },
             ),
             (
@@ -270,6 +275,7 @@ impl Deployment {
                     decimals: 6,
                     feed_id: Pubkey::new_from_array(Self::ETH_CHAINLINK_FEED_ID),
                     precision: 4,
+                    max_deviation_factor: Some(MAX_DEVIATION_FACTOR),
                 },
             ),
             (
@@ -279,6 +285,7 @@ impl Deployment {
                     decimals: 6,
                     feed_id: Pubkey::new_from_array(Self::USDT_CHAINLINK_FEED_ID),
                     precision: 6,
+                    max_deviation_factor: Some(MAX_DEVIATION_FACTOR),
                 },
             ),
         ])
@@ -291,6 +298,7 @@ impl Deployment {
                 decimals: 9,
                 feed_id: Pubkey::new_from_array(Self::SOL_PYTH_FEED_ID),
                 precision: 4,
+                max_deviation_factor: Some(MAX_DEVIATION_FACTOR),
             },
         )]);
         // self.create_token_accounts().await?;
@@ -470,6 +478,7 @@ impl Deployment {
                     decimals: native_mint::DECIMALS,
                     feed_id: Pubkey::new_from_array(Self::SOL_PYTH_FEED_ID),
                     precision: 4,
+                    max_deviation_factor: Some(MAX_DEVIATION_FACTOR),
                 },
             });
         }
@@ -660,8 +669,8 @@ impl Deployment {
                             .update_price_feed(&token.config.provider, token.config.feed_id, None)?
                             .with_expected_provider(token.config.provider)
                             .with_precision(token.config.precision);
-                        if synthetic {
-                            Ok(client.insert_synthetic_token_config(
+                        let insert = if synthetic {
+                            client.insert_synthetic_token_config(
                                 store,
                                 &address,
                                 name,
@@ -670,9 +679,9 @@ impl Deployment {
                                 config,
                                 true,
                                 true,
-                            ))
+                            )
                         } else {
-                            Ok(client.insert_token_config(
+                            client.insert_token_config(
                                 store,
                                 &address,
                                 name,
@@ -680,8 +689,29 @@ impl Deployment {
                                 config,
                                 true,
                                 true,
-                            ))
-                        }
+                            )
+                        };
+
+                        let set_max_deviation = client.update_feed_config(
+                            store,
+                            &address,
+                            &token.address,
+                            token.config.provider,
+                            UpdateFeedConfig::builder()
+                                .max_deviation_factor(token.config.max_deviation_factor)
+                                .build(),
+                        );
+
+                        let enable_price_adjustment = client.toggle_token_price_adjustment(
+                            store,
+                            &address,
+                            &token.address,
+                            true,
+                        );
+
+                        Ok(insert
+                            .merge(set_max_deviation)
+                            .merge(enable_price_adjustment))
                     })
                     .collect::<eyre::Result<Vec<_>>>()?,
                 false,
@@ -1639,6 +1669,7 @@ pub(crate) struct TokenConfig {
     pub(crate) decimals: u8,
     pub(crate) feed_id: Pubkey,
     pub(crate) precision: u8,
+    pub(crate) max_deviation_factor: Option<u128>,
 }
 
 /// Get current deployment.

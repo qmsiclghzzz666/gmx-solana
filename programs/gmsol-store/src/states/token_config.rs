@@ -36,6 +36,7 @@ impl From<TokenConfigError> for CoreError {
             TokenConfigError::InvalidProviderIndex => Self::InvalidProviderKindIndex,
             TokenConfigError::FixedStr(err) => err.into(),
             TokenConfigError::ExceedMaxLengthLimit => Self::ExceedMaxLengthLimit,
+            _ => Self::InvalidArgument,
         }
     }
 }

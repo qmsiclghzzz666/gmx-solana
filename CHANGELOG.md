@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - programs(store): Added `confirm_gt_exchange_vault_v2` instruction, which requires the caller to provide buyback information.
 - programs(store): Added `OrderUpdated` CPI event to be emitted on order creation or update.
 - programs: Added the `gmsol-competition` program.
+- programs(store): Added a new `AllowPriceAdjustment` flag to `TokenConfig` indicating whether the price adjustment is allowed.
+- programs(store): Introduced price deviation checks with a `max_deviation_ratio` parameter. If price adjustment is allowed, the oracle price will be adjusted as needed to stay within the allowed range.
+- programs(store): Added the `toggle_token_price_adjustment` and `set_feed_config_v2` instructions to support new token config items.
 - sdk(sdk): Added `callback` option to `ops::CreateOrderBuilder`.
 - sdk(sdk): Added `callback` field to `ExecuteOrderHint` and `CloseOrderHint`.
 
@@ -38,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - programs(store): Deprecated `create_order`, `update_order`, `close_order`, `execute_increase_or_swap_order` and `execute_decrease_order` instructions.
 - programs(store): Deprecated `confirm_gt_exchange_vault` instruction.
+- programs(store): Deprecated `set_feed_config` instruction.
 
 ### Fixed
 

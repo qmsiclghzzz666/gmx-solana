@@ -257,6 +257,8 @@ declare_id!("Gmso1uvJnLbawvw7yezdfCDcPydwW2s2iqG3w6MDucLo");
 #[program]
 /// Instructions definitions of the GMSOL Store Program.
 pub mod gmsol_store {
+    use gmsol_utils::token_config::TokenConfigFlag;
+
     use super::*;
 
     // ===========================================
@@ -843,7 +845,38 @@ pub mod gmsol_store {
         token: Pubkey,
         enable: bool,
     ) -> Result<()> {
-        instructions::unchecked_toggle_token_config(ctx, token, enable)
+        ToggleTokenConfig::invoke_unchecked(ctx, token, TokenConfigFlag::Enabled, enable)
+    }
+
+    /// Enable or disable price adjustment for the token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](ToggleTokenConfig).
+    ///
+    /// # Arguments
+    /// - `token`: The token whose config will be updated.
+    /// - `enable`: Enable or disable.
+    ///
+    /// # Errors
+    /// - The [`authority`](ToggleTokenConfig::authority) must be a signer
+    ///   and a MARKET_KEEPER in the given store.
+    /// - The [`store`](ToggleTokenConfig::store) must be an initialized [`Store`](states::Store)
+    ///   account owned by the store program .
+    /// - The [`token_map`](ToggleTokenConfig::token_map) must be an initialized token map account
+    ///   owned by the `store`.
+    /// - The given `token` must exist in the token map.
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn toggle_token_price_adjustment(
+        ctx: Context<ToggleTokenConfig>,
+        token: Pubkey,
+        enable: bool,
+    ) -> Result<()> {
+        ToggleTokenConfig::invoke_unchecked(
+            ctx,
+            token,
+            TokenConfigFlag::AllowPriceAdjustment,
+            enable,
+        )
     }
 
     /// Set the expected provider for the given token.
@@ -900,6 +933,7 @@ pub mod gmsol_store {
     ///   owned by the `store`.
     /// - The given `token` must exist in the token map.
     /// - The `provider` index must correspond to a valid [`PriceProviderKind`].
+    #[deprecated(since = "0.6.0", note = "use `set_feed_config_v2` instead")]
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn set_feed_config(
         ctx: Context<SetFeedConfig>,
@@ -908,13 +942,55 @@ pub mod gmsol_store {
         feed: Pubkey,
         timestamp_adjustment: u32,
     ) -> Result<()> {
-        instructions::unchecked_set_feed_config(
+        SetFeedConfig::invoke_unchecked(
+            ctx,
+            token,
+            &PriceProviderKind::try_from(provider)
+                .map_err(|_| CoreError::InvalidProviderKindIndex)?,
+            Some(feed),
+            Some(timestamp_adjustment),
+            None,
+        )
+    }
+
+    /// Set the feed config of the given provider for the given token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](SetFeedConfig).
+    ///
+    /// # Arguments
+    /// - `token`: The token whose config will be updated.
+    /// - `provider`: The index of the provider whose feed config will be updated.
+    ///   Must be a valid [`PriceProviderKind`] value.
+    /// - `feed`: The new feed address.
+    /// - `timestamp_adjustment`: The new timestamp adjustment in seconds.
+    ///
+    /// # Errors
+    /// - The [`authority`](SetFeedConfig::authority) must be a signer
+    ///   and a MARKET_KEEPER in the given store.
+    /// - The [`store`](SetFeedConfig::store) must be an initialized [`Store`](states::Store)
+    ///   account owned by the store program.
+    /// - The [`token_map`](SetFeedConfig::token_map) must be an initialized token map account
+    ///   owned by the `store`.
+    /// - The given `token` must exist in the token map.
+    /// - The `provider` index must correspond to a valid [`PriceProviderKind`].
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn set_feed_config_v2(
+        ctx: Context<SetFeedConfig>,
+        token: Pubkey,
+        provider: u8,
+        feed: Option<Pubkey>,
+        timestamp_adjustment: Option<u32>,
+        max_deviation_factor: Option<u128>,
+    ) -> Result<()> {
+        SetFeedConfig::invoke_unchecked(
             ctx,
             token,
             &PriceProviderKind::try_from(provider)
                 .map_err(|_| CoreError::InvalidProviderKindIndex)?,
             feed,
             timestamp_adjustment,
+            max_deviation_factor,
         )
     }
 

@@ -51,6 +51,15 @@ pub trait TokenConfigOps<C> {
         enable: bool,
     ) -> TransactionBuilder<C>;
 
+    /// Toggle token price adjustment.
+    fn toggle_token_price_adjustment(
+        &self,
+        store: &Pubkey,
+        token_map: &Pubkey,
+        token: &Pubkey,
+        enable: bool,
+    ) -> TransactionBuilder<C>;
+
     /// Set expected provider.
     fn set_expected_provider(
         &self,
@@ -58,6 +67,16 @@ pub trait TokenConfigOps<C> {
         token_map: &Pubkey,
         token: &Pubkey,
         provider: PriceProviderKind,
+    ) -> TransactionBuilder<C>;
+
+    /// Update feed config.
+    fn update_feed_config(
+        &self,
+        store: &Pubkey,
+        token_map: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
+        update: UpdateFeedConfig,
     ) -> TransactionBuilder<C>;
 }
 
@@ -156,6 +175,26 @@ impl<C: Deref<Target = impl Signer> + Clone> TokenConfigOps<C> for crate::Client
             })
     }
 
+    fn toggle_token_price_adjustment(
+        &self,
+        store: &Pubkey,
+        token_map: &Pubkey,
+        token: &Pubkey,
+        enable: bool,
+    ) -> TransactionBuilder<C> {
+        let authority = self.payer();
+        self.store_transaction()
+            .anchor_accounts(accounts::ToggleTokenPriceAdjustment {
+                authority,
+                store: *store,
+                token_map: *token_map,
+            })
+            .anchor_args(args::ToggleTokenPriceAdjustment {
+                token: *token,
+                enable,
+            })
+    }
+
     fn set_expected_provider(
         &self,
         store: &Pubkey,
@@ -175,4 +214,42 @@ impl<C: Deref<Target = impl Signer> + Clone> TokenConfigOps<C> for crate::Client
                 provider: provider as u8,
             })
     }
+
+    fn update_feed_config(
+        &self,
+        store: &Pubkey,
+        token_map: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
+        update: UpdateFeedConfig,
+    ) -> TransactionBuilder<C> {
+        let authority = self.payer();
+        self.store_transaction()
+            .anchor_accounts(accounts::SetFeedConfigV2 {
+                authority,
+                store: *store,
+                token_map: *token_map,
+            })
+            .anchor_args(args::SetFeedConfigV2 {
+                token: *token,
+                provider: provider.into(),
+                feed: update.feed_id,
+                timestamp_adjustment: update.timestamp_adjustment,
+                max_deviation_factor: update.max_deviation_factor,
+            })
+    }
+}
+
+/// Contains updated parameters for the feed config.
+#[derive(typed_builder::TypedBuilder)]
+pub struct UpdateFeedConfig {
+    /// Feed id.
+    #[builder(default)]
+    pub feed_id: Option<Pubkey>,
+    /// Timestamp adjustment.
+    #[builder(default)]
+    pub timestamp_adjustment: Option<u32>,
+    /// Max deviation factor.
+    #[builder(default)]
+    pub max_deviation_factor: Option<u128>,
 }

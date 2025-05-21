@@ -20,12 +20,16 @@ pub const DEFAULT_PRECISION: u8 = 4;
 /// Default timestamp adjustment.
 pub const DEFAULT_TIMESTAMP_ADJUSTMENT: u32 = 0;
 
+/// Default maximum deviation ratio.
+pub const DEFAULT_MAX_DEVIATION_RATIO: u32 = 0;
+
 const MAX_FEEDS: usize = 4;
 const MAX_FLAGS: usize = 8;
 const MAX_NAME_LEN: usize = 32;
 
 /// Token config error.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum TokenConfigError {
     /// Not found.
     #[error("not found")]
@@ -39,6 +43,9 @@ pub enum TokenConfigError {
     /// Exceed max length limit.
     #[error("exceed max length limit")]
     ExceedMaxLengthLimit,
+    /// Exceed max ratio.
+    #[error("exceed max ratio")]
+    ExceedMaxRatio,
 }
 
 pub(crate) type TokenConfigResult<T> = std::result::Result<T, TokenConfigError>;
@@ -54,6 +61,8 @@ pub enum TokenConfigFlag {
     Enabled,
     /// Is a synthetic asset.
     Synthetic,
+    /// Indicates whether price adjustment is allowed.
+    AllowPriceAdjustment,
     // CHECK: Cannot have more than `MAX_FLAGS` flags.
 }
 
@@ -107,6 +116,23 @@ impl TokenConfig {
     pub fn get_feed_config(&self, kind: &PriceProviderKind) -> TokenConfigResult<&FeedConfig> {
         let index = *kind as usize;
         let config = self.feeds.get(index).ok_or(TokenConfigError::NotFound)?;
+        if config.feed == DEFAULT_PUBKEY {
+            Err(TokenConfigError::NotFound)
+        } else {
+            Ok(config)
+        }
+    }
+
+    /// Get the mutable reference of feed config by kind.
+    pub fn get_feed_config_mut(
+        &mut self,
+        kind: &PriceProviderKind,
+    ) -> TokenConfigResult<&mut FeedConfig> {
+        let index = *kind as usize;
+        let config = self
+            .feeds
+            .get_mut(index)
+            .ok_or(TokenConfigError::NotFound)?;
         if config.feed == DEFAULT_PUBKEY {
             Err(TokenConfigError::NotFound)
         } else {
@@ -176,6 +202,11 @@ impl TokenConfig {
         !self.is_synthetic()
     }
 
+    /// Returns `true` if price adjustment is allowed.
+    pub fn is_price_adjustment_allowed(&self) -> bool {
+        self.flag(TokenConfigFlag::AllowPriceAdjustment)
+    }
+
     /// Set flag
     pub fn set_flag(&mut self, flag: TokenConfigFlag, value: bool) {
         self.flags.set_flag(flag, value);
@@ -201,7 +232,15 @@ impl TokenConfig {
         &self,
         price_provider: &PriceProviderKind,
     ) -> TokenConfigResult<u32> {
-        Ok(self.get_feed_config(price_provider)?.timestamp_adjustment)
+        Ok(self.get_feed_config(price_provider)?.timestamp_adjustment())
+    }
+
+    /// Get max deviation factor.
+    pub fn max_deviation_factor(
+        &self,
+        price_provider: &PriceProviderKind,
+    ) -> TokenConfigResult<Option<u128>> {
+        Ok(self.get_feed_config(price_provider)?.max_deviation_factor())
     }
 
     /// Heartbeat duration.
@@ -231,9 +270,12 @@ pub struct FeedConfig {
     )]
     feed: Pubkey,
     timestamp_adjustment: u32,
+    /// The maximum allowed deviation ratio from the mid-price.
+    /// A value of `0` means no restriction is applied.
+    max_deviation_ratio: u32,
     #[cfg_attr(feature = "debug", debug(skip))]
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
-    reserved: [u8; 28],
+    reserved: [u8; 24],
 }
 
 #[cfg(feature = "display")]
@@ -248,19 +290,45 @@ impl std::fmt::Display for FeedConfig {
 }
 
 impl FeedConfig {
+    /// Multiplier used to convert a `u32` ratio into a `u128` factor.
+    /// The resulting precision is `FACTOR_DECIMALS` (typically 20) minus `log(RATIO_MULTIPLIER)`.
+    pub const RATIO_MULTIPLIER: u128 = 10u128.pow(12);
+
     /// Create a new feed config.
     pub fn new(feed: Pubkey) -> Self {
         Self {
             feed,
             timestamp_adjustment: DEFAULT_TIMESTAMP_ADJUSTMENT,
+            max_deviation_ratio: DEFAULT_MAX_DEVIATION_RATIO,
             reserved: Default::default(),
         }
     }
 
-    /// Change the timestamp adjustment.
+    /// Set feed id.
+    pub fn with_feed(mut self, feed_id: Pubkey) -> Self {
+        self.feed = feed_id;
+        self
+    }
+
+    /// Set timestamp adjustment,
     pub fn with_timestamp_adjustment(mut self, timestamp_adjustment: u32) -> Self {
         self.timestamp_adjustment = timestamp_adjustment;
         self
+    }
+
+    /// Set max deviation factor
+    pub fn with_max_deviation_factor(
+        mut self,
+        max_deviation_factor: Option<u128>,
+    ) -> TokenConfigResult<Self> {
+        let ratio = match max_deviation_factor {
+            Some(factor) => (factor / Self::RATIO_MULTIPLIER)
+                .try_into()
+                .map_err(|_| TokenConfigError::ExceedMaxRatio)?,
+            None => 0,
+        };
+        self.max_deviation_ratio = ratio;
+        Ok(self)
     }
 
     /// Get feed.
@@ -271,6 +339,16 @@ impl FeedConfig {
     /// Get timestamp adjustment.
     pub fn timestamp_adjustment(&self) -> u32 {
         self.timestamp_adjustment
+    }
+
+    /// Get max deviation factor.
+    pub fn max_deviation_factor(&self) -> Option<u128> {
+        let ratio = self.max_deviation_ratio;
+        if self.max_deviation_ratio == 0 {
+            None
+        } else {
+            Some(u128::from(ratio) * Self::RATIO_MULTIPLIER)
+        }
     }
 }
 

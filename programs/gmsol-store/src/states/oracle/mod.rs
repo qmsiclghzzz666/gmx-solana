@@ -22,10 +22,12 @@ pub mod time;
 use std::ops::Deref;
 
 use crate::{
+    constants,
     states::{TokenMapAccess, TokenMapLoader},
     CoreError, CoreResult,
 };
 use anchor_lang::prelude::*;
+use gmsol_utils::token_config::FeedConfig;
 
 use self::price_map::PriceMap;
 use super::{HasMarketMeta, Seed, Store, TokenConfig, TokenMapHeader, TokenMapRef};
@@ -326,19 +328,22 @@ impl OraclePrice {
             provider
         );
 
-        let feed_id = token_config.get_feed(&provider).map_err(CoreError::from)?;
+        let feed_config = token_config
+            .get_feed_config(&provider)
+            .map_err(CoreError::from)?;
+        let feed_id = feed_config.feed();
 
-        let (oracle_slot, oracle_ts, price) = match provider {
+        let (oracle_slot, oracle_ts, mut price) = match provider {
             PriceProviderKind::ChainlinkDataStreams => {
                 parsed.ok_or_else(|| error!(CoreError::Internal))?
             }
             PriceProviderKind::Pyth => {
                 let (oracle_slot, oracle_ts, price) =
-                    Pyth::check_and_get_price(clock, token_config, account, &feed_id)?;
+                    Pyth::check_and_get_price(clock, token_config, account, feed_id)?;
                 (oracle_slot, oracle_ts, price)
             }
             PriceProviderKind::Chainlink => {
-                require_keys_eq!(feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
+                require_keys_eq!(*feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
                 let program =
                     chainlink.ok_or_else(|| error!(CoreError::ChainlinkProgramIsRequired))?;
                 let (oracle_slot, oracle_ts, price) = Chainlink::check_and_get_chainlink_price(
@@ -350,7 +355,7 @@ impl OraclePrice {
                 (oracle_slot, oracle_ts, price)
             }
             PriceProviderKind::Switchboard => {
-                require_keys_eq!(feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
+                require_keys_eq!(*feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
                 Switchboard::check_and_get_price(clock, token_config, account)?
             }
             kind => {
@@ -359,6 +364,13 @@ impl OraclePrice {
             }
         };
 
+        if token_config.is_price_adjustment_allowed() {
+            let adjusted = try_adjust_price(feed_config, &mut price)?;
+            if adjusted {
+                msg!("[Oracle] price is adjusted, feed_id = {}", feed_id);
+            }
+        }
+
         Ok(Self {
             provider,
             oracle_slot,
@@ -366,4 +378,39 @@ impl OraclePrice {
             price,
         })
     }
+}
+
+fn try_adjust_price(feed_config: &FeedConfig, price: &mut gmsol_utils::Price) -> Result<bool> {
+    let mut adjusted = false;
+    if let Some(factor) = feed_config.max_deviation_factor() {
+        adjusted = try_adjust_price_with_max_deviation_factor(&factor, price).unwrap_or(false);
+    }
+    Ok(adjusted)
+}
+
+fn try_adjust_price_with_max_deviation_factor(
+    factor: &u128,
+    price: &mut gmsol_utils::Price,
+) -> Option<bool> {
+    use gmsol_model::utils::apply_factor;
+
+    let mut adjusted = false;
+
+    let unit_prices = gmsol_model::price::Price::<u128>::from(&*price);
+    let mid_price = unit_prices.checked_mid()?;
+    let max_deviation = apply_factor::<_, { constants::MARKET_DECIMALS }>(&mid_price, factor)?;
+
+    if unit_prices.max.abs_diff(mid_price) > max_deviation
+        || unit_prices.min.abs_diff(mid_price) > max_deviation
+    {
+        price.max = price
+            .max
+            .with_unit_price(mid_price.checked_add(max_deviation)?, false)?;
+        price.min = price
+            .min
+            .with_unit_price(mid_price.checked_sub(max_deviation)?, true)?;
+        adjusted = true;
+    }
+
+    Some(adjusted)
 }
