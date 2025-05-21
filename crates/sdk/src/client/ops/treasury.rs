@@ -572,8 +572,8 @@ impl<C: Deref<Target = impl Signer> + Clone> TreasuryOps<C> for crate::Client<C>
 
         let sync = self
             .treasury_transaction()
-            .anchor_args(args::SyncGtBank {})
-            .anchor_accounts(accounts::SyncGtBank {
+            .anchor_args(args::SyncGtBankV2 {})
+            .anchor_accounts(accounts::SyncGtBankV2 {
                 authority: self.payer(),
                 store: *store,
                 config,

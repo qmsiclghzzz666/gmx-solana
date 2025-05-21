@@ -176,10 +176,10 @@ impl OnExecuted<'_> {
         if volume >= comp.volume_threshold {
             // Extend competition time
             comp.end_time = comp.end_time.saturating_add(comp.time_extension);
-            
+
             // Record the trigger address
             comp.extension_trigger = Some(part.trader);
-            
+
             msg!(
                 "competition: extended time by {} seconds due to large trade volume={} from trader={}",
                 comp.time_extension,

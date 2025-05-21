@@ -142,9 +142,18 @@ pub mod gmsol_treasury {
     }
 
     /// Sync GT Bank.
+    #[deprecated(since = "0.6.0", note = "use `sync_gt_bank_v2` instead")]
     #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_WITHDRAWER))]
     pub fn sync_gt_bank(ctx: Context<SyncGtBank>) -> Result<()> {
-        instructions::unchecked_sync_gt_bank(ctx)
+        SyncGtBank::invoke_unchecked(ctx)?;
+        Ok(())
+    }
+
+    /// Sync GT Bank.
+    #[deprecated(since = "0.6.0", note = "use `sync_gt_bank_v2` instead")]
+    #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_WITHDRAWER))]
+    pub fn sync_gt_bank_v2(ctx: Context<SyncGtBank>) -> Result<u64> {
+        SyncGtBank::invoke_unchecked(ctx)
     }
 
     /// Complete GT Exchange.

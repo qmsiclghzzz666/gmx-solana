@@ -382,9 +382,10 @@ pub(crate) fn unchecked_deposit_to_treasury_vault(
     let signer = ReceiverSigner::new(ctx.accounts.config.key(), ctx.bumps.receiver);
     let decimals = ctx.accounts.token.decimals;
 
-    let (gt_amount, treasury_amount): (u64, u64) = {
+    let (receiver_amount, gt_amount, treasury_amount): (u64, u64, u64) = {
         let gt_factor = ctx.accounts.config.load()?.gt_factor();
-        let amount = u128::from(ctx.accounts.receiver_vault.amount);
+        let receiver_amount = ctx.accounts.receiver_vault.amount;
+        let amount = u128::from(receiver_amount);
         require_gte!(MARKET_USD_UNIT, gt_factor, CoreError::Internal);
         let gt_amount = apply_factor::<_, MARKET_DECIMALS>(&amount, &gt_factor)
             .ok_or_else(|| error!(CoreError::Internal))?;
@@ -392,6 +393,7 @@ pub(crate) fn unchecked_deposit_to_treasury_vault(
             .checked_sub(gt_amount)
             .ok_or_else(|| error!(CoreError::Internal))?;
         (
+            receiver_amount,
             gt_amount
                 .try_into()
                 .map_err(|_| error!(CoreError::TokenAmountOverflow))?,
@@ -419,6 +421,11 @@ pub(crate) fn unchecked_deposit_to_treasury_vault(
         treasury_amount,
         decimals,
     )?;
+
+    ctx.accounts
+        .gt_bank
+        .load_mut()?
+        .increase_receiver_vault_out_unchecked(receiver_amount)?;
     Ok(())
 }
 
@@ -706,7 +713,9 @@ impl<'info> ConfirmGtBuyback<'info> {
         let signer = self.config.load()?.signer();
 
         let total_gt_amount = self.gt_exchange_vault.load()?.amount();
-        self.gt_bank.load_mut()?.unchecked_confirm(total_gt_amount);
+        self.gt_bank
+            .load_mut()?
+            .confirm_unchecked(total_gt_amount)?;
 
         let tokens = self
             .gt_bank

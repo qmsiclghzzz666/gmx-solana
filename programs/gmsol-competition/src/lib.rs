@@ -23,9 +23,9 @@ pub mod gmsol_competition {
         time_extension: i64,
     ) -> Result<()> {
         InitializeCompetition::invoke(
-            ctx, 
-            start_time, 
-            end_time, 
+            ctx,
+            start_time,
+            end_time,
             store_program,
             volume_threshold,
             time_extension,

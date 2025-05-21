@@ -20,8 +20,9 @@ pub struct GtBank {
     pub(crate) treasury_vault_config: Pubkey,
     pub(crate) gt_exchange_vault: Pubkey,
     remaining_confirmed_gt_amount: u64,
+    receiver_vault_out: u64,
     #[cfg_attr(feature = "debug", debug(skip))]
-    reserved: [u8; 256],
+    reserved: [u8; 248],
     balances: TokenBalances,
 }
 
@@ -164,6 +165,21 @@ impl GtBank {
         Ok(())
     }
 
+    /// # CHECK
+    /// Must be called only after `amount` has been withdrawn from the receiver vault.
+    pub(crate) fn increase_receiver_vault_out_unchecked(&mut self, amount: u64) -> Result<()> {
+        self.receiver_vault_out = self
+            .receiver_vault_out
+            .checked_add(amount)
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
+        Ok(())
+    }
+
+    /// Get receiver vault out amount.
+    pub fn receiver_vault_out(&self) -> u64 {
+        self.receiver_vault_out
+    }
+
     /// Returns whether the GT bank is initialized.
     pub fn is_initialized(&self) -> bool {
         self.flags.get_flag(GtBankFlags::Initialized)
@@ -227,8 +243,19 @@ impl GtBank {
     /// # CHECK
     /// `gt_amount` must be the total amount of the GT exchange vault
     /// of this bank and it must have been confirmed.
-    pub(crate) fn unchecked_confirm(&mut self, gt_amount: u64) {
+    pub(crate) fn confirm_unchecked(&mut self, gt_amount: u64) -> Result<()> {
+        let previsous = self.flags.set_flag(GtBankFlags::Confirmed, true);
+        require_eq!(previsous, false, {
+            msg!("[GT Bank] this GT bank has been confirmed");
+            CoreError::PreconditionsAreNotMet
+        });
         self.remaining_confirmed_gt_amount = gt_amount;
+        Ok(())
+    }
+
+    /// Returns whether the GT bank is confirmed.
+    pub fn is_confirmed(&self) -> bool {
+        self.flags.get_flag(GtBankFlags::Confirmed)
     }
 
     pub(crate) fn record_claimed(&mut self, gt_amount: u64) -> Result<()> {
@@ -242,6 +269,21 @@ impl GtBank {
 
     pub(crate) fn remaining_confirmed_gt_amount(&self) -> u64 {
         self.remaining_confirmed_gt_amount
+    }
+
+    /// # CHECK
+    /// Only call this after syncing the GT bank.
+    pub(crate) fn handle_synced_unchecked(&mut self) -> Result<()> {
+        if self.is_confirmed() && !self.is_synced_after_confirmation() {
+            self.flags
+                .set_flag(GtBankFlags::SyncedAfterConfirmation, true);
+        }
+        Ok(())
+    }
+
+    /// Returns whether this GT bank has been synced after confirmation.
+    pub fn is_synced_after_confirmation(&self) -> bool {
+        self.flags.get_flag(GtBankFlags::SyncedAfterConfirmation)
     }
 }
 
@@ -288,6 +330,10 @@ const MAX_FLAGS: usize = 8;
 pub enum GtBankFlags {
     /// Initialized.
     Initialized,
+    /// Confirmed.
+    Confirmed,
+    /// Synced after confirmation.
+    SyncedAfterConfirmation,
     // CHECK: cannot have more than `MAX_FLAGS` flags.
 }
 

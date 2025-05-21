@@ -186,38 +186,42 @@ pub struct SyncGtBank<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-/// Sync the GT bank and deposit the exceeding amount into treasury vault.
-/// # CHECK
-/// Only [`TREASURY_WITHDRAWER`](crate::roles::TREASURY_WITHDRAWER) can use.
-pub(crate) fn unchecked_sync_gt_bank(ctx: Context<SyncGtBank>) -> Result<()> {
-    let delta = {
-        let gt_bank = ctx.accounts.gt_bank.load_mut()?;
-        let token = ctx.accounts.token.key();
+impl SyncGtBank<'_> {
+    /// Sync the GT bank and deposit the exceeding amount into treasury vault.
+    /// # CHECK
+    /// Only [`TREASURY_WITHDRAWER`](crate::roles::TREASURY_WITHDRAWER) can use.
+    pub(crate) fn invoke_unchecked(ctx: Context<Self>) -> Result<u64> {
+        let delta = {
+            let gt_bank = ctx.accounts.gt_bank.load_mut()?;
+            let token = ctx.accounts.token.key();
 
-        let recorded_balance = gt_bank.get_balance(&token).unwrap_or(0);
-        let balance = ctx.accounts.gt_bank_vault.amount;
+            let recorded_balance = gt_bank.get_balance(&token).unwrap_or(0);
+            let balance = ctx.accounts.gt_bank_vault.amount;
 
-        balance
-            .checked_sub(recorded_balance)
-            .ok_or_else(|| error!(CoreError::NotEnoughTokenAmount))?
-    };
+            balance
+                .checked_sub(recorded_balance)
+                .ok_or_else(|| error!(CoreError::NotEnoughTokenAmount))?
+        };
 
-    // Check if the balance is already in sync.
-    require_neq!(delta, 0, CoreError::PreconditionsAreNotMet);
+        // Check if the balance is already in sync.
+        require_neq!(delta, 0, CoreError::PreconditionsAreNotMet);
 
-    let cpi_ctx = ctx.accounts.transfer_checked_ctx();
-    let signer = ctx.accounts.gt_bank.load()?.signer();
-    transfer_checked(
-        cpi_ctx.with_signer(&[&signer.as_seeds()]),
-        delta,
-        ctx.accounts.token.decimals,
-    )?;
-    msg!(
-        "[Treasury] Synced GT Bank balance, deposit exceeding {} tokens into treasury",
-        delta
-    );
+        let cpi_ctx = ctx.accounts.transfer_checked_ctx();
+        let signer = ctx.accounts.gt_bank.load()?.signer();
+        transfer_checked(
+            cpi_ctx.with_signer(&[&signer.as_seeds()]),
+            delta,
+            ctx.accounts.token.decimals,
+        )?;
+        msg!(
+            "[Treasury] Synced GT Bank balance, deposit exceeding {} tokens into treasury",
+            delta
+        );
 
-    Ok(())
+        ctx.accounts.gt_bank.load_mut()?.handle_synced_unchecked()?;
+
+        Ok(delta)
+    }
 }
 
 impl<'info> WithStore<'info> for SyncGtBank<'info> {
