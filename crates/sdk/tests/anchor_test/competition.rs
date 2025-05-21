@@ -190,6 +190,7 @@ async fn competition() -> eyre::Result<()> {
             &COMPETITION_PROGRAM_ID,
         )
         .0;
+
         let create_participant = client
             .store_transaction()
             .program(COMPETITION_PROGRAM_ID)
@@ -203,6 +204,8 @@ async fn competition() -> eyre::Result<()> {
             });
 
         let random_size = rng.gen_range(10, 50) * MARKET_USD_UNIT;
+
+        // Increase.
         let (mut rpc, order) = client
             .market_increase(
                 store,
@@ -210,7 +213,7 @@ async fn competition() -> eyre::Result<()> {
                 true,
                 long_collateral_amount,
                 true,
-                size + random_size,
+                random_size,
             )
             .callback(Some(Callback {
                 version: 0,
@@ -222,6 +225,34 @@ async fn competition() -> eyre::Result<()> {
             .await?;
 
         rpc = create_participant.merge(rpc);
+        let signature = rpc.send().await?;
+        tracing::info!(extra_user=%idx, %order, %signature, "created order");
+
+        let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+        // Ignore errors.
+        _ = deployment
+            .execute_with_pyth(
+                builder
+                    .add_alt(deployment.common_alt().clone())
+                    .add_alt(deployment.market_alt().clone()),
+                None,
+                true,
+                true,
+            )
+            .await;
+
+        // Decrease.
+        let (rpc, order) = client
+            .market_decrease(store, market_token, true, 0, true, random_size)
+            .callback(Some(Callback {
+                version: 0,
+                program: COMPETITION_PROGRAM_ID,
+                config: competition,
+                action_stats: participant,
+            }))
+            .build_with_address()
+            .await?;
+
         let signature = rpc.send().await?;
         tracing::info!(extra_user=%idx, %order, %signature, "created order");
 
