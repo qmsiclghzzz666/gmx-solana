@@ -4,7 +4,10 @@ use crate::{
     serde::StringPubkey,
     solana_utils::transaction_group::TransactionGroupOptions as SdkTransactionGroupOptions,
 };
-use gmsol_solana_utils::signer::TransactionSigners;
+use gmsol_solana_utils::{
+    instruction_group::ComputeBudgetOptions, signer::TransactionSigners,
+    transaction_builder::default_before_sign,
+};
 use serde::{Deserialize, Serialize};
 use solana_sdk::{signature::NullSigner, transaction::VersionedTransaction};
 use tsify_next::Tsify;
@@ -28,8 +31,6 @@ pub struct TransactionGroupOptions {
     #[serde(default)]
     max_instructions_per_tx: Option<usize>,
     #[serde(default)]
-    compute_unit_price_micro_lamports: Option<u64>,
-    #[serde(default)]
     luts: HashMap<StringPubkey, Vec<StringPubkey>>,
     #[serde(default)]
     memo: Option<String>,
@@ -44,7 +45,6 @@ impl<'a> From<&'a TransactionGroupOptions> for SdkTransactionGroupOptions {
         if let Some(num) = value.max_instructions_per_tx {
             options.max_instructions_per_tx = num;
         }
-        options.compute_unit_price_micro_lamports = value.compute_unit_price_micro_lamports;
         options.memo = value.memo.clone();
         options
     }
@@ -95,13 +95,21 @@ impl TransactionGroup {
     fn new(
         group: &gmsol_solana_utils::TransactionGroup,
         recent_blockhash: &str,
+        compute_unit_price_micro_lamports: Option<u64>,
+        compute_unit_min_priority_lamports: Option<u64>,
     ) -> crate::Result<Self> {
         let signers = empty_signers();
         let transactions = group
-            .to_transactions(
+            .to_transactions_with_options(
                 &signers,
                 recent_blockhash.parse().map_err(crate::Error::custom)?,
                 true,
+                ComputeBudgetOptions {
+                    without_compute_budget: false,
+                    compute_unit_price_micro_lamports,
+                    compute_unit_min_priority_lamports,
+                },
+                default_before_sign,
             )
             .map(|res| res.map_err(crate::Error::from))
             .collect::<crate::Result<Vec<_>>>()?;

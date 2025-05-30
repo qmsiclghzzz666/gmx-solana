@@ -133,7 +133,7 @@ impl ChainlinkPullOracleFactory {
             .await?;
 
         if !txs.is_empty() {
-            match txs.send_all(false).await {
+            match txs.build()?.send_all(false).await {
                 Ok(signatures) => {
                     tracing::info!("initialized feeds with txs: {signatures:#?}");
                 }

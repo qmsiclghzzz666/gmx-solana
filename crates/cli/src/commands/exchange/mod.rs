@@ -26,7 +26,7 @@ use gmsol_sdk::{
     },
     serde::{serde_market::SerdeMarket, serde_position::SerdePosition, StringPubkey},
     solana_utils::{
-        instruction_group::GetInstructionsOptions,
+        instruction_group::{ComputeBudgetOptions, GetInstructionsOptions},
         solana_sdk::{
             commitment_config::CommitmentConfig, instruction::Instruction, signer::Signer,
         },
@@ -2305,7 +2305,10 @@ impl NativeCollector {
             .build()
             .into_atomic_group(&false)?
             .instructions_with_options(GetInstructionsOptions {
-                without_compute_budget: true,
+                compute_budget: ComputeBudgetOptions {
+                    without_compute_budget: true,
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .map(|ix| (*ix).clone())

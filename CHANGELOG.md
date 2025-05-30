@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking Changes
 
 - model: Changed trait definitions to support virtual inventories.
+- sdk(solana-utils): remiplemented the `BundleBuilder`A to support the new transaction group API.
 
 ### Added
 

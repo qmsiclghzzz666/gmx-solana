@@ -558,7 +558,7 @@ impl Deployment {
             builder.try_push(rpc).map_err(|(_, err)| err)?;
         }
 
-        match builder.send_all(false).await {
+        match builder.build()?.send_all(false).await {
             Ok(signatures) => {
                 tracing::info!("created tokens with {signatures:#?}");
             }
@@ -607,6 +607,7 @@ impl Deployment {
         }
 
         match builder
+            .build()?
             .send_all_with_opts(
                 SendBundleOptions {
                     config: RpcSendTransactionConfig {
@@ -662,7 +663,7 @@ impl Deployment {
             .push(client.grant_role(store, &keeper, RoleKey::CONFIG_KEEPER))?
             .push(client.grant_role(store, &keeper, RoleKey::GT_CONTROLLER))?;
 
-        _ = builder
+        _ = builder.build()?
             .send_all(false)
             .await.
             inspect(|signatures| {
@@ -751,7 +752,7 @@ impl Deployment {
             )?
             .push(client.initialize_oracle(store, &self.oracle, None).await?.0)?;
 
-        _ = builder
+        _ = builder.build()?
             .send_all(false)
             .await.
             inspect(|signatures| {
@@ -848,6 +849,7 @@ impl Deployment {
             builder.push(rpc)?;
         }
         _ = builder
+            .build()?
             .send_all(false)
             .await
             .inspect(|signatures| {
@@ -890,6 +892,7 @@ impl Deployment {
         let signatures = self
             .client
             .extend_alt(&self.common_alt.key, addresses.clone(), None)?
+            .build()?
             .send_all(false)
             .await
             .map_err(|(_, err)| err)?;
@@ -912,6 +915,7 @@ impl Deployment {
         let signatures = self
             .client
             .extend_alt(&self.market_alt.key, addresses.clone(), None)?
+            .build()?
             .send_all(false)
             .await
             .map_err(|(_, err)| err)?;
@@ -957,7 +961,7 @@ impl Deployment {
             ))?;
         }
 
-        match txn.send_all(true).await {
+        match txn.build()?.send_all(true).await {
             Ok(signatures) => {
                 tracing::info!(%glv_token, "GLV deposit enabled, signatures: {signatures:#?}");
             }
@@ -1019,7 +1023,8 @@ impl Deployment {
             ),
         )?;
 
-        tx.send_all(false)
+        tx.build()?
+            .send_all(false)
             .instrument(tracing::info_span!("initalize GT"))
             .await
             .inspect(|signatures| {
@@ -1069,7 +1074,7 @@ impl Deployment {
                     system_program: system_program::ID,
                 }),
         )?;
-        tx.send_all(false)
+        tx.build()?.send_all(false)
             .instrument(tracing::info_span!("initalize callback"))
             .await
             .inspect(|signatures| {
@@ -1132,7 +1137,7 @@ impl Deployment {
                 )?)?;
             }
         }
-        bundle.send_all(false)
+        bundle.build()?.send_all(false)
             .instrument(tracing::info_span!("initalize virtual inventories"))
             .await
             .inspect(|signatures| {
@@ -1167,7 +1172,7 @@ impl Deployment {
             false,
         )?;
 
-        match builder.send_all(false).await {
+        match builder.build()?.send_all(false).await {
             Ok(signatures) => {
                 tracing::info!("funded users with {signatures:#?}");
             }
@@ -1215,7 +1220,7 @@ impl Deployment {
                 .map_err(|(_, err)| err)?;
         }
 
-        match builder.send_all(false).await {
+        match builder.build()?.send_all(false).await {
             Ok(signatures) => {
                 tracing::info!("closed native token accounts with {signatures:#?}");
             }
@@ -1251,7 +1256,7 @@ impl Deployment {
                 .map_err(|(_, err)| err)?;
         }
 
-        match builder.send_all(false).await {
+        match builder.build()?.send_all(false).await {
             Ok(signatures) => {
                 tracing::info!("refunded the payer with {signatures:#?}");
             }
@@ -1466,6 +1471,7 @@ impl Deployment {
             .await?
             .build()
             .await?
+            .build()?
             .send_all_with_opts(
                 SendBundleOptions {
                     compute_unit_price_micro_lamports,
@@ -1529,6 +1535,7 @@ impl Deployment {
         let signature = rpc
             .send_with_options(
                 false,
+                None,
                 None,
                 RpcSendTransactionConfig {
                     skip_preflight,
