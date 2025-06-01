@@ -618,11 +618,14 @@ pub const MAX_TREASURY_TOKEN_FLAGS: usize = 8;
 
 /// Token Flags.
 #[cfg(feature = "treasury")]
+#[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "clap", clap(rename_all = "snake_case"))]
 #[derive(
     num_enum::IntoPrimitive, Clone, Copy, strum::EnumString, strum::Display, PartialEq, Eq,
 )]
 #[strum(serialize_all = "snake_case")]
-#[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
 #[repr(u8)]
 pub enum TokenFlag {
     /// Allow deposit.
