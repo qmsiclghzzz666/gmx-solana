@@ -37,6 +37,11 @@ pub mod gmsol_competition {
         CreateParticipantIdempotent::invoke(ctx)
     }
 
+    /// Close the [`Participant`](crate::states::Participant) account and reclaim rent.
+    pub fn close_participant(ctx: Context<CloseParticipant>) -> Result<()> {
+        CloseParticipant::invoke(ctx)
+    }
+
     // ---------------------------------------------------------------------
     // Callbacks expected by the GMX‑Solana store‑program
     // ---------------------------------------------------------------------

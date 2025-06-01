@@ -1,4 +1,7 @@
-use crate::states::{Competition, Participant, PARTICIPANT_SEED};
+use crate::{
+    error::CompetitionError,
+    states::{Competition, Participant, PARTICIPANT_SEED},
+};
 use anchor_lang::prelude::*;
 
 /// Create [`Participant`] account idempotently.
@@ -31,6 +34,44 @@ pub struct CreateParticipantIdempotent<'info> {
     pub trader: UncheckedAccount<'info>,
     /// System program.
     pub system_program: Program<'info, System>,
+}
+
+/// Close the [`Participant`] account and reclaim rent.
+///
+/// This instruction can be called by the trader to close their participant account
+/// and reclaim the rent after they are done with the competition.
+#[derive(Accounts)]
+pub struct CloseParticipant<'info> {
+    /// The authority of the participant account.
+    #[account(mut)]
+    pub trader: Signer<'info>,
+    /// The competition account this participant belongs to.
+    pub competition: Account<'info, Competition>,
+    /// The participant PDA to close.
+    #[account(
+        mut,
+        seeds = [
+            PARTICIPANT_SEED,
+            competition.key().as_ref(),
+            trader.key().as_ref(),
+        ],
+        bump = participant.bump,
+        has_one = competition,
+        has_one = trader,
+        close = trader,
+    )]
+    pub participant: Account<'info, Participant>,
+}
+
+impl CloseParticipant<'_> {
+    pub(crate) fn invoke(ctx: Context<Self>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let comp = &ctx.accounts.competition;
+
+        require!(now > comp.end_time, CompetitionError::CompetitionNotEnded);
+
+        Ok(())
+    }
 }
 
 impl CreateParticipantIdempotent<'_> {
