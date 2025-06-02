@@ -29,6 +29,7 @@ gmsol-sdk = { workspace = true, features = [
     "clap",
     "competition",
     "decode",
+    "treasury",
 ] }
 
 eyre = { workspace = true }
@@ -52,6 +53,7 @@ humantime = { workspace = true }
 either = { workspace = true }
 prettytable = { workspace = true }
 indexmap = { workspace = true }
+spl-token = { workspace = true }
 
 color-eyre = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, optional = true, features = [
