@@ -6,12 +6,17 @@ use std::ops::Deref;
 use eyre::OptionExt;
 use gmsol_sdk::{
     builders::{token::WrapNative, NonceBytes},
+    constants::MARKET_DECIMALS,
+    core::{market::MarketMeta, order::OrderKind},
     decode::gmsol::programs::GMSOLAccountData,
     ops::{
-        exchange::{deposit, withdrawal},
+        exchange::{deposit, shift, withdrawal},
         AddressLookupTableOps, ExchangeOps,
     },
-    programs::{anchor_lang::prelude::Pubkey, gmsol_store::accounts::Market},
+    programs::{
+        anchor_lang::prelude::Pubkey,
+        gmsol_store::{accounts::Market, types::UpdateOrderParams},
+    },
     serde::{serde_market::SerdeMarket, serde_position::SerdePosition, StringPubkey},
     solana_utils::{
         instruction_group::GetInstructionsOptions,
@@ -22,7 +27,12 @@ use gmsol_sdk::{
     utils::{Amount, GmAmount, Lamport, Value},
 };
 
-use crate::{commands::utils::token_amount, config::DisplayOptions};
+use crate::{
+    commands::utils::{get_token_amount_with_token_map, token_amount, unit_price},
+    config::DisplayOptions,
+};
+
+use super::utils::price_to_min_output_amount;
 
 /// Exchange-related commands.
 #[derive(Debug, clap::Args)]
@@ -137,10 +147,35 @@ enum Command {
         /// The address of the withdrawal to cancel.
         withdrawal: Pubkey,
     },
+    /// Create a shift.
+    CreateShift {
+        /// From market token.
+        #[arg(long, value_name = "FROM_MARKET_TOKEN")]
+        from: Pubkey,
+        /// To market token.
+        #[arg(long, value_name = "TO_MARKET_TOKEN")]
+        to: Pubkey,
+        /// Amount.
+        #[arg(long)]
+        amount: GmAmount,
+        /// Min output amount.
+        #[arg(long, default_value_t = GmAmount::ZERO)]
+        min_output_amount: GmAmount,
+        /// Extra execution fee allowed to use.
+        #[arg(long, short, default_value_t = Lamport::ZERO)]
+        extra_execution_fee: Lamport,
+    },
+    /// Close a shift.
+    CloseShift {
+        /// The address of the shift to cancel.
+        shift: Pubkey,
+    },
     /// Close an order.
     CloseOrder {
         /// The address of the order to cancel.
         order: Pubkey,
+        /// Whether to skip callback.
+        skip_callabck: bool,
     },
     /// Create a market increase order.
     MarketIncrease {
@@ -149,6 +184,9 @@ enum Command {
         /// Whether the collateral is long token.
         #[arg(long)]
         collateral_side: Side,
+        /// Min collateral amount.
+        #[arg(long)]
+        min_collateral_amount: Option<Amount>,
         /// Initial collateral token.
         #[arg(long, short = 'c')]
         initial_collateral_token: Option<Pubkey>,
@@ -161,6 +199,50 @@ enum Command {
         /// Position side.
         #[arg(long)]
         side: Side,
+        /// Acceptable price.
+        #[arg(long)]
+        acceptable_price: Option<Value>,
+        /// Position increment size in usd.
+        #[arg(long)]
+        size: Value,
+        /// Swap paths for collateral token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+        /// Whether to wait for the action to be completed.
+        #[arg(long, short)]
+        wait: bool,
+        /// Provide this to participate in a competition.
+        #[arg(long)]
+        competition: Option<Pubkey>,
+    },
+    /// Create a limit increase order.
+    LimitIncrease {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Whether the collateral is long token.
+        #[arg(long)]
+        collateral_side: Side,
+        /// Min collateral amount.
+        #[arg(long)]
+        min_collateral_amount: Option<Amount>,
+        /// Initial collateral token.
+        #[arg(long, short = 'c')]
+        initial_collateral_token: Option<Pubkey>,
+        /// Initial collateral token account.
+        #[arg(long, requires = "initial_collateral_token")]
+        initial_collateral_token_account: Option<Pubkey>,
+        /// Collateral amount.
+        #[arg(long, short = 'a')]
+        initial_collateral_token_amount: Amount,
+        /// Position side.
+        #[arg(long)]
+        side: Side,
+        /// Trigger price.
+        #[arg(long)]
+        price: Value,
+        /// Acceptable price.
+        #[arg(long)]
+        acceptable_price: Option<Value>,
         /// Position increment size in usd.
         #[arg(long)]
         size: Value,
@@ -187,12 +269,18 @@ enum Command {
         /// Position side.
         #[arg(long)]
         side: Side,
+        /// Acceptable price.
+        #[arg(long)]
+        acceptable_price: Option<Value>,
         /// Position decrement size in usd.
         #[arg(long, default_value_t = Value::ZERO)]
         size: Value,
         /// Final output token.
-        #[arg(long, short = 'o')]
+        #[arg(long, short = 'c')]
         final_output_token: Option<Pubkey>,
+        /// Min output value.
+        #[arg(long)]
+        min_output: Option<Value>,
         /// Swap paths for output token (collateral token).
         #[arg(long, short, action = clap::ArgAction::Append)]
         swap: Vec<Pubkey>,
@@ -202,6 +290,169 @@ enum Command {
         /// Provide this to participate in a competition.
         #[arg(long)]
         competition: Option<Pubkey>,
+    },
+    /// Create a limit decrese order.
+    LimitDecrease {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Whether the collateral is long token.
+        #[arg(long)]
+        collateral_side: Side,
+        /// Collateral withdrawal amount.
+        #[arg(long, short = 'a', default_value_t = Amount::ZERO)]
+        collateral_withdrawal_amount: Amount,
+        /// Position side.
+        #[arg(long)]
+        side: Side,
+        /// Trigger price.
+        #[arg(long)]
+        price: Value,
+        /// Acceptable price.
+        #[arg(long)]
+        acceptable_price: Option<Value>,
+        /// Position decrement size in usd.
+        #[arg(long, default_value_t = Value::ZERO)]
+        size: Value,
+        /// Final output token.
+        #[arg(long, short = 'c')]
+        final_output_token: Option<Pubkey>,
+        /// Min output value.
+        #[arg(long)]
+        min_output: Option<Value>,
+        /// Swap paths for output token (collateral token).
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+        /// Whether to wait for the action to be completed.
+        #[arg(long, short)]
+        wait: bool,
+        /// Provide this to participate in a competition.
+        #[arg(long)]
+        competition: Option<Pubkey>,
+        /// Valid from this timestamp.
+        #[arg(long)]
+        valid_from_ts: Option<humantime::Timestamp>,
+    },
+    /// Create a stop-loss decrese order.
+    StopLoss {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Whether the collateral is long token.
+        #[arg(long)]
+        collateral_side: Side,
+        /// Collateral withdrawal amount.
+        #[arg(long, short = 'a', default_value_t = Amount::ZERO)]
+        collateral_withdrawal_amount: Amount,
+        /// Position side.
+        #[arg(long)]
+        side: Side,
+        /// Trigger price.
+        #[arg(long)]
+        price: Value,
+        /// Acceptable price.
+        #[arg(long)]
+        acceptable_price: Option<Value>,
+        #[arg(long, default_value_t = Value::ZERO)]
+        size: Value,
+        /// Final output token.
+        #[arg(long, short = 'c')]
+        final_output_token: Option<Pubkey>,
+        /// Min output value.
+        #[arg(long)]
+        min_output: Option<Value>,
+        /// Swap paths for output token (collateral token).
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+        /// Whether to wait for the action to be completed.
+        #[arg(long, short)]
+        wait: bool,
+        /// Provide this to participate in a competition.
+        #[arg(long)]
+        competition: Option<Pubkey>,
+        /// Valid from this timestamp.
+        #[arg(long)]
+        valid_from_ts: Option<humantime::Timestamp>,
+    },
+    /// Update a limit or stop-loss order.
+    UpdateOrder {
+        /// The address of the swap order to udpate.
+        address: Pubkey,
+        /// New Tigger price.
+        #[arg(long)]
+        price: Option<Value>,
+        /// Accetable price.
+        #[arg(long)]
+        acceptable_price: Option<Value>,
+        /// Min output amount or value.
+        #[arg(long)]
+        min_output: Option<Amount>,
+        /// New size.
+        #[arg(long)]
+        size: Option<Value>,
+        /// Valid from this timestamp.
+        #[arg(long)]
+        valid_from_ts: Option<humantime::Timestamp>,
+    },
+    /// Create a market swap order.
+    MarketSwap {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Output side.
+        #[arg(long, short = 'o')]
+        output_side: Side,
+        /// Initial swap in token.
+        #[arg(long, short = 'i')]
+        initial_swap_in_token: Pubkey,
+        /// Initial swap in token account.
+        #[arg(long)]
+        initial_swap_in_token_account: Option<Pubkey>,
+        /// Collateral amount.
+        #[arg(long, short = 'a')]
+        initial_swap_in_token_amount: Amount,
+        /// Extra swap path. No need to provide the target market token;
+        /// it will be automatically added to the end of the swap path.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+        /// Min output amount.
+        #[arg(long)]
+        min_output_amount: Option<Amount>,
+    },
+    /// Create a limit swap order.
+    LimitSwap {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Output side.
+        #[arg(long)]
+        output_side: Side,
+        /// Limit price (`token_in` to `token_out` price)
+        #[arg(long)]
+        price: Value,
+        /// Initial swap in token.
+        #[arg(long, short = 'i')]
+        initial_swap_in_token: Pubkey,
+        /// Initial swap in token account.
+        #[arg(long)]
+        initial_swap_in_token_account: Option<Pubkey>,
+        /// Collateral amount.
+        #[arg(long, short = 'a')]
+        initial_swap_in_token_amount: Amount,
+        /// Extra swap path. No need to provide the target market token;
+        /// it will be automatically added to the end of the swap path.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+        /// Valid from this timestamp.
+        #[arg(long)]
+        valid_from_ts: Option<humantime::Timestamp>,
+    },
+    /// Update a limit swap order.
+    UpdateSwap {
+        /// The address of the swap order to udpate.
+        address: Pubkey,
+        /// New limit price (`token_in` to `token_out` price).
+        #[arg(long)]
+        price: Option<Value>,
+        /// Valid from this timestamp.
+        #[arg(long)]
+        valid_from_ts: Option<humantime::Timestamp>,
     },
     /// Executes the given action.
     /// Requires appropriate permissions.
@@ -222,10 +473,12 @@ impl super::Command for Exchange {
         let nonce = self.nonce.map(|nonce| nonce.to_bytes());
         let store = ctx.store();
         let client = ctx.client()?;
-        let token_map = match &self.command {
+        let mut token_map = match &self.command {
             Command::CloseOrder { .. }
             | Command::CloseDeposit { .. }
-            | Command::CloseWithdrawal { .. } => None,
+            | Command::CloseWithdrawal { .. }
+            | Command::CreateShift { .. }
+            | Command::CloseShift { .. } => None,
             Command::CreateWithdrawal {
                 min_long_token_amount,
                 min_short_token_amount,
@@ -233,8 +486,15 @@ impl super::Command for Exchange {
             } if min_long_token_amount.is_zero() && min_short_token_amount.is_zero() => None,
             Command::MarketDecrease {
                 collateral_withdrawal_amount,
+                acceptable_price,
                 ..
-            } if collateral_withdrawal_amount.is_zero() => None,
+            } if collateral_withdrawal_amount.is_zero() && acceptable_price.is_none() => None,
+            Command::UpdateOrder {
+                price,
+                acceptable_price,
+                ..
+            } if price.is_none() && acceptable_price.is_none() => None,
+            Command::UpdateSwap { price, .. } if price.is_none() => None,
             _ => Some(client.authorized_token_map(store).await?),
         };
         let options = ctx.bundle_options();
@@ -563,8 +823,38 @@ impl super::Command for Exchange {
                 .build()
                 .await?
                 .into_bundle_with_options(options)?,
-            Command::CloseOrder { order } => client
+            Command::CreateShift {
+                from,
+                to,
+                amount,
+                min_output_amount,
+                extra_execution_fee,
+            } => {
+                let mut builder = client.create_shift(store, from, to, amount.to_u64()?);
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
+                builder
+                    .execution_fee(extra_execution_fee.to_u64()? + shift::MIN_EXECUTION_LAMPORTS)
+                    .min_to_market_token_amount(min_output_amount.to_u64()?);
+
+                let (rpc, shift) = builder.build_with_address()?;
+
+                println!("Shift: {shift}");
+
+                rpc.into_bundle_with_options(options)?
+            }
+            Command::CloseShift { shift } => client
+                .close_shift(shift)
+                .build()
+                .await?
+                .into_bundle_with_options(options)?,
+            Command::CloseOrder {
+                order,
+                skip_callabck,
+            } => client
                 .close_order(order)?
+                .skip_callback(*skip_callabck)
                 .build()
                 .await?
                 .into_bundle_with_options(options)?,
@@ -579,14 +869,17 @@ impl super::Command for Exchange {
                 swap,
                 wait,
                 competition,
+                min_collateral_amount,
+                acceptable_price,
             } => {
                 let market_address = client.find_market_address(store, market_token);
                 let market = client.market(&market_address).await?;
+                let token_map = token_map.as_ref().expect("must exist");
                 let is_collateral_token_long = collateral_side.is_long();
                 let initial_collateral_token_amount = token_amount(
                     initial_collateral_token_amount,
                     initial_collateral_token.as_ref(),
-                    token_map.as_ref().expect("must exist"),
+                    token_map,
                     &market,
                     is_collateral_token_long,
                 )?;
@@ -614,6 +907,15 @@ impl super::Command for Exchange {
                 if let Some(token) = initial_collateral_token {
                     builder
                         .initial_collateral_token(token, initial_collateral_token_account.as_ref());
+                }
+                if let Some(amount) = min_collateral_amount {
+                    builder.min_output_amount(
+                        token_amount(amount, None, token_map, &market, is_collateral_token_long)?
+                            .into(),
+                    );
+                }
+                if let Some(price) = acceptable_price {
+                    builder.acceptable_price(unit_price(price, token_map, &market)?);
                 }
 
                 builder.swap_path(swap.clone());
@@ -654,6 +956,101 @@ impl super::Command for Exchange {
                 };
                 tx.into_bundle_with_options(options)?
             }
+            Command::LimitIncrease {
+                market_token,
+                collateral_side,
+                initial_collateral_token,
+                initial_collateral_token_account,
+                initial_collateral_token_amount,
+                side,
+                price,
+                size,
+                swap,
+                wait,
+                competition,
+                min_collateral_amount,
+                acceptable_price,
+            } => {
+                let market_address = client.find_market_address(store, market_token);
+                let market = client.market(&market_address).await?;
+                let token_map = token_map.as_ref().expect("must exist");
+                let price = unit_price(price, token_map, &market)?;
+                let is_collateral_token_long = collateral_side.is_long();
+                let initial_collateral_token_amount = token_amount(
+                    initial_collateral_token_amount,
+                    initial_collateral_token.as_ref(),
+                    token_map,
+                    &market,
+                    is_collateral_token_long,
+                )?;
+                if let Some(c) = collector.as_mut() {
+                    c.add(
+                        initial_collateral_token_amount,
+                        owner,
+                        initial_collateral_token.as_ref(),
+                        initial_collateral_token_account.as_ref(),
+                        &market,
+                        is_collateral_token_long,
+                    )?;
+                }
+                let mut builder = client.limit_increase(
+                    store,
+                    market_token,
+                    side.is_long(),
+                    size.to_u128()?,
+                    price,
+                    is_collateral_token_long,
+                    initial_collateral_token_amount,
+                );
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
+                if let Some(token) = initial_collateral_token {
+                    builder
+                        .initial_collateral_token(token, initial_collateral_token_account.as_ref());
+                }
+
+                if let Some(competition) = competition {
+                    builder.competition(competition);
+                }
+
+                if let Some(amount) = min_collateral_amount {
+                    builder.min_output_amount(
+                        token_amount(amount, None, token_map, &market, is_collateral_token_long)?
+                            .into(),
+                    );
+                }
+                if let Some(price) = acceptable_price {
+                    builder.acceptable_price(unit_price(price, token_map, &market)?);
+                }
+
+                let (rpc, order) = builder.swap_path(swap.clone()).build_with_address().await?;
+
+                let rpc = rpc.pre_instructions(
+                    collector
+                        .as_ref()
+                        .map(|c| c.to_instructions(owner))
+                        .transpose()?
+                        .unwrap_or_default(),
+                    false,
+                );
+
+                println!("Order: {order}");
+
+                let tx = if *wait {
+                    ctx.require_not_serialize_only_mode()?;
+                    ctx.require_not_ix_buffer_mode()?;
+
+                    let signature = rpc.send_without_preflight().await?;
+                    tracing::info!("created a limit increase order {order} at tx {signature}");
+
+                    wait_for_order(client, &order).await?;
+                    return Ok(());
+                } else {
+                    rpc
+                };
+                tx.into_bundle_with_options(options)?
+            }
             Command::MarketDecrease {
                 market_token,
                 collateral_side,
@@ -664,18 +1061,25 @@ impl super::Command for Exchange {
                 swap,
                 wait,
                 competition,
+                min_output,
+                acceptable_price,
             } => {
                 let is_collateral_token_long = collateral_side.is_long();
+                let market = if token_map.is_some() {
+                    let market_address = client.find_market_address(store, market_token);
+                    let market = client.market(&market_address).await?;
+                    Some(market)
+                } else {
+                    None
+                };
                 let collateral_withdrawal_amount = if collateral_withdrawal_amount.is_zero() {
                     0
                 } else {
-                    let market_address = client.find_market_address(store, market_token);
-                    let market = client.market(&market_address).await?;
                     token_amount(
                         collateral_withdrawal_amount,
                         final_output_token.as_ref(),
                         token_map.as_ref().expect("must exist"),
-                        &market,
+                        market.as_ref().expect("must exist"),
                         is_collateral_token_long,
                     )?
                 };
@@ -699,6 +1103,17 @@ impl super::Command for Exchange {
                     builder.competition(competition);
                 }
 
+                if let Some(value) = min_output {
+                    builder.min_output_amount(value.to_u128()?);
+                }
+                if let Some(price) = acceptable_price {
+                    builder.acceptable_price(unit_price(
+                        price,
+                        token_map.as_ref().expect("must exist"),
+                        market.as_ref().expect("must exist"),
+                    )?);
+                }
+
                 let (rpc, order) = builder.build_with_address().await?;
 
                 println!("Order: {order}");
@@ -716,6 +1131,367 @@ impl super::Command for Exchange {
                     rpc
                 };
                 tx.into_bundle_with_options(options)?
+            }
+            Command::LimitDecrease {
+                market_token,
+                collateral_side,
+                collateral_withdrawal_amount,
+                side,
+                price,
+                size,
+                final_output_token,
+                swap,
+                wait,
+                competition,
+                min_output,
+                acceptable_price,
+                valid_from_ts,
+            }
+            | Command::StopLoss {
+                market_token,
+                collateral_side,
+                collateral_withdrawal_amount,
+                side,
+                price,
+                size,
+                final_output_token,
+                swap,
+                wait,
+                competition,
+                min_output,
+                acceptable_price,
+                valid_from_ts,
+            } => {
+                let market_address = client.find_market_address(store, market_token);
+                let market = client.market(&market_address).await?;
+                let token_map = token_map.as_ref().expect("must exist");
+                let price = unit_price(price, token_map, &market)?;
+                let is_collateral_token_long = collateral_side.is_long();
+                let collateral_withdrawal_amount = token_amount(
+                    collateral_withdrawal_amount,
+                    final_output_token.as_ref(),
+                    token_map,
+                    &market,
+                    is_collateral_token_long,
+                )?;
+                let mut builder = match &self.command {
+                    Command::LimitDecrease { .. } => client.limit_decrease(
+                        store,
+                        market_token,
+                        side.is_long(),
+                        size.to_u128()?,
+                        price,
+                        is_collateral_token_long,
+                        collateral_withdrawal_amount,
+                    ),
+                    Command::StopLoss { .. } => client.stop_loss(
+                        store,
+                        market_token,
+                        side.is_long(),
+                        size.to_u128()?,
+                        price,
+                        is_collateral_token_long,
+                        collateral_withdrawal_amount,
+                    ),
+                    _ => unreachable!(),
+                };
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
+                if let Some(token) = final_output_token {
+                    builder.final_output_token(token);
+                }
+                if let Some(competition) = competition {
+                    builder.competition(competition);
+                }
+                if let Some(value) = min_output {
+                    builder.min_output_amount(value.to_u128()?);
+                }
+                if let Some(price) = acceptable_price {
+                    builder.acceptable_price(unit_price(price, token_map, &market)?);
+                }
+                if let Some(ts) = valid_from_ts {
+                    builder.valid_from_ts(to_unix_timestamp(ts)?);
+                }
+
+                let (rpc, order) = builder.swap_path(swap.clone()).build_with_address().await?;
+                println!("Order: {order}");
+
+                let tx = if *wait {
+                    ctx.require_not_serialize_only_mode()?;
+                    ctx.require_not_ix_buffer_mode()?;
+
+                    let signature = rpc.send_without_preflight().await?;
+                    tracing::info!("created a limit decrease order {order} at tx {signature}");
+
+                    wait_for_order(client, &order).await?;
+                    return Ok(());
+                } else {
+                    rpc
+                };
+                tx.into_bundle_with_options(options)?
+            }
+            Command::UpdateOrder {
+                address,
+                price,
+                acceptable_price,
+                min_output,
+                size,
+                valid_from_ts,
+            } => {
+                let order = client.order(address).await?;
+                let kind = order.params.kind()?;
+                let market = if token_map.is_some() {
+                    let market_address = client.find_market_address(store, &order.market_token);
+                    Some(client.market(&market_address).await?)
+                } else {
+                    None
+                };
+                let min_output = match kind {
+                    OrderKind::LimitDecrease | OrderKind::StopLossDecrease => min_output
+                        .as_ref()
+                        .map(|value| value.to_u128(MARKET_DECIMALS))
+                        .transpose()?,
+                    OrderKind::LimitIncrease => {
+                        if let Some(amount) = min_output {
+                            if token_map.is_none() {
+                                token_map = Some(client.authorized_token_map(store).await?);
+                            }
+                            Some(
+                                get_token_amount_with_token_map(
+                                    amount,
+                                    &order.params.collateral_token,
+                                    token_map.as_ref().expect("must exist"),
+                                )?
+                                .into(),
+                            )
+                        } else {
+                            None
+                        }
+                    }
+                    OrderKind::LimitSwap => {
+                        eyre::bail!(
+                            "cannot update swap order with this command, use `update-swap` instead"
+                        );
+                    }
+                    kind => {
+                        eyre::bail!("{:?} is not updatable", kind);
+                    }
+                };
+                let params = UpdateOrderParams {
+                    size_delta_value: size.as_ref().map(|s| s.to_u128()).transpose()?,
+                    acceptable_price: acceptable_price
+                        .as_ref()
+                        .map(|price| {
+                            unit_price(
+                                price,
+                                token_map.as_ref().expect("must exist"),
+                                market.as_ref().expect("must exist"),
+                            )
+                        })
+                        .transpose()?,
+                    trigger_price: price
+                        .as_ref()
+                        .map(|price| {
+                            unit_price(
+                                price,
+                                token_map.as_ref().expect("must exist"),
+                                market.as_ref().expect("must exist"),
+                            )
+                        })
+                        .transpose()?,
+                    min_output,
+                    valid_from_ts: valid_from_ts.as_ref().map(to_unix_timestamp).transpose()?,
+                };
+                client
+                    .update_order(store, &order.market_token, address, params, None)
+                    .await?
+                    .into_bundle_with_options(options)?
+            }
+            Command::MarketSwap {
+                market_token,
+                output_side,
+                initial_swap_in_token,
+                initial_swap_in_token_account,
+                initial_swap_in_token_amount,
+                swap,
+                min_output_amount,
+            } => {
+                let token_map = token_map.as_ref().expect("must exist");
+                let initial_swap_in_token_amount = get_token_amount_with_token_map(
+                    initial_swap_in_token_amount,
+                    initial_swap_in_token,
+                    token_map,
+                )?;
+                let is_output_token_long = output_side.is_long();
+                if let Some(c) = collector.as_mut() {
+                    c.add_with_token(
+                        initial_swap_in_token_amount,
+                        owner,
+                        initial_swap_in_token,
+                        initial_swap_in_token_account.as_ref(),
+                    )?;
+                }
+                let mut builder = client.market_swap(
+                    store,
+                    market_token,
+                    is_output_token_long,
+                    initial_swap_in_token,
+                    initial_swap_in_token_amount,
+                    swap.iter().chain(Some(market_token)),
+                );
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
+                if let Some(account) = initial_swap_in_token_account {
+                    builder.initial_collateral_token(initial_swap_in_token, Some(account));
+                }
+
+                if let Some(amount) = min_output_amount {
+                    let market_address = client.find_market_address(store, market_token);
+                    let market = client.market(&market_address).await?;
+                    builder.min_output_amount(
+                        token_amount(amount, None, token_map, &market, is_output_token_long)?
+                            .into(),
+                    );
+                }
+
+                let (rpc, order) = builder.build_with_address().await?;
+
+                let rpc = rpc.pre_instructions(
+                    collector
+                        .as_ref()
+                        .map(|c| c.to_instructions(owner))
+                        .transpose()?
+                        .unwrap_or_default(),
+                    false,
+                );
+
+                println!("Order: {order}");
+
+                rpc.into_bundle_with_options(options)?
+            }
+            Command::LimitSwap {
+                market_token,
+                output_side,
+                price,
+                initial_swap_in_token,
+                initial_swap_in_token_account,
+                initial_swap_in_token_amount,
+                swap,
+                valid_from_ts,
+            } => {
+                let token_map = token_map.as_ref().expect("must exist");
+                let market = client
+                    .market(&client.find_market_address(store, market_token))
+                    .await?;
+                let market_meta = MarketMeta::from(market.meta);
+                let token_out = market_meta.pnl_token(output_side.is_long());
+                let initial_swap_in_token_amount = get_token_amount_with_token_map(
+                    initial_swap_in_token_amount,
+                    initial_swap_in_token,
+                    token_map,
+                )?;
+                if let Some(c) = collector.as_mut() {
+                    c.add_with_token(
+                        initial_swap_in_token_amount,
+                        owner,
+                        initial_swap_in_token,
+                        initial_swap_in_token_account.as_ref(),
+                    )?;
+                }
+                let min_output_amount = price_to_min_output_amount(
+                    token_map,
+                    initial_swap_in_token,
+                    initial_swap_in_token_amount,
+                    &token_out,
+                    *price,
+                )
+                .ok_or_eyre("invalid price")?;
+                let mut builder = client.limit_swap(
+                    store,
+                    market_token,
+                    output_side.is_long(),
+                    min_output_amount,
+                    initial_swap_in_token,
+                    initial_swap_in_token_amount,
+                    swap.iter().chain(Some(market_token)),
+                );
+                if let Some(nonce) = nonce {
+                    builder.nonce(nonce);
+                }
+                if let Some(account) = initial_swap_in_token_account {
+                    builder.initial_collateral_token(initial_swap_in_token, Some(account));
+                }
+                if let Some(ts) = valid_from_ts {
+                    builder.valid_from_ts(to_unix_timestamp(ts)?);
+                }
+
+                let (rpc, order) = builder.build_with_address().await?;
+
+                let rpc = rpc.pre_instructions(
+                    collector
+                        .as_ref()
+                        .map(|c| c.to_instructions(owner))
+                        .transpose()?
+                        .unwrap_or_default(),
+                    false,
+                );
+
+                println!("Order: {order}");
+
+                rpc.into_bundle_with_options(options)?
+            }
+            Command::UpdateSwap {
+                address,
+                price,
+                valid_from_ts,
+            } => {
+                let order = client.order(address).await?;
+                if !matches!(order.params.kind()?, OrderKind::LimitSwap) {
+                    eyre::bail!("the given order is not a limit-swap order");
+                }
+                let token_map = client
+                    .token_map(
+                        &client
+                            .authorized_token_map_address(store)
+                            .await?
+                            .ok_or_eyre("token map is not set")?,
+                    )
+                    .await?;
+                let min_output_amount = price
+                    .as_ref()
+                    .map(|price| {
+                        price_to_min_output_amount(
+                            &token_map,
+                            &order
+                                .tokens
+                                .initial_collateral
+                                .token()
+                                .ok_or_eyre("missing swap in token")?,
+                            order.params.initial_collateral_delta_amount,
+                            &order
+                                .tokens
+                                .final_output_token
+                                .token()
+                                .ok_or_eyre("missing swap out token")?,
+                            *price,
+                        )
+                        .ok_or_eyre("invalid price")
+                    })
+                    .transpose()?;
+                let params = UpdateOrderParams {
+                    size_delta_value: None,
+                    acceptable_price: None,
+                    trigger_price: None,
+                    min_output: min_output_amount.map(Into::into),
+                    valid_from_ts: valid_from_ts.as_ref().map(to_unix_timestamp).transpose()?,
+                };
+
+                client
+                    .update_order(store, &order.market_token, address, params, None)
+                    .await?
+                    .into_bundle_with_options(options)?
             }
         };
 
@@ -764,28 +1540,15 @@ struct NativeCollector {
 }
 
 impl NativeCollector {
-    fn add(
+    fn add_with_token(
         &mut self,
         amount: u64,
         owner: &Pubkey,
-        token: Option<&Pubkey>,
+        token: &Pubkey,
         token_account: Option<&Pubkey>,
-        market: &Market,
-        is_long: bool,
     ) -> eyre::Result<()> {
         use anchor_spl::{
             associated_token::get_associated_token_address, token::spl_token::native_mint::ID,
-        };
-
-        let token = match token {
-            Some(token) => token,
-            None => {
-                if is_long {
-                    &market.meta.long_token_mint
-                } else {
-                    &market.meta.short_token_mint
-                }
-            }
         };
 
         if *token == ID {
@@ -799,6 +1562,29 @@ impl NativeCollector {
         }
 
         Ok(())
+    }
+
+    fn add(
+        &mut self,
+        amount: u64,
+        owner: &Pubkey,
+        token: Option<&Pubkey>,
+        token_account: Option<&Pubkey>,
+        market: &Market,
+        is_long: bool,
+    ) -> eyre::Result<()> {
+        let token = match token {
+            Some(token) => token,
+            None => {
+                if is_long {
+                    &market.meta.long_token_mint
+                } else {
+                    &market.meta.short_token_mint
+                }
+            }
+        };
+
+        self.add_with_token(amount, owner, token, token_account)
     }
 
     fn to_instructions(&self, owner: &Pubkey) -> eyre::Result<Vec<Instruction>> {
@@ -816,4 +1602,13 @@ impl NativeCollector {
             .map(|ix| (*ix).clone())
             .collect())
     }
+}
+
+fn to_unix_timestamp(ts: &humantime::Timestamp) -> eyre::Result<i64> {
+    use std::time::SystemTime;
+
+    Ok(ts
+        .duration_since(SystemTime::UNIX_EPOCH)?
+        .as_secs()
+        .try_into()?)
 }
