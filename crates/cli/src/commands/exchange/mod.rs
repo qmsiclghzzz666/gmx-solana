@@ -461,6 +461,10 @@ enum Command {
         #[command(flatten)]
         args: executor::ExecutorArgs,
         address: Pubkey,
+        #[arg(long)]
+        skip_close: bool,
+        #[arg(long)]
+        throw_error_on_failure: bool,
     },
 }
 
@@ -627,32 +631,6 @@ impl super::Command for Exchange {
                     }
                 }
 
-                return Ok(());
-            }
-            #[cfg(feature = "execute")]
-            Command::Execute { args, address } => {
-                use gmsol_sdk::decode::gmsol::programs::GMSOLAccountData;
-
-                let decoded = client
-                    .decode_account_with_config(address, Default::default())
-                    .await?
-                    .into_value()
-                    .ok_or_eyre("account not found")?;
-                let executor = args.build(client).await?;
-                match decoded {
-                    GMSOLAccountData::Order(_) => {
-                        let mut builder =
-                            client.execute_order(store, ctx.config().oracle()?, address, true)?;
-                        for alt in ctx.config().alts() {
-                            let alt = client.alt(alt).await?.ok_or(gmsol_sdk::Error::NotFound)?;
-                            builder.add_alt(alt);
-                        }
-                        executor.execute(builder, options).await?;
-                    }
-                    _ => {
-                        eyre::bail!("unsupported");
-                    }
-                }
                 return Ok(());
             }
             Command::CreateDeposit {
@@ -1492,6 +1470,102 @@ impl super::Command for Exchange {
                     .update_order(store, &order.market_token, address, params, None)
                     .await?
                     .into_bundle_with_options(options)?
+            }
+            #[cfg(feature = "execute")]
+            Command::Execute {
+                args,
+                address,
+                skip_close,
+                throw_error_on_failure,
+            } => {
+                use gmsol_sdk::decode::gmsol::programs::GMSOLAccountData;
+
+                let decoded = client
+                    .decode_account_with_config(address, Default::default())
+                    .await?
+                    .into_value()
+                    .ok_or_eyre("account not found")?;
+                let executor = args.build(client).await?;
+                let oracle = ctx.config().oracle()?;
+                match decoded {
+                    GMSOLAccountData::Deposit(_) => {
+                        let mut builder = client.execute_deposit(
+                            store,
+                            oracle,
+                            address,
+                            !*throw_error_on_failure,
+                        );
+                        builder.close(!*skip_close);
+                        executor.execute(builder, options).await?;
+                    }
+                    GMSOLAccountData::Withdrawal(_) => {
+                        let mut builder = client.execute_withdrawal(
+                            store,
+                            oracle,
+                            address,
+                            !*throw_error_on_failure,
+                        );
+                        builder.close(!*skip_close);
+                        executor.execute(builder, options).await?;
+                    }
+                    GMSOLAccountData::Shift(_) => {
+                        let mut builder =
+                            client.execute_shift(oracle, address, !*throw_error_on_failure);
+                        builder.close(!*skip_close);
+                        executor.execute(builder, options).await?;
+                    }
+                    GMSOLAccountData::GlvDeposit(_) => {
+                        let mut builder =
+                            client.execute_glv_deposit(oracle, address, !*throw_error_on_failure);
+                        builder.close(!*skip_close);
+                        for alt in ctx.config().alts() {
+                            let alt = client.alt(alt).await?.ok_or(gmsol_sdk::Error::NotFound)?;
+                            builder.add_alt(alt);
+                        }
+                        executor.execute(builder, options).await?;
+                    }
+                    GMSOLAccountData::GlvWithdrawal(_) => {
+                        let mut builder = client.execute_glv_withdrawal(
+                            oracle,
+                            address,
+                            !*throw_error_on_failure,
+                        );
+                        builder.close(!*skip_close);
+                        for alt in ctx.config().alts() {
+                            let alt = client.alt(alt).await?.ok_or(gmsol_sdk::Error::NotFound)?;
+                            builder.add_alt(alt);
+                        }
+                        executor.execute(builder, options).await?;
+                    }
+                    GMSOLAccountData::GlvShift(_) => {
+                        let mut builder =
+                            client.execute_glv_shift(oracle, address, !*throw_error_on_failure);
+                        builder.close(!*skip_close);
+                        for alt in ctx.config().alts() {
+                            let alt = client.alt(alt).await?.ok_or(gmsol_sdk::Error::NotFound)?;
+                            builder.add_alt(alt);
+                        }
+                        executor.execute(builder, options).await?;
+                    }
+                    GMSOLAccountData::Order(_) => {
+                        let mut builder = client.execute_order(
+                            store,
+                            oracle,
+                            address,
+                            !*throw_error_on_failure,
+                        )?;
+                        for alt in ctx.config().alts() {
+                            let alt = client.alt(alt).await?.ok_or(gmsol_sdk::Error::NotFound)?;
+                            builder.add_alt(alt);
+                        }
+                        builder.close(!*skip_close);
+                        executor.execute(builder, options).await?;
+                    }
+                    _ => {
+                        eyre::bail!("unsupported");
+                    }
+                }
+                return Ok(());
             }
         };
 
