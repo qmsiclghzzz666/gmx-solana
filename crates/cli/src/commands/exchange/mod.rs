@@ -1,8 +1,12 @@
 #[cfg(feature = "execute")]
 pub(crate) mod executor;
 
-use std::ops::Deref;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+};
 
+use clap::ArgGroup;
 use eyre::OptionExt;
 use gmsol_sdk::{
     builders::{token::WrapNative, NonceBytes},
@@ -26,6 +30,7 @@ use gmsol_sdk::{
     },
     utils::{Amount, GmAmount, Lamport, Value},
 };
+use indexmap::IndexMap;
 
 use crate::{
     commands::utils::{get_token_amount_with_token_map, token_amount, unit_price},
@@ -57,8 +62,25 @@ enum Command {
         #[arg(long, group = "market-address")]
         address: Option<StringPubkey>,
     },
-    /// Fetches action or position accounts.
-    Actions { address: Pubkey },
+    /// Fetches actions or positions.
+    #[command(group(ArgGroup::new("select-action").required(true)))]
+    Actions {
+        #[arg(group = "select-action")]
+        address: Option<Pubkey>,
+        #[arg(long, group = "select-owner")]
+        owner: Option<Pubkey>,
+        #[arg(long, group = "select-owner")]
+        all: bool,
+        /// Provides to include empty positions / actions.
+        #[arg(long)]
+        include_empty: bool,
+        #[arg(long)]
+        market_token: Option<Pubkey>,
+        #[arg(long, group = "select-action")]
+        orders: bool,
+        #[arg(long, group = "select-action")]
+        positions: bool,
+    },
     /// Creates a deposit.
     CreateDeposit {
         /// The address of the market token of the Market to deposit into.
@@ -622,51 +644,117 @@ impl super::Command for Exchange {
                 }
                 return Ok(());
             }
-            Command::Actions { address } => {
-                let decoded = client
-                    .decode_account_with_config(address, Default::default())
-                    .await?
-                    .into_value()
-                    .ok_or_eyre("account not found")?;
-                match decoded {
-                    GMSOLAccountData::Position(position) => {
-                        let market_address =
-                            client.find_market_address(store, &position.market_token);
-                        let market = client.market(&market_address).await?;
-                        let position = SerdePosition::from_position(
-                            &position,
-                            &market.meta.into(),
-                            token_map.as_ref().expect("must exist"),
-                        )?;
-                        println!(
-                            "{}",
-                            output.display_keyed_account(
-                                address,
-                                position,
-                                DisplayOptions::table_projection([
-                                    ("kind", "Kind"),
-                                    ("pubkey", "Address"),
-                                    ("owner", "Owner"),
-                                    ("is_long", "Is Long"),
-                                    ("market_token", "Market Token"),
-                                    ("collateral_token", "Collateral Token"),
-                                    ("state.trade_id", "Last Trade ID"),
-                                    ("state.updated_at_slot", "Last Updated Slot"),
-                                    ("state.increased_at", "Last Increased At"),
-                                    ("state.decreased_at", "Last Decreased At"),
-                                    ("state.collateral_amount", "Collateral Amount"),
-                                    ("state.size_in_usd", "$ Size"),
-                                    ("state.size_in_tokens", "◎ Size In Tokens"),
-                                ])
-                                .add_extra(serde_json::json!({
-                                    "kind": "Position",
-                                }))?
-                            )?
-                        );
+            Command::Actions {
+                address,
+                owner,
+                all,
+                include_empty,
+                market_token,
+                orders,
+                positions,
+            } => {
+                let owner = (!*all).then(|| owner.as_ref().copied().unwrap_or(client.payer()));
+                if let Some(address) = address {
+                    let decoded = client
+                        .decode_account_with_config(address, Default::default())
+                        .await?
+                        .into_value()
+                        .ok_or_eyre("account not found")?;
+                    match decoded {
+                        GMSOLAccountData::Position(position) => {
+                            let market_address =
+                                client.find_market_address(store, &position.market_token);
+                            let market = client.market(&market_address).await?;
+                            let position = SerdePosition::from_position(
+                                &position,
+                                &market.meta.into(),
+                                token_map.as_ref().expect("must exist"),
+                            )?;
+                            println!(
+                                "{}",
+                                output.display_keyed_account(
+                                    address,
+                                    position,
+                                    DisplayOptions::table_projection([
+                                        ("kind", "Kind"),
+                                        ("pubkey", "Address"),
+                                        ("owner", "Owner"),
+                                        ("is_long", "Is Long"),
+                                        ("market_token", "Market Token"),
+                                        ("collateral_token", "Collateral Token"),
+                                        ("state.trade_id", "Last Trade ID"),
+                                        ("state.updated_at_slot", "Last Updated Slot"),
+                                        ("state.increased_at", "Last Increased At"),
+                                        ("state.decreased_at", "Last Decreased At"),
+                                        ("state.collateral_amount", "Collateral Amount"),
+                                        ("state.size_in_usd", "$ Size"),
+                                        ("state.size_in_tokens", "◎ Size In Tokens"),
+                                    ])
+                                    .add_extra(
+                                        serde_json::json!({
+                                            "kind": "Position",
+                                        })
+                                    )?
+                                )?
+                            );
+                        }
+                        decoded => {
+                            println!("{decoded:#?}");
+                        }
                     }
-                    decoded => {
-                        println!("{decoded:#?}");
+                } else if *orders {
+                    let orders = client
+                        .orders(store, owner.as_ref(), market_token.as_ref())
+                        .await?;
+                    println!("{orders:?}");
+                } else if *positions {
+                    let token_map = token_map.as_ref().expect("must exist");
+                    let positions = client
+                        .positions(store, owner.as_ref(), market_token.as_ref())
+                        .await?;
+                    let market_tokens = positions
+                        .values()
+                        .filter(|p| *include_empty || p.state.size_in_usd != 0)
+                        .map(|p| p.market_token)
+                        .collect::<HashSet<_>>();
+                    let mut market_metas = HashMap::<_, _>::default();
+                    for market_token in market_tokens {
+                        let market = client
+                            .market(&client.find_market_address(store, &market_token))
+                            .await?;
+                        market_metas.insert(market_token, MarketMeta::from(market.meta));
                     }
+                    let mut positions = positions
+                        .iter()
+                        .filter(|(_, p)| *include_empty || p.state.size_in_usd != 0)
+                        .map(|(k, p)| {
+                            Ok((
+                                *k,
+                                SerdePosition::from_position(
+                                    p,
+                                    market_metas.get(&p.market_token).unwrap(),
+                                    token_map,
+                                )?,
+                            ))
+                        })
+                        .collect::<eyre::Result<IndexMap<_, _>>>()?;
+                    positions.sort_by(|_, a, _, b| {
+                        a.state.size_in_usd.cmp(&b.state.size_in_usd).reverse()
+                    });
+                    positions.sort_by(|_, a, _, b| a.market_token.cmp(&b.market_token));
+                    let output = output.display_keyed_accounts(
+                        positions,
+                        DisplayOptions::table_projection([
+                            ("pubkey", "Address"),
+                            ("market_token", "Market Token"),
+                            ("is_long", "Is Long"),
+                            ("is_collateral_long_token", "Is Collateral Long"),
+                            ("state.collateral_amount", "Collateral Amount"),
+                            ("state.size_in_usd", "Size($)"),
+                            ("state.trade_id", "Last Trade ID"),
+                        ]),
+                    )?;
+                    println!("{output}");
                 }
 
                 return Ok(());

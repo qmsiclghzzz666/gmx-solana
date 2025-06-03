@@ -19,6 +19,8 @@ pub struct SerdePosition {
     pub market_token: StringPubkey,
     /// The collateral token address.
     pub collateral_token: StringPubkey,
+    /// Indicates the side of the collateral t oken.
+    pub is_collateral_long_token: bool,
     /// Position state.
     pub state: SerdePositionState,
 }
@@ -40,6 +42,7 @@ impl SerdePosition {
             owner: position.owner.into(),
             market_token: position.market_token.into(),
             collateral_token: position.collateral_token.into(),
+            is_collateral_long_token,
             state: SerdePositionState::from_state(
                 &position.state,
                 decimals,
