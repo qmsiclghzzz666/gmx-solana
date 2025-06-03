@@ -454,6 +454,13 @@ enum Command {
         #[arg(long)]
         valid_from_ts: Option<humantime::Timestamp>,
     },
+    /// Cancel an order if no position.
+    /// Requires appropriate permissions.
+    CancelOrderIfNoPosition {
+        order: Pubkey,
+        #[arg(long)]
+        keep: bool,
+    },
     /// Executes the given action.
     /// Requires appropriate permissions.
     #[cfg(feature = "execute")]
@@ -465,6 +472,37 @@ enum Command {
         skip_close: bool,
         #[arg(long)]
         throw_error_on_failure: bool,
+    },
+    /// Update the ADL state for the given market.
+    /// Requires appropriate permissions.
+    #[cfg(feature = "execute")]
+    UpdateAdl {
+        #[command(flatten)]
+        args: executor::ExecutorArgs,
+        market_token: Pubkey,
+        /// Provides to only update for one side.
+        #[arg(long, short)]
+        side: Option<Side>,
+    },
+    /// Close a profitable position when ADL is enabled.
+    #[cfg(feature = "execute")]
+    Adl {
+        #[command(flatten)]
+        args: executor::ExecutorArgs,
+        #[clap(requires = "close_size")]
+        position: Pubkey,
+        /// The size to be closed.
+        #[arg(long, group = "close_size")]
+        size: Option<u128>,
+        #[arg(long, group = "close_size")]
+        close_all: bool,
+    },
+    /// Liquidate a position.
+    #[cfg(feature = "execute")]
+    Liquidate {
+        #[command(flatten)]
+        args: executor::ExecutorArgs,
+        position: Pubkey,
     },
 }
 
@@ -1471,6 +1509,19 @@ impl super::Command for Exchange {
                     .await?
                     .into_bundle_with_options(options)?
             }
+            Command::CancelOrderIfNoPosition { order, keep } => {
+                let cancel = client
+                    .cancel_order_if_no_position(store, order, None)
+                    .await?;
+                let rpc = if *keep {
+                    cancel
+                } else {
+                    let close = client.close_order(order)?.build().await?;
+                    cancel.merge(close)
+                };
+
+                rpc.into_bundle_with_options(options)?
+            }
             #[cfg(feature = "execute")]
             Command::Execute {
                 args,
@@ -1479,6 +1530,9 @@ impl super::Command for Exchange {
                 throw_error_on_failure,
             } => {
                 use gmsol_sdk::decode::gmsol::programs::GMSOLAccountData;
+
+                ctx.require_not_serialize_only_mode()?;
+                ctx.require_not_ix_buffer_mode()?;
 
                 let decoded = client
                     .decode_account_with_config(address, Default::default())
@@ -1565,6 +1619,70 @@ impl super::Command for Exchange {
                         eyre::bail!("unsupported");
                     }
                 }
+                return Ok(());
+            }
+            #[cfg(feature = "execute")]
+            Command::UpdateAdl {
+                args,
+                market_token,
+                side,
+            } => {
+                ctx.require_not_serialize_only_mode()?;
+                ctx.require_not_ix_buffer_mode()?;
+
+                let executor = args.build(client).await?;
+                let oracle = ctx.config().oracle()?;
+                let (for_long, for_short) = match side {
+                    Some(Side::Long) => (true, false),
+                    Some(Side::Short) => (false, true),
+                    None => (true, true),
+                };
+                let builder =
+                    client.update_adl(store, oracle, market_token, for_long, for_short)?;
+                executor.execute(builder, options).await?;
+                return Ok(());
+            }
+            #[cfg(feature = "execute")]
+            Command::Adl {
+                args,
+                position,
+                size,
+                close_all,
+            } => {
+                ctx.require_not_serialize_only_mode()?;
+                ctx.require_not_ix_buffer_mode()?;
+
+                let executor = args.build(client).await?;
+                let oracle = ctx.config().oracle()?;
+                let size = match size {
+                    Some(size) => *size,
+                    None => {
+                        debug_assert!(*close_all);
+                        let position = client.position(position).await?;
+                        position.state.size_in_usd
+                    }
+                };
+                let mut builder = client.auto_deleverage(oracle, position, size)?;
+                for alt in ctx.config().alts() {
+                    let alt = client.alt(alt).await?.ok_or(gmsol_sdk::Error::NotFound)?;
+                    builder.add_alt(alt);
+                }
+                executor.execute(builder, options).await?;
+                return Ok(());
+            }
+            #[cfg(feature = "execute")]
+            Command::Liquidate { args, position } => {
+                ctx.require_not_serialize_only_mode()?;
+                ctx.require_not_ix_buffer_mode()?;
+
+                let executor = args.build(client).await?;
+                let oracle = ctx.config().oracle()?;
+                let mut builder = client.liquidate(oracle, position)?;
+                for alt in ctx.config().alts() {
+                    let alt = client.alt(alt).await?.ok_or(gmsol_sdk::Error::NotFound)?;
+                    builder.add_alt(alt);
+                }
+                executor.execute(builder, options).await?;
                 return Ok(());
             }
         };
