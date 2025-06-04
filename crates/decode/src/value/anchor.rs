@@ -19,6 +19,7 @@ where
 
     fn visit_bytes(self, data: &[u8]) -> Result<Self::Value, crate::DecodeError> {
         use anchor_lang::prelude::{Error, ErrorCode};
+        use bytemuck::PodCastError;
 
         let disc = T::DISCRIMINATOR;
         if data.len() < disc.len() {
@@ -32,9 +33,16 @@ where
         if data.len() < end {
             return Err(Error::from(ErrorCode::AccountDidNotDeserialize).into());
         }
-        let data_without_discriminator = data[8..end].to_vec();
-        Ok(*bytemuck::try_from_bytes(&data_without_discriminator)
-            .map_err(|err| crate::DecodeError::custom(format!("bytemuck: {err}")))?)
+        let data_without_discriminator = &data[8..end];
+
+        match bytemuck::try_from_bytes(data_without_discriminator) {
+            Ok(data) => Ok(*data),
+            Err(PodCastError::TargetAlignmentGreaterAndInputNotAligned) => {
+                bytemuck::try_pod_read_unaligned(data_without_discriminator)
+                    .map_err(|_| Error::from(ErrorCode::AccountDidNotDeserialize).into())
+            }
+            Err(error) => Err(crate::DecodeError::custom(format!("bytemuck: {error}"))),
+        }
     }
 }
 
