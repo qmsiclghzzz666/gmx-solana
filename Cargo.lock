@@ -2327,6 +2327,7 @@ dependencies = [
  "etcetera",
  "eyre",
  "figment",
+ "futures-util",
  "gmsol-sdk",
  "hex",
  "humantime",
