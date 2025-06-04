@@ -77,7 +77,6 @@ use gmsol_utils::oracle::PriceProviderKind;
 use instruction_buffer::InstructionBuffer;
 use ops::market::MarketOps;
 use pubsub::{PubsubClient, SubscriptionConfig};
-use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
     nonblocking::rpc_client::RpcClient,
     rpc_config::RpcAccountInfoConfig,
@@ -637,12 +636,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     pub async fn decode_account_with_config(
         &self,
         address: &Pubkey,
-        mut config: RpcAccountInfoConfig,
+        config: RpcAccountInfoConfig,
     ) -> crate::Result<WithSlot<Option<gmsol_decode::gmsol::programs::GMSOLAccountData>>> {
         use crate::utils::decode::KeyedAccount;
         use gmsol_decode::{decoder::AccountAccessDecoder, gmsol::programs::GMSOLAccountData};
 
-        config.encoding = Some(config.encoding.unwrap_or(UiAccountEncoding::Base64));
         let account = self.raw_account_with_config(address, config).await?;
         let slot = account.slot();
         match account.into_value() {
@@ -665,12 +663,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     pub async fn account_with_config<T>(
         &self,
         address: &Pubkey,
-        mut config: RpcAccountInfoConfig,
+        config: RpcAccountInfoConfig,
     ) -> crate::Result<WithSlot<Option<T>>>
     where
         T: AccountDeserialize,
     {
-        config.encoding = Some(config.encoding.unwrap_or(UiAccountEncoding::Base64));
         let client = self.store_program().rpc();
         account_with_context(&client, address, config).await
     }

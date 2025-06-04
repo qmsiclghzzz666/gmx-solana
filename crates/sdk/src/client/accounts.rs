@@ -66,6 +66,7 @@ pub async fn get_account_with_context(
     address: &Pubkey,
     mut config: RpcAccountInfoConfig,
 ) -> crate::Result<WithSlot<Option<Account>>> {
+    config.encoding = Some(config.encoding.unwrap_or(UiAccountEncoding::Base64));
     let commitment = config.commitment.unwrap_or_else(|| client.commitment());
     config.commitment = Some(commitment);
     tracing::debug!(%address, ?config, "fetching account");
