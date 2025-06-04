@@ -889,7 +889,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(price)
     }
 
-    /// Fetch all [`Position`](store_accounts::Position) accounts of the given owner of the given store.
+    /// Fetch [`Position`](store_accounts::Position) accounts.
     pub async fn positions(
         &self,
         store: &Pubkey,
@@ -961,13 +961,12 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .map(|a| a.map(|a| a.0)))
     }
 
-    /// Fetch all [`Order`](store_accounts::Order) accounts of the given owner of the given store.
-    pub async fn orders(
+    fn create_action_filters(
         &self,
         store: &Pubkey,
         owner: Option<&Pubkey>,
         market_token: Option<&Pubkey>,
-    ) -> crate::Result<BTreeMap<Pubkey, store_accounts::Order>> {
+    ) -> (StoreFilter, Vec<RpcFilterType>) {
         let mut filters = Vec::default();
         if let Some(owner) = owner {
             filters.push(RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
@@ -986,6 +985,18 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             store,
             bytemuck::offset_of!(store_types::ActionHeader, store),
         );
+
+        (store_filter, filters)
+    }
+
+    /// Fetch [`Order`](store_accounts::Order) accounts.
+    pub async fn orders(
+        &self,
+        store: &Pubkey,
+        owner: Option<&Pubkey>,
+        market_token: Option<&Pubkey>,
+    ) -> crate::Result<BTreeMap<Pubkey, store_accounts::Order>> {
+        let (store_filter, filters) = self.create_action_filters(store, owner, market_token);
 
         let orders = self
             .store_accounts::<ZeroCopy<store_accounts::Order>>(Some(store_filter), filters)
@@ -1006,6 +1017,25 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .0)
     }
 
+    /// Fetch [`Deposit`](store_accounts::Deposit) accounts.
+    pub async fn deposits(
+        &self,
+        store: &Pubkey,
+        owner: Option<&Pubkey>,
+        market_token: Option<&Pubkey>,
+    ) -> crate::Result<BTreeMap<Pubkey, store_accounts::Deposit>> {
+        let (store_filter, filters) = self.create_action_filters(store, owner, market_token);
+
+        let orders = self
+            .store_accounts::<ZeroCopy<store_accounts::Deposit>>(Some(store_filter), filters)
+            .await?
+            .into_iter()
+            .map(|(addr, action)| (addr, action.0))
+            .collect();
+
+        Ok(orders)
+    }
+
     /// Fetch [`Withdrawal`](store_accounts::Withdrawal) account with its address.
     pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<store_accounts::Withdrawal> {
         Ok(self
@@ -1013,6 +1043,101 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .await?
             .ok_or(crate::Error::NotFound)?
             .0)
+    }
+
+    /// Fetch [`Withdrawal`](store_accounts::Withdrawal) accounts.
+    pub async fn withdrawals(
+        &self,
+        store: &Pubkey,
+        owner: Option<&Pubkey>,
+        market_token: Option<&Pubkey>,
+    ) -> crate::Result<BTreeMap<Pubkey, store_accounts::Withdrawal>> {
+        let (store_filter, filters) = self.create_action_filters(store, owner, market_token);
+
+        let orders = self
+            .store_accounts::<ZeroCopy<store_accounts::Withdrawal>>(Some(store_filter), filters)
+            .await?
+            .into_iter()
+            .map(|(addr, action)| (addr, action.0))
+            .collect();
+
+        Ok(orders)
+    }
+
+    /// Fetch [`Shift`](store_accounts::Shift) accounts.
+    pub async fn shifts(
+        &self,
+        store: &Pubkey,
+        owner: Option<&Pubkey>,
+        market_token: Option<&Pubkey>,
+    ) -> crate::Result<BTreeMap<Pubkey, store_accounts::Shift>> {
+        let (store_filter, filters) = self.create_action_filters(store, owner, market_token);
+
+        let orders = self
+            .store_accounts::<ZeroCopy<store_accounts::Shift>>(Some(store_filter), filters)
+            .await?
+            .into_iter()
+            .map(|(addr, action)| (addr, action.0))
+            .collect();
+
+        Ok(orders)
+    }
+
+    /// Fetch [`GlvDeposit`](store_accounts::GlvDeposit) accounts.
+    pub async fn glv_deposits(
+        &self,
+        store: &Pubkey,
+        owner: Option<&Pubkey>,
+        market_token: Option<&Pubkey>,
+    ) -> crate::Result<BTreeMap<Pubkey, store_accounts::GlvDeposit>> {
+        let (store_filter, filters) = self.create_action_filters(store, owner, market_token);
+
+        let orders = self
+            .store_accounts::<ZeroCopy<store_accounts::GlvDeposit>>(Some(store_filter), filters)
+            .await?
+            .into_iter()
+            .map(|(addr, action)| (addr, action.0))
+            .collect();
+
+        Ok(orders)
+    }
+
+    /// Fetch [`GlvWithdrawal`](store_accounts::GlvWithdrawal) accounts.
+    pub async fn glv_withdrawals(
+        &self,
+        store: &Pubkey,
+        owner: Option<&Pubkey>,
+        market_token: Option<&Pubkey>,
+    ) -> crate::Result<BTreeMap<Pubkey, store_accounts::GlvWithdrawal>> {
+        let (store_filter, filters) = self.create_action_filters(store, owner, market_token);
+
+        let orders = self
+            .store_accounts::<ZeroCopy<store_accounts::GlvWithdrawal>>(Some(store_filter), filters)
+            .await?
+            .into_iter()
+            .map(|(addr, action)| (addr, action.0))
+            .collect();
+
+        Ok(orders)
+    }
+
+    /// Fetch [`GlvShift`](store_accounts::GlvShift) accounts.
+    pub async fn glv_shifts(
+        &self,
+        store: &Pubkey,
+        owner: Option<&Pubkey>,
+        market_token: Option<&Pubkey>,
+    ) -> crate::Result<BTreeMap<Pubkey, store_accounts::GlvShift>> {
+        let (store_filter, filters) = self.create_action_filters(store, owner, market_token);
+
+        let orders = self
+            .store_accounts::<ZeroCopy<store_accounts::GlvShift>>(Some(store_filter), filters)
+            .await?
+            .into_iter()
+            .map(|(addr, action)| (addr, action.0))
+            .collect();
+
+        Ok(orders)
     }
 
     /// Fetch [`PriceFeed`](store_accounts::PriceFeed) account with its address.
