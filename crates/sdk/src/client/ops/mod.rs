@@ -47,11 +47,15 @@ pub mod alt;
 /// Operations for system program.
 pub mod system;
 
+/// Operations for IDL accounts.
+pub mod idl;
+
 pub use alt::AddressLookupTableOps;
 pub use config::ConfigOps;
 pub use exchange::ExchangeOps;
 pub use glv::GlvOps;
 pub use gt::GtOps;
+pub use idl::IdlOps;
 pub use market::MarketOps;
 pub use oracle::OracleOps;
 pub use role::RoleOps;
