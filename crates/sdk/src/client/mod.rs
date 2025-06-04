@@ -808,6 +808,16 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .0)
     }
 
+    /// Fetch [`Market`](store_accounts::Market) account with its token address.
+    pub async fn market_by_token(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+    ) -> crate::Result<Arc<store_accounts::Market>> {
+        let address = self.find_market_address(store, market_token);
+        self.market(&address).await
+    }
+
     /// Fetch all [`Glv`](store_accounts::Glv) accounts of the given store.
     pub async fn glvs_with_config(
         &self,

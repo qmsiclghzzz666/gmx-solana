@@ -14,7 +14,7 @@ use gmsol_sdk::{
     core::{market::MarketMeta, order::OrderKind},
     decode::gmsol::programs::GMSOLAccountData,
     ops::{
-        exchange::{deposit, shift, withdrawal},
+        exchange::{deposit, glv_deposit, glv_shift, glv_withdrawal, shift, withdrawal},
         AddressLookupTableOps, ExchangeOps,
     },
     programs::{
@@ -37,7 +37,7 @@ use crate::{
     config::DisplayOptions,
 };
 
-use super::utils::price_to_min_output_amount;
+use super::{glv::GlvToken, utils::price_to_min_output_amount};
 
 /// Exchange-related commands.
 #[derive(Debug, clap::Args)]
@@ -135,7 +135,7 @@ enum Command {
     },
     /// Close a deposit account.
     CloseDeposit {
-        /// The address of the deposit to cancel.
+        /// The address of the deposit to close.
         deposit: Pubkey,
     },
     /// Create a withdrawal.
@@ -178,7 +178,7 @@ enum Command {
     },
     /// Close a withdrawal account.
     CloseWithdrawal {
-        /// The address of the withdrawal to cancel.
+        /// The address of the withdrawal to close.
         withdrawal: Pubkey,
     },
     /// Create a shift.
@@ -201,12 +201,12 @@ enum Command {
     },
     /// Close a shift.
     CloseShift {
-        /// The address of the shift to cancel.
+        /// The address of the shift to close.
         shift: Pubkey,
     },
     /// Close an order.
     CloseOrder {
-        /// The address of the order to cancel.
+        /// The address of the order to close.
         order: Pubkey,
         /// Whether to skip callback.
         skip_callabck: bool,
@@ -495,6 +495,13 @@ enum Command {
         #[arg(long)]
         keep: bool,
     },
+    /// GLV operations.
+    Glv {
+        #[command(flatten)]
+        glv_token: GlvToken,
+        #[command(subcommand)]
+        command: GlvCommand,
+    },
     /// Executes the given action.
     /// Requires appropriate permissions.
     #[cfg(feature = "execute")]
@@ -540,6 +547,126 @@ enum Command {
     },
 }
 
+#[derive(Debug, clap::Subcommand)]
+enum GlvCommand {
+    /// Create a GLV deposit.
+    CreateDeposit {
+        /// The address of the market token of the GLV Market to deposit into.
+        market_token: Pubkey,
+        #[arg(long, group = "deposit-receiver")]
+        receiver: Option<Pubkey>,
+        #[arg(long, group = "deposit-receiver", requires = "min_amount")]
+        first_deposit: bool,
+        /// Extra execution fee allowed to use.
+        #[arg(long, short, default_value_t = Lamport::ZERO)]
+        extra_execution_fee: Lamport,
+        /// Minimum amount of GLV tokens to mint.
+        #[arg(long, default_value_t = GmAmount::ZERO)]
+        min_amount: GmAmount,
+        /// Minimum amount of market tokens to mint.
+        #[arg(long, default_value_t = GmAmount::ZERO)]
+        min_market_token_amount: GmAmount,
+        /// The initial long token.
+        #[arg(long, requires = "long_token_amount")]
+        long_token: Option<Pubkey>,
+        /// The initial short token.
+        #[arg(long, requires = "short_token_amount")]
+        short_token: Option<Pubkey>,
+        /// The market token account.
+        market_token_account: Option<Pubkey>,
+        /// The initial long token account.
+        #[arg(long)]
+        long_token_account: Option<Pubkey>,
+        /// The initial short token account.
+        #[arg(long)]
+        short_token_account: Option<Pubkey>,
+        /// The initial long token amount.
+        /// Market token amount to deposit.
+        #[arg(long, default_value_t = GmAmount::ZERO)]
+        market_token_amount: GmAmount,
+        #[arg(long, default_value_t = Amount::ZERO)]
+        long_token_amount: Amount,
+        /// The initial short token amount.
+        #[arg(long, default_value_t = Amount::ZERO)]
+        short_token_amount: Amount,
+        /// Swap paths for long token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        long_swap: Vec<Pubkey>,
+        /// Swap paths for short token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        short_swap: Vec<Pubkey>,
+    },
+    /// Close a GLV deposit.
+    CloseDeposit {
+        /// The address of the GLV deposit to close.
+        glv_deposit: Pubkey,
+    },
+    /// Create a GLV withdrawal.
+    CreateWithdrawal {
+        /// The address of the market token of the GLV Market to withdraw from.
+        market_token: Pubkey,
+        #[arg(long)]
+        receiver: Option<Pubkey>,
+        /// Extra execution fee allowed to use.
+        #[arg(long, short, default_value_t = Lamport::ZERO)]
+        extra_execution_fee: Lamport,
+        /// The amount of GLV tokens to burn.
+        #[arg(long)]
+        amount: GmAmount,
+        /// Final long token.
+        #[arg(long)]
+        final_long_token: Option<Pubkey>,
+        /// Final short token.
+        #[arg(long)]
+        final_short_token: Option<Pubkey>,
+        /// The GLV token account to use.
+        #[arg(long)]
+        glv_token_account: Option<Pubkey>,
+        /// Minimal amount of final long tokens to withdraw.
+        #[arg(long, default_value_t = Amount::ZERO)]
+        min_final_long_token_amount: Amount,
+        /// Minimal amount of final short tokens to withdraw.
+        #[arg(long, default_value_t = Amount::ZERO)]
+        min_final_short_token_amount: Amount,
+        /// Swap paths for long token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        long_swap: Vec<Pubkey>,
+        /// Swap paths for short token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        short_swap: Vec<Pubkey>,
+    },
+    /// Close a GLV withdrawal.
+    CloseWithdrawal {
+        /// The address of the GLV withdrawal to close.
+        glv_withdrawal: Pubkey,
+    },
+    /// Create a GLV shift.
+    /// Requires appropriate permissions.
+    CreateShift {
+        /// From market token.
+        #[arg(long, value_name = "FROM_MARKET_TOKEN")]
+        from: Pubkey,
+        /// To market token.
+        #[arg(long, value_name = "TO_MARKET_TOKEN")]
+        to: Pubkey,
+        /// Amount.
+        #[arg(long)]
+        amount: GmAmount,
+        /// Min output amount.
+        #[arg(long, default_value_t = GmAmount::ZERO)]
+        min_output_amount: GmAmount,
+        /// Extra execution fee allowed to use.
+        #[arg(long, short, default_value_t = Lamport::ZERO)]
+        extra_execution_fee: Lamport,
+    },
+    /// Close a GLV shift.
+    /// Requires appropriate permissions.
+    CloseShift {
+        /// The address of the GLV shift to close.
+        glv_shift: Pubkey,
+    },
+}
+
 impl super::Command for Exchange {
     fn is_client_required(&self) -> bool {
         true
@@ -571,6 +698,27 @@ impl super::Command for Exchange {
                 ..
             } if price.is_none() && acceptable_price.is_none() => None,
             Command::UpdateSwap { price, .. } if price.is_none() => None,
+            Command::Glv { command, .. } => match command {
+                GlvCommand::CloseDeposit { .. }
+                | GlvCommand::CloseWithdrawal { .. }
+                | GlvCommand::CloseShift { .. }
+                | GlvCommand::CreateShift { .. } => None,
+                GlvCommand::CreateDeposit {
+                    long_token_amount,
+                    short_token_amount,
+                    ..
+                } if long_token_amount.is_zero() && short_token_amount.is_zero() => None,
+                GlvCommand::CreateWithdrawal {
+                    min_final_long_token_amount,
+                    min_final_short_token_amount,
+                    ..
+                } if min_final_long_token_amount.is_zero()
+                    && min_final_short_token_amount.is_zero() =>
+                {
+                    None
+                }
+                _ => Some(client.authorized_token_map(store).await?),
+            },
             _ => Some(client.authorized_token_map(store).await?),
         };
         let options = ctx.bundle_options();
@@ -1657,6 +1805,224 @@ impl super::Command for Exchange {
                 };
 
                 rpc.into_bundle_with_options(options)?
+            }
+            Command::Glv { glv_token, command } => {
+                let glv_token = glv_token.address(client, store);
+
+                let txn = match command {
+                    GlvCommand::CloseDeposit { glv_deposit } => {
+                        client.close_glv_deposit(glv_deposit).build().await?
+                    }
+                    GlvCommand::CloseShift { glv_shift } => {
+                        client.close_glv_shift(glv_shift).build().await?
+                    }
+                    GlvCommand::CloseWithdrawal { glv_withdrawal } => {
+                        client.close_glv_withdrawal(glv_withdrawal).build().await?
+                    }
+                    GlvCommand::CreateDeposit {
+                        market_token,
+                        receiver,
+                        first_deposit,
+                        extra_execution_fee,
+                        min_amount,
+                        min_market_token_amount,
+                        long_token,
+                        short_token,
+                        market_token_account,
+                        long_token_account,
+                        short_token_account,
+                        market_token_amount,
+                        long_token_amount,
+                        short_token_amount,
+                        long_swap,
+                        short_swap,
+                    } => {
+                        let market = if token_map.is_some() {
+                            Some(client.market_by_token(store, market_token).await?)
+                        } else {
+                            None
+                        };
+                        let mut builder =
+                            client.create_glv_deposit(store, &glv_token, market_token);
+                        if let Some(nonce) = nonce {
+                            builder.nonce(nonce);
+                        }
+                        if !market_token_amount.is_zero() {
+                            builder.market_token_deposit(
+                                market_token_amount.to_u64()?,
+                                market_token_account.as_ref(),
+                            );
+                        }
+                        if !long_token_amount.is_zero() {
+                            let market = market.as_ref().expect("must exist");
+                            let long_token_amount = token_amount(
+                                long_token_amount,
+                                long_token.as_ref(),
+                                token_map.as_ref().expect("must exist"),
+                                market,
+                                true,
+                            )?;
+                            builder.long_token_deposit(
+                                long_token_amount,
+                                long_token.as_ref(),
+                                long_token_account.as_ref(),
+                            );
+                            if let Some(c) = collector.as_mut() {
+                                c.add(
+                                    long_token_amount,
+                                    owner,
+                                    long_token.as_ref(),
+                                    long_token_account.as_ref(),
+                                    market,
+                                    true,
+                                )?;
+                            }
+                        }
+                        if !short_token_amount.is_zero() {
+                            let market = market.as_ref().expect("must exist");
+                            let short_token_amount = token_amount(
+                                short_token_amount,
+                                short_token.as_ref(),
+                                token_map.as_ref().expect("must exist"),
+                                market,
+                                false,
+                            )?;
+                            builder.short_token_deposit(
+                                short_token_amount,
+                                short_token.as_ref(),
+                                short_token_account.as_ref(),
+                            );
+                            if let Some(c) = collector.as_mut() {
+                                c.add(
+                                    short_token_amount,
+                                    owner,
+                                    short_token.as_ref(),
+                                    short_token_account.as_ref(),
+                                    market,
+                                    false,
+                                )?;
+                            }
+                        }
+                        let (rpc, deposit) = builder
+                            .max_execution_fee(
+                                extra_execution_fee.to_u64()? + glv_deposit::MIN_EXECUTION_LAMPORTS,
+                            )
+                            .min_glv_token_amount(min_amount.to_u64()?)
+                            .min_market_token_amount(min_market_token_amount.to_u64()?)
+                            .long_token_swap_path(long_swap.clone())
+                            .short_token_swap_path(short_swap.clone())
+                            .receiver(if *first_deposit {
+                                Some(client.find_first_deposit_owner_address())
+                            } else {
+                                *receiver
+                            })
+                            .build_with_address()
+                            .await?;
+                        println!("GLV deposit: {deposit}");
+                        rpc
+                    }
+                    GlvCommand::CreateWithdrawal {
+                        market_token,
+                        receiver,
+                        extra_execution_fee,
+                        amount,
+                        final_long_token,
+                        final_short_token,
+                        glv_token_account,
+                        min_final_long_token_amount,
+                        min_final_short_token_amount,
+                        long_swap,
+                        short_swap,
+                    } => {
+                        let market = if token_map.is_some() {
+                            Some(client.market_by_token(store, market_token).await?)
+                        } else {
+                            None
+                        };
+                        let mut builder = client.create_glv_withdrawal(
+                            store,
+                            &glv_token,
+                            market_token,
+                            amount.to_u64()?,
+                        );
+                        if let Some(nonce) = nonce {
+                            builder.nonce(nonce);
+                        }
+                        if let Some(account) = glv_token_account {
+                            builder.glv_token_source(account);
+                        }
+                        let min_final_long_token_amount = if min_final_long_token_amount.is_zero() {
+                            0
+                        } else {
+                            token_amount(
+                                min_final_long_token_amount,
+                                final_long_token.as_ref(),
+                                token_map.as_ref().expect("must exist"),
+                                market.as_ref().expect("must exist"),
+                                true,
+                            )?
+                        };
+                        let min_final_short_token_amount = if min_final_short_token_amount.is_zero()
+                        {
+                            0
+                        } else {
+                            token_amount(
+                                min_final_short_token_amount,
+                                final_short_token.as_ref(),
+                                token_map.as_ref().expect("must exist"),
+                                market.as_ref().expect("must exist"),
+                                false,
+                            )?
+                        };
+                        builder
+                            .final_long_token(
+                                final_long_token.as_ref(),
+                                min_final_long_token_amount,
+                                long_swap.clone(),
+                            )
+                            .final_short_token(
+                                final_short_token.as_ref(),
+                                min_final_short_token_amount,
+                                short_swap.clone(),
+                            );
+                        let (rpc, withdrawal) = builder
+                            .max_execution_fee(
+                                extra_execution_fee.to_u64()?
+                                    + glv_withdrawal::MIN_EXECUTION_LAMPORTS,
+                            )
+                            .receiver(*receiver)
+                            .build_with_address()
+                            .await?;
+                        println!("GLV withdrawal: {withdrawal}");
+                        rpc
+                    }
+                    GlvCommand::CreateShift {
+                        from,
+                        to,
+                        amount,
+                        min_output_amount,
+                        extra_execution_fee,
+                    } => {
+                        let mut builder =
+                            client.create_glv_shift(store, &glv_token, from, to, amount.to_u64()?);
+                        if let Some(nonce) = nonce {
+                            builder.nonce(nonce);
+                        }
+                        builder
+                            .execution_fee(
+                                extra_execution_fee.to_u64()? + glv_shift::MIN_EXECUTION_LAMPORTS,
+                            )
+                            .min_to_market_token_amount(min_output_amount.to_u64()?);
+
+                        let (rpc, shift) = builder.build_with_address()?;
+
+                        println!("GLV shift: {shift}");
+
+                        rpc
+                    }
+                };
+
+                txn.into_bundle_with_options(options)?
             }
             #[cfg(feature = "execute")]
             Command::Execute {
