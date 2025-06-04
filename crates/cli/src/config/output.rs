@@ -72,7 +72,9 @@ impl OutputFormat {
             .collect::<eyre::Result<Vec<_>>>()?;
         match self {
             Self::Json => Self::display_json_many(&items),
-            Self::Table => Self::display_table_many(&items),
+            Self::Table => {
+                Self::display_table_many(&items, || options.empty_message.unwrap_or_default())
+            }
         }
     }
 
@@ -102,10 +104,13 @@ impl OutputFormat {
         Ok(serde_json::to_string_pretty(items)?)
     }
 
-    fn display_table_many(items: &[Map<String, Value>]) -> eyre::Result<String> {
+    fn display_table_many(
+        items: &[Map<String, Value>],
+        empty_msg: impl FnOnce() -> String,
+    ) -> eyre::Result<String> {
         let mut items = items.iter().peekable();
         let Some(first) = items.peek() else {
-            return Ok("emtpy".to_string());
+            return Ok(empty_msg());
         };
         let mut table = Table::new();
         table.set_format(table_format());
@@ -144,6 +149,8 @@ pub struct DisplayOptions {
     pub projection_table_only: bool,
     /// Extra fields.
     pub extra: Map<String, Value>,
+    /// Empty message.
+    pub empty_message: Option<String>,
 }
 
 impl DisplayOptions {
@@ -167,6 +174,7 @@ impl DisplayOptions {
             ),
             projection_table_only,
             extra: Default::default(),
+            empty_message: None,
         }
     }
 
@@ -177,6 +185,12 @@ impl DisplayOptions {
         };
         self.extra.append(&mut map);
         Ok(self)
+    }
+
+    /// Set message to display when the table is empty.
+    pub fn set_empty_message(mut self, message: impl ToString) -> Self {
+        self.empty_message = Some(message.to_string());
+        self
     }
 }
 

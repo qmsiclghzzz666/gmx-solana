@@ -918,7 +918,8 @@ impl super::Command for Exchange {
                             ("state.collateral_amount", "Collateral Amount"),
                             ("state.size_in_usd", "Size($)"),
                             ("state.trade_id", "Last Trade ID"),
-                        ]),
+                        ])
+                        .set_empty_message("No Positions"),
                     )?;
                     println!("{output}");
                 } else if *deposits {
