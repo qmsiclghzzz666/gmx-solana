@@ -524,7 +524,7 @@ struct Withdraw {
 }
 
 fn default_token_program_id() -> StringPubkey {
-    spl_token::ID.into()
+    anchor_spl::token::ID.into()
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
