@@ -8,14 +8,16 @@ use gmsol_sdk::{
     programs::anchor_lang::prelude::Pubkey,
     serde::StringPubkey,
     solana_utils::{
+        bundle_builder::BundleOptions,
         cluster::Cluster,
+        compute_budget::ComputeBudget,
         signer::{local_signer, LocalSignerRef},
         solana_sdk::{
             commitment_config::{CommitmentConfig, CommitmentLevel},
             signature::NullSigner,
         },
     },
-    utils::instruction_serialization::InstructionSerialization,
+    utils::{instruction_serialization::InstructionSerialization, Lamport},
 };
 use store_address::StoreAddress;
 
@@ -71,9 +73,12 @@ pub struct Config {
     timelock_program: Option<StringPubkey>,
     /// Print the serialized instructions,
     /// instead of sending the transaction.
-    #[arg(long, global = true, default_missing_value = "base64", num_args=0..=1)]
+    #[arg(long, global = true, default_missing_value = "base64", num_args=0..=1, group = "tx-opts")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     serialize_only: Option<InstructionSerialization>,
+    /// Whether to skip preflight.
+    #[arg(long, global = true, group = "tx-opts")]
+    skip_preflight: bool,
     /// Use this address as payer.
     ///
     /// Only available in `serialize-only` mode.
@@ -97,6 +102,18 @@ pub struct Config {
     #[arg(long, global = true)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     oracle: Option<StringPubkey>,
+    /// Max transaction size.
+    #[arg(long, global = true)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    max_transaction_size: Option<usize>,
+    /// Force one transaction.
+    #[arg(long, global = true)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    force_one_tx: Option<bool>,
+    /// Priority fee lamports.
+    #[arg(long, global = true)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    priority_lamports: Option<Lamport>,
 }
 
 impl Config {
@@ -261,6 +278,29 @@ impl Config {
     /// Get output format.
     pub fn output(&self) -> OutputFormat {
         self.output.unwrap_or_default()
+    }
+
+    /// Get bundle options.
+    pub fn bundle_options(&self) -> BundleOptions {
+        BundleOptions {
+            force_one_transaction: self.force_one_tx.unwrap_or(false),
+            max_packet_size: self.max_transaction_size,
+            ..Default::default()
+        }
+    }
+
+    /// Get priority lamports.
+    pub fn priority_lamports(&self) -> eyre::Result<u64> {
+        Ok(self
+            .priority_lamports
+            .map(|a| a.to_u64())
+            .transpose()?
+            .unwrap_or(ComputeBudget::DEFAULT_MIN_PRIORITY_LAMPORTS))
+    }
+
+    /// Returns whether the transaction preflight test should be skipped.
+    pub fn skip_preflight(&self) -> bool {
+        self.skip_preflight
     }
 }
 

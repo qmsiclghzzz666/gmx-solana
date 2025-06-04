@@ -2317,6 +2317,7 @@ name = "gmsol-cli"
 version = "0.6.0"
 dependencies = [
  "anchor-spl",
+ "bs58 0.5.1",
  "cfg-if",
  "clap",
  "color-eyre",
@@ -2327,6 +2328,7 @@ dependencies = [
  "eyre",
  "figment",
  "gmsol-sdk",
+ "hex",
  "humantime",
  "indexmap 2.9.0",
  "prettytable",

@@ -15,6 +15,7 @@ use gmsol_sdk::{
     solana_utils::{
         bundle_builder::{BundleBuilder, BundleOptions, SendBundleOptions},
         signer::LocalSignerRef,
+        solana_client::rpc_config::RpcSendTransactionConfig,
         solana_sdk::{
             message::VersionedMessage,
             signature::{Keypair, Signature},
@@ -146,7 +147,7 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn bundle_options(&self) -> BundleOptions {
-        BundleOptions::default()
+        self.config.bundle_options()
     }
 
     pub(crate) fn require_not_serialize_only_mode(&self) -> eyre::Result<()> {
@@ -184,6 +185,8 @@ pub(crate) struct CommandClient {
     ix_buffer_ctx: Option<IxBufferCtx<LocalSignerRef>>,
     serialize_only: Option<InstructionSerialization>,
     verbose: bool,
+    priority_lamports: u64,
+    skip_preflight: bool,
 }
 
 impl CommandClient {
@@ -220,11 +223,20 @@ impl CommandClient {
             }),
             serialize_only: config.serialize_only(),
             verbose,
+            priority_lamports: config.priority_lamports()?,
+            skip_preflight: config.skip_preflight(),
         })
     }
 
     pub(self) fn send_bundle_options(&self) -> SendBundleOptions {
-        SendBundleOptions::default()
+        SendBundleOptions {
+            compute_unit_min_priority_lamports: Some(self.priority_lamports),
+            config: RpcSendTransactionConfig {
+                skip_preflight: self.skip_preflight,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 
     pub(crate) async fn send_or_serialize_with_callback(
