@@ -80,6 +80,18 @@ enum Command {
         orders: bool,
         #[arg(long, group = "select-action")]
         positions: bool,
+        #[arg(long, group = "select-action")]
+        deposits: bool,
+        #[arg(long, group = "select-action")]
+        withdrawals: bool,
+        #[arg(long, group = "select-action")]
+        shifts: bool,
+        #[arg(long, group = "select-action")]
+        glv_deposits: bool,
+        #[arg(long, group = "select-action")]
+        glv_withdrawals: bool,
+        #[arg(long, group = "select-action")]
+        glv_shifts: bool,
     },
     /// Creates a deposit.
     CreateDeposit {
@@ -652,6 +664,12 @@ impl super::Command for Exchange {
                 market_token,
                 orders,
                 positions,
+                deposits,
+                withdrawals,
+                shifts,
+                glv_deposits,
+                glv_withdrawals,
+                glv_shifts,
             } => {
                 let owner = (!*all).then(|| owner.as_ref().copied().unwrap_or(client.payer()));
                 if let Some(address) = address {
@@ -755,6 +773,36 @@ impl super::Command for Exchange {
                         ]),
                     )?;
                     println!("{output}");
+                } else if *deposits {
+                    let deposits = client
+                        .deposits(store, owner.as_ref(), market_token.as_ref())
+                        .await?;
+                    println!("{deposits:?}");
+                } else if *withdrawals {
+                    let withdrawals = client
+                        .withdrawals(store, owner.as_ref(), market_token.as_ref())
+                        .await?;
+                    println!("{withdrawals:?}");
+                } else if *shifts {
+                    let shifts = client
+                        .shifts(store, owner.as_ref(), market_token.as_ref())
+                        .await?;
+                    println!("{shifts:?}");
+                } else if *glv_deposits {
+                    let glv_deposits = client
+                        .glv_deposits(store, owner.as_ref(), market_token.as_ref())
+                        .await?;
+                    println!("{glv_deposits:?}");
+                } else if *glv_withdrawals {
+                    let glv_withdrawals = client
+                        .glv_withdrawals(store, owner.as_ref(), market_token.as_ref())
+                        .await?;
+                    println!("{glv_withdrawals:?}");
+                } else if *glv_shifts {
+                    let glv_shifts = client
+                        .glv_shifts(store, owner.as_ref(), market_token.as_ref())
+                        .await?;
+                    println!("{glv_shifts:?}");
                 }
 
                 return Ok(());
