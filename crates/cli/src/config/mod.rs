@@ -80,10 +80,11 @@ pub struct Config {
     #[arg(long, requires = "serialize_only", global = true)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     payer: Option<StringPubkey>,
-    /// Whether to create a timelocked buffer for this instruction.
+    /// Provides to create as timelocked instruction buffers.
     #[arg(long, group = "ix-buffer", global = true)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     timelock: Option<String>,
+    /// Provides to create as a Squads vault transaction.
     #[cfg(feature = "squads")]
     #[arg(long, group = "ix-buffer", global = true)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
