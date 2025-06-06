@@ -1,30 +1,42 @@
-use std::{ops::Deref, path::PathBuf};
+use std::{collections::BTreeMap, ops::Deref, path::PathBuf};
 
+use eyre::OptionExt;
 use gmsol_sdk::{
     core::glv::GlvMarketFlag,
     ops::GlvOps,
     programs::gmsol_store::types::UpdateGlvParams,
-    serde::StringPubkey,
+    serde::{serde_glv::SerdeGlv, StringPubkey},
     solana_utils::solana_sdk::{pubkey::Pubkey, signer::Signer},
-    utils::{GmAmount, Value},
+    utils::{zero_copy::ZeroCopy, GmAmount, Value},
 };
 use indexmap::IndexMap;
+
+use crate::config::DisplayOptions;
 
 use super::utils::{toml_from_file, ToggleValue};
 
 /// GLV management commands.
 #[derive(Debug, clap::Args)]
 pub struct Glv {
-    #[command(flatten)]
-    glv_token: GlvToken,
     #[command(subcommand)]
     command: Command,
 }
 
 #[derive(Debug, clap::Subcommand)]
 enum Command {
+    /// Display the current status of the selected GLV.
+    Get {
+        /// GLV token address.
+        #[arg(group = "select-glv")]
+        glv_token: Option<Pubkey>,
+        /// Index.
+        #[arg(long, group = "select-glv")]
+        index: Option<u16>,
+    },
     /// Inititalize a GLV.
     Init {
+        #[command(flatten)]
+        glv_token: GlvToken,
         #[clap(required = true)]
         market_tokens: Vec<Pubkey>,
     },
@@ -32,6 +44,8 @@ enum Command {
     UpdateConfig(UpdateGlvArgs),
     /// Toggle GLV market flag.
     ToggleMarketFlag {
+        #[command(flatten)]
+        glv_token: GlvToken,
         market_token: Pubkey,
         #[arg(long)]
         flag: GlvMarketFlag,
@@ -40,17 +54,23 @@ enum Command {
     },
     /// Update Market Config.
     UpdateMarket {
+        #[command(flatten)]
+        glv_token: GlvToken,
         market_token: Pubkey,
         #[command(flatten)]
         config: MarketConfig,
     },
     /// Insert Market.
     InsertMarket {
+        #[command(flatten)]
+        glv_token: GlvToken,
         #[clap(required = true)]
         market_tokens: Vec<Pubkey>,
     },
     /// Remove Market.
     RemoveMarket {
+        #[command(flatten)]
+        glv_token: GlvToken,
         #[clap(required = true)]
         market_tokens: Vec<Pubkey>,
     },
@@ -62,13 +82,91 @@ impl super::Command for Glv {
     }
 
     async fn execute(&self, ctx: super::Context<'_>) -> eyre::Result<()> {
-        let selected = &self.glv_token;
         let client = ctx.client()?;
         let store = ctx.store();
         let options = ctx.bundle_options();
 
         let bundle = match &self.command {
-            Command::Init { market_tokens } => {
+            Command::Get { glv_token, index } => {
+                let output = ctx.config().output();
+                let glv_token = match (glv_token, index) {
+                    (Some(address), None) => Some(*address),
+                    (None, Some(index)) => Some(client.find_glv_token_address(store, *index)),
+                    (None, None) => None,
+                    _ => unreachable!(),
+                };
+                match glv_token {
+                    Some(glv_token) => {
+                        let glv_address = client.find_glv_address(&glv_token);
+                        let glv = client
+                            .account::<ZeroCopy<gmsol_sdk::programs::gmsol_store::accounts::Glv>>(
+                                &glv_address,
+                            )
+                            .await?
+                            .ok_or_eyre("GLV not found")?;
+                        let glv = SerdeGlv::from_glv(&glv.0)?;
+                        println!(
+                            "{}",
+                            output.display_keyed_account(
+                                &glv_address,
+                                &glv,
+                                DisplayOptions::table_projection([
+                                    ("pubkey", "Address"),
+                                    ("glv_token", "GLV Token"),
+                                    ("shift_last_executed_at", "Shift Last Executed"),
+                                    ("shift_min_interval_secs", "Shift Min Interval"),
+                                    ("shift_min_value", "Shift Min Value"),
+                                    (
+                                        "min_tokens_for_first_deposit",
+                                        "Min tokens for first deposit"
+                                    ),
+                                ])
+                            )?
+                        );
+                        println!(
+                            "{}",
+                            output.display_keyed_accounts(
+                                glv.markets,
+                                DisplayOptions::table_projection([
+                                    ("pubkey", "Market Token"),
+                                    ("balance", "Vault Balance"),
+                                    ("max_amount", "Max Amount"),
+                                    ("max_value", "Max Value"),
+                                    ("is_deposit_allowed", "Allow Deposit"),
+                                ])
+                            )?
+                        );
+                    }
+                    None => {
+                        let glvs = client.glvs(store).await?;
+                        let glvs = glvs
+                            .iter()
+                            .filter(|(_, v)| {
+                                client.find_glv_token_address(store, v.index) == v.glv_token
+                            })
+                            .map(|(k, v)| Ok((k, SerdeGlv::from_glv(v)?)))
+                            .collect::<eyre::Result<BTreeMap<_, _>>>()?;
+                        println!(
+                            "{}",
+                            output.display_keyed_accounts(
+                                glvs,
+                                DisplayOptions::table_projection([
+                                    ("glv_token", "GLV token"),
+                                    ("index", "Index"),
+                                    ("long_token", "Long Token"),
+                                    ("short_token", "Short Token"),
+                                ])
+                            )?
+                        );
+                    }
+                }
+
+                return Ok(());
+            }
+            Command::Init {
+                glv_token: selected,
+                market_tokens,
+            } => {
                 let Some(index) = selected.index else {
                     eyre::bail!("must provide --index to init GLV");
                 };
@@ -81,7 +179,7 @@ impl super::Command for Glv {
                 rpc.into_bundle_with_options(options)?
             }
             Command::UpdateConfig(args) => {
-                let glv_token = selected.address(client, store);
+                let glv_token = args.glv_token.address(client, store);
                 match &args.file {
                     Some(file) => {
                         let UpdateGlv { glv, market } = toml_from_file(file)?;
@@ -125,6 +223,7 @@ impl super::Command for Glv {
                 }
             }
             Command::ToggleMarketFlag {
+                glv_token: selected,
                 market_token,
                 flag,
                 toggle,
@@ -138,6 +237,7 @@ impl super::Command for Glv {
                 )
                 .into_bundle_with_options(options)?,
             Command::UpdateMarket {
+                glv_token: selected,
                 market_token,
                 config,
             } => client
@@ -149,7 +249,10 @@ impl super::Command for Glv {
                     config.max_value()?,
                 )
                 .into_bundle_with_options(options)?,
-            Command::InsertMarket { market_tokens } => {
+            Command::InsertMarket {
+                glv_token: selected,
+                market_tokens,
+            } => {
                 let mut bundle = client.bundle_with_options(options);
                 let glv_token = selected.address(client, store);
                 for market_token in market_tokens {
@@ -157,7 +260,10 @@ impl super::Command for Glv {
                 }
                 bundle
             }
-            Command::RemoveMarket { market_tokens } => {
+            Command::RemoveMarket {
+                glv_token: selected,
+                market_tokens,
+            } => {
                 let mut bundle = client.bundle_with_options(options);
                 let glv_token = selected.address(client, store);
 
@@ -203,6 +309,8 @@ impl GlvToken {
 #[derive(Debug, clap::Args)]
 #[group(required = true, multiple = true)]
 struct UpdateGlvArgs {
+    #[command(flatten)]
+    glv_token: GlvToken,
     /// Path to the update file (TOML).
     #[arg(long, short)]
     file: Option<PathBuf>,

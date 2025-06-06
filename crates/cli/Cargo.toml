@@ -42,7 +42,7 @@ figment = { workspace = true, features = ["env", 'toml'] }
 tracing = { workspace = true }
 cfg-if = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-serde_with = { workspace = true }
+serde_with = { workspace = true, features = ["indexmap_2"] }
 serde_json = { workspace = true, features = ["preserve_order"] }
 url = { workspace = true }
 shellexpand = { workspace = true }

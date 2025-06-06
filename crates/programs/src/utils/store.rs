@@ -172,6 +172,7 @@ mod utils {
     use gmsol_utils::{
         action::{ActionCallbackKind, ActionFlag, ActionState, MAX_ACTION_FLAGS},
         fixed_str::bytes_to_fixed_str,
+        glv::{GlvMarketFlag, MAX_GLV_MARKET_FLAGS},
         impl_fixed_map, impl_flags,
         market::{self, HasMarketMeta, MarketConfigKey, MarketFlag, MAX_MARKET_FLAGS},
         order::{self, PositionKind, TradeFlag, TradeFlagContainer},
@@ -184,9 +185,10 @@ mod utils {
         accounts::{Glv, Market, Position},
         events::TradeEvent,
         types::{
-            ActionFlagContainer, ActionHeader, GlvMarketConfig, GlvMarkets, GlvMarketsEntry,
-            MarketConfig, MarketFlagContainer, MarketMeta, OrderActionParams, OrderKind,
-            SwapActionParams, TokenAndAccount, Tokens, TokensEntry, UpdateTokenConfigParams,
+            ActionFlagContainer, ActionHeader, GlvMarketConfig, GlvMarketFlagContainer, GlvMarkets,
+            GlvMarketsEntry, MarketConfig, MarketFlagContainer, MarketMeta, OrderActionParams,
+            OrderKind, SwapActionParams, TokenAndAccount, Tokens, TokensEntry,
+            UpdateTokenConfigParams,
         },
     };
 
@@ -204,6 +206,7 @@ mod utils {
 
     impl_flags!(ActionFlag, MAX_ACTION_FLAGS, u8);
     impl_flags!(MarketFlag, MAX_MARKET_FLAGS, u8);
+    impl_flags!(GlvMarketFlag, MAX_GLV_MARKET_FLAGS, u8);
 
     impl From<SwapActionParams> for swap::SwapActionParams {
         fn from(params: SwapActionParams) -> Self {
