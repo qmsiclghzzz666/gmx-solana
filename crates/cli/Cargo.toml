@@ -54,12 +54,13 @@ dialoguer = { workspace = true }
 anchor-spl = { workspace = true, features = ["token", "associated_token"] }
 time = { workspace = true, features = ["parsing", "formatting"] }
 humantime = { workspace = true }
-either = { workspace = true }
+either = { workspace = true, features = ["serde"] }
 prettytable = { workspace = true }
 indexmap = { workspace = true }
 bs58 = { workspace = true }
 hex = { workspace = true }
 futures-util = { workspace = true }
+rand = { workspace = true }
 
 color-eyre = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, optional = true, features = [
