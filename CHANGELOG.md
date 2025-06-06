@@ -64,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk(sdk): Added ALT support for `CreateOrderBuilder`.
 - sdk(sdk): Added list query methods for all remaining action types.
 - sdk(sdk): Added `IdlOps` to support IDL account operations and implemented it for `Client`.
-- sdk(sdk): Added `Borrow<Pubkey>` implementation for `StringPubkey`.
+- sdk(sdk): Added `Borrow<Pubkey>` and `Display` implementations for `StringPubkey`.
 - just: Added the `cli` recipe for running the `gmsol` commands.
 
 ### Fixed

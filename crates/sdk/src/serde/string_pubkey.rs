@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, ops::Deref, str::FromStr};
+use std::{borrow::Borrow, fmt, ops::Deref, str::FromStr};
 
 use solana_sdk::pubkey::Pubkey;
 
@@ -38,6 +38,12 @@ impl FromStr for StringPubkey {
 impl Borrow<Pubkey> for StringPubkey {
     fn borrow(&self) -> &Pubkey {
         &self.0
+    }
+}
+
+impl fmt::Display for StringPubkey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
