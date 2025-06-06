@@ -1,4 +1,4 @@
-use std::{ops::Deref, str::FromStr};
+use std::{borrow::Borrow, ops::Deref, str::FromStr};
 
 use solana_sdk::pubkey::Pubkey;
 
@@ -32,6 +32,12 @@ impl FromStr for StringPubkey {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self(Pubkey::from_str(s)?))
+    }
+}
+
+impl Borrow<Pubkey> for StringPubkey {
+    fn borrow(&self) -> &Pubkey {
+        &self.0
     }
 }
 
