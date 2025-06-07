@@ -4,6 +4,8 @@
 [![Docs.rs](https://docs.rs/gmsol-sdk/badge.svg)](https://docs.rs/gmsol-sdk)
 [![npm](https://img.shields.io/npm/v/@gmsol-labs/gmsol-sdk.svg)](https://www.npmjs.com/package/@gmsol-labs/gmsol-sdk)
 
+[Examples](https://github.com/gmsol-labs/gmx-solana/tree/main/examples)
+
 ## Audits
 
 | Program          | Last Audit Date | Version   |

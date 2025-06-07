@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk(sdk): Added `Borrow<Pubkey>` and `Display` implementations for `StringPubkey`.
 - sdk(chainlink-datastreams): Added `FromChainlinkReport` trait.
 - sdk(chainlink-datastreams): Added `FromChainlinkReport` implementation for `PriceFeedPrice` behind the `gmsol` feature.
+- docs(examples): Added examples of using `gmsol-sdk`.
 - just: Added the `cli` recipe for running the `gmsol` commands.
 
 ### Fixed
