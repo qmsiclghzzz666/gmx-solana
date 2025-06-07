@@ -67,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk(sdk): Added list query methods for all remaining action types.
 - sdk(sdk): Added `IdlOps` to support IDL account operations and implemented it for `Client`.
 - sdk(sdk): Added `Borrow<Pubkey>` and `Display` implementations for `StringPubkey`.
+- sdk(sdk): Implemented `HasMarketMeta` for `Market` type (from `gmsol-programs`).
 - sdk(chainlink-datastreams): Added `FromChainlinkReport` trait.
 - sdk(chainlink-datastreams): Added `FromChainlinkReport` implementation for `PriceFeedPrice` behind the `gmsol` feature.
 - docs(examples): Added examples of using `gmsol-sdk`.

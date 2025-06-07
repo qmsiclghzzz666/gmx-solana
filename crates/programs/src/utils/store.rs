@@ -254,6 +254,19 @@ mod utils {
         }
     }
 
+    impl Market {
+        /// Get name.
+        pub fn name(&self) -> crate::Result<&str> {
+            bytes_to_fixed_str(&self.name).map_err(crate::Error::custom)
+        }
+    }
+
+    impl HasMarketMeta for Market {
+        fn market_meta(&self) -> &market::MarketMeta {
+            bytemuck::cast_ref(&self.meta)
+        }
+    }
+
     impl MarketConfig {
         /// Get config by [`MarketConfigKey`].
         pub fn get(&self, key: MarketConfigKey) -> Option<&u128> {
@@ -590,13 +603,6 @@ mod utils {
             position.collateral_token = collateral_token;
             position.state = self.after.into();
             position
-        }
-    }
-
-    impl Market {
-        /// Get name.
-        pub fn name(&self) -> crate::Result<&str> {
-            bytes_to_fixed_str(&self.name).map_err(crate::Error::custom)
         }
     }
 
