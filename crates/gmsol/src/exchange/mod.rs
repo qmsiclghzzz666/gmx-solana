@@ -574,6 +574,7 @@ where
         CreateOrderBuilder::new(self, store, market_token, params, is_output_token_long)
     }
 
+    #[allow(deprecated)]
     fn update_order(
         &self,
         store: &Pubkey,

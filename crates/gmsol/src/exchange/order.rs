@@ -356,6 +356,7 @@ where
     }
 
     /// Create [`TransactionBuilder`] and return order address and optional position address.
+    #[allow(deprecated)]
     pub async fn build_with_addresses(
         &mut self,
     ) -> crate::Result<(TransactionBuilder<'a, C>, Pubkey, Option<Pubkey>)> {
@@ -878,6 +879,7 @@ where
         self
     }
 
+    #[allow(deprecated)]
     async fn build_txns(&mut self, options: BundleOptions) -> crate::Result<BundleBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
         let [claimable_long_token_account_for_user, claimable_short_token_account_for_user, claimable_pnl_token_account_for_holding] =
@@ -1281,6 +1283,7 @@ where
     }
 
     /// Build [`TransactionBuilder`] for cancelling the order.
+    #[allow(deprecated)]
     pub async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
         let payer = self.client.payer();

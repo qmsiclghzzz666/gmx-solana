@@ -714,6 +714,7 @@ where
             ))
     }
 
+    #[allow(deprecated)]
     async fn create_treasury_swap(
         &self,
         store: &Pubkey,
