@@ -68,6 +68,22 @@ impl Deref for Cli {
 
 /// Command-line interface for GMX-Solana.
 #[derive(Debug, Parser)]
+#[command(
+    version = concat!(
+        env!("CARGO_PKG_VERSION"), " (",
+        env!("VERGEN_BUILD_DATE"), ")"
+    ),
+    long_version = concat!(
+        env!("CARGO_PKG_VERSION"), "\n",
+        "Built: ", env!("VERGEN_BUILD_TIMESTAMP"), "\n",
+        "Git commit: ", env!("VERGEN_GIT_SHA"), "\n",
+        "Rustc version: ", env!("VERGEN_RUSTC_SEMVER"), "\n",
+        "Enabled features: ", env!("VERGEN_CARGO_FEATURES"), "\n",
+        "Debug: ", env!("VERGEN_CARGO_DEBUG"),
+    ),
+    about = None,
+    long_about = None,
+)]
 pub struct Inner {
     /// Path to the config file.
     #[clap(long = "config", short)]

@@ -68,3 +68,7 @@ tracing-subscriber = { workspace = true, optional = true, features = [
     "env-filter",
 ] }
 solana-remote-wallet = { workspace = true, optional = true }
+
+[build-dependencies]
+vergen-git2 = { workspace = true, features = ["build", "cargo", "rustc"] }
+anyhow = { workspace = true }
