@@ -3,7 +3,6 @@ use std::env;
 use anchor_spl::token::Mint;
 use gmsol_sdk::{
     client::pyth::Hermes,
-    core::market::MarketMeta,
     market::MarketCalculations,
     model::{LiquidityMarketExt, MarketModel, PnlFactorKind},
     solana_utils::solana_sdk::signature::Keypair,
@@ -37,16 +36,13 @@ async fn main() -> gmsol_sdk::Result<()> {
     let markets = client.markets(&store).await?;
     tracing::info!("Loaded {} markets.", markets.len());
 
-    // Use the first available market.
-    let Some(market) = markets.first_key_value().map(|(_, v)| v) else {
+    // Use the last available market.
+    let Some(market) = markets.last_key_value().map(|(_, v)| v) else {
         return Err(gmsol_sdk::Error::custom("No available markets"));
     };
 
-    // Convert raw market metadata to `MarketMeta`.
-    let meta = MarketMeta::from(market.meta);
-
     // Load the token mint associated with the selected market.
-    let mint_address = &meta.market_token_mint;
+    let mint_address = &market.meta.market_token_mint;
     let Some(mint) = client.account::<Mint>(mint_address).await? else {
         return Err(gmsol_sdk::Error::custom(format!(
             "The token mint `{mint_address}` does not exist"
@@ -61,7 +57,7 @@ async fn main() -> gmsol_sdk::Result<()> {
 
     // Fetch token prices using Pyth.
     let hermes = Hermes::default();
-    let prices = hermes.unit_prices_for_market(&token_map, &meta).await?;
+    let prices = hermes.unit_prices_for_market(&token_map, &**market).await?;
 
     // Display the market status.
     println!("Market: {}", market.name()?);
