@@ -410,10 +410,11 @@ pub(crate) fn unchecked_deposit_to_treasury_vault(
         decimals,
     )?;
 
+    let token = ctx.accounts.token.key();
     ctx.accounts
         .gt_bank
         .load_mut()?
-        .record_transferred_in(&ctx.accounts.token.key(), gt_amount)?;
+        .record_transferred_in(&token, gt_amount)?;
 
     let cpi_ctx = ctx.accounts.transfer_checked_ctx_for_treasury();
     transfer_checked(
@@ -425,7 +426,7 @@ pub(crate) fn unchecked_deposit_to_treasury_vault(
     ctx.accounts
         .gt_bank
         .load_mut()?
-        .increase_receiver_vault_out_unchecked(receiver_amount)?;
+        .increase_receiver_vault_out_unchecked(&token, receiver_amount)?;
     Ok(())
 }
 

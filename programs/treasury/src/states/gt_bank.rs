@@ -21,9 +21,8 @@ pub struct GtBank {
     pub(crate) treasury_vault_config: Pubkey,
     pub(crate) gt_exchange_vault: Pubkey,
     remaining_confirmed_gt_amount: u64,
-    receiver_vault_out: u64,
     #[cfg_attr(feature = "debug", debug(skip))]
-    reserved: [u8; 248],
+    reserved: [u8; 256],
     balances: TokenBalances,
 }
 
@@ -168,8 +167,16 @@ impl GtBank {
 
     /// # CHECK
     /// Must be called only after `amount` has been withdrawn from the receiver vault.
-    pub(crate) fn increase_receiver_vault_out_unchecked(&mut self, amount: u64) -> Result<()> {
-        self.receiver_vault_out = self
+    pub(crate) fn increase_receiver_vault_out_unchecked(
+        &mut self,
+        token: &Pubkey,
+        amount: u64,
+    ) -> Result<()> {
+        let balance = self
+            .balances
+            .get_mut(token)
+            .ok_or_else(|| error!(CoreError::NotFound))?;
+        balance.receiver_vault_out = balance
             .receiver_vault_out
             .checked_add(amount)
             .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
@@ -177,8 +184,9 @@ impl GtBank {
     }
 
     /// Get receiver vault out amount.
-    pub fn receiver_vault_out(&self) -> u64 {
-        self.receiver_vault_out
+    #[cfg(feature = "utils")]
+    pub fn receiver_vault_out(&self, token: &Pubkey) -> Option<u64> {
+        Some(self.balances.get(token)?.receiver_vault_out)
     }
 
     /// Returns whether the GT bank is initialized.
@@ -309,10 +317,12 @@ impl GtBankSigner {
 
 /// Token Balance.
 #[zero_copy]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 pub struct TokenBalance {
     amount: u64,
-    reserved: [u8; 64],
+    receiver_vault_out: u64,
+    #[cfg_attr(feature = "debug", debug(skip))]
+    reserved: [u8; 56],
 }
 
 impl Default for TokenBalance {
