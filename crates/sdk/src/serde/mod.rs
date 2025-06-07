@@ -13,6 +13,10 @@ pub mod serde_token_map;
 /// GLV serialization.
 pub mod serde_glv;
 
+/// Treasury serialization.
+#[cfg(feature = "treasury")]
+pub mod treasury;
+
 #[cfg(serde)]
 pub use string_pubkey::pubkey;
 pub use string_pubkey::StringPubkey;

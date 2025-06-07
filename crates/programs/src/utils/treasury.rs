@@ -31,20 +31,27 @@ mod utils {
     use crate::gmsol_treasury::{
         accounts::{GtBank, TreasuryVaultConfig},
         types::{
-            TokenBalance, TokenBalances, TokenBalancesEntry, TokenConfig, TokenMap, TokenMapEntry,
+            GtBankFlagsContainer, TokenBalance, TokenBalances, TokenBalancesEntry, TokenConfig,
+            TokenFlagContainer, TokenMap, TokenMapEntry,
         },
     };
     use anchor_lang::prelude::Pubkey;
     use gmsol_utils::{
-        impl_fixed_map,
+        gt::{GtBankFlags, MAX_GT_BANK_FLAGS},
+        impl_fixed_map, impl_flags,
         pubkey::to_bytes,
-        token_config::{TokenMapAccess, TokenRecord, TokensWithFeed},
+        token_config::{
+            TokenFlag, TokenMapAccess, TokenRecord, TokensWithFeed, MAX_TREASURY_TOKEN_FLAGS,
+        },
     };
 
     const MAX_TOKENS: usize = 16;
 
     impl_fixed_map!(TokenBalances, Pubkey, to_bytes, TokenBalance, MAX_TOKENS);
     impl_fixed_map!(TokenMap, Pubkey, to_bytes, TokenConfig, MAX_TOKENS);
+
+    impl_flags!(TokenFlag, MAX_TREASURY_TOKEN_FLAGS, u8);
+    impl_flags!(GtBankFlags, MAX_GT_BANK_FLAGS, u8);
 
     impl GtBank {
         /// Get the number of tokens.
