@@ -2458,6 +2458,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "gmsol-examples"
+version = "0.6.0"
+dependencies = [
+ "anchor-spl",
+ "gmsol-sdk",
+ "shellexpand",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "gmsol-mock-chainlink-verifier"
 version = "0.6.0"
 dependencies = [
