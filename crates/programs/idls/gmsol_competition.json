@@ -9,6 +9,80 @@
   },
   "instructions": [
     {
+      "name": "close_participant",
+      "docs": [
+        "Close the participant account and recover rent."
+      ],
+      "discriminator": [
+        192,
+        162,
+        92,
+        5,
+        148,
+        191,
+        207,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "trader",
+          "docs": [
+            "The trader that owns the participant account."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "participant"
+          ]
+        },
+        {
+          "name": "competition",
+          "docs": [
+            "The competition account this participant belongs to."
+          ],
+          "relations": [
+            "participant"
+          ]
+        },
+        {
+          "name": "participant",
+          "docs": [
+            "The participant PDA to close."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  116,
+                  105,
+                  99,
+                  105,
+                  112,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "competition"
+              },
+              {
+                "kind": "account",
+                "path": "trader"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "create_participant_idempotent",
       "docs": [
         "Create [`Participant`](crate::states::Participant) PDA idempotently."
@@ -309,9 +383,9 @@
           ]
         },
         {
-          "name": "action",
+          "name": "shared_data",
           "docs": [
-            "The action account."
+            "The shared data account."
           ]
         }
       ],
@@ -468,9 +542,9 @@
           ]
         },
         {
-          "name": "action",
+          "name": "shared_data",
           "docs": [
-            "The action account."
+            "The shared data account."
           ]
         }
       ],
@@ -637,7 +711,7 @@
         {
           "name": "trade_event",
           "docs": [
-            "Trade event data"
+            "Trade event data."
           ],
           "optional": true
         }
@@ -798,9 +872,9 @@
           ]
         },
         {
-          "name": "action",
+          "name": "shared_data",
           "docs": [
-            "The action account."
+            "The shared data account."
           ]
         }
       ],
@@ -905,6 +979,11 @@
       "code": 6007,
       "name": "InvalidMaxExtension",
       "msg": "Invalid max extension"
+    },
+    {
+      "code": 6008,
+      "name": "CompetitionInProgress",
+      "msg": "Competition is still in progress"
     }
   ],
   "types": [
@@ -945,13 +1024,6 @@
             "type": "i64"
           },
           {
-            "name": "is_active",
-            "docs": [
-              "Whether the competition is active."
-            ],
-            "type": "bool"
-          },
-          {
             "name": "leaderboard",
             "docs": [
               "The fixed-length leaderboard."
@@ -967,28 +1039,28 @@
           {
             "name": "volume_threshold",
             "docs": [
-              "Volume threshold in USD"
+              "Volume threshold in USD."
             ],
             "type": "u128"
           },
           {
-            "name": "time_extension",
+            "name": "extension_duration",
             "docs": [
-              "Time extension in seconds"
+              "Time extension in seconds."
             ],
             "type": "i64"
           },
           {
-            "name": "max_extension",
+            "name": "extension_cap",
             "docs": [
-              "Maximum time extension in seconds"
+              "Maximum time extension in seconds."
             ],
             "type": "i64"
           },
           {
-            "name": "extension_trigger",
+            "name": "extension_triggerer",
             "docs": [
-              "Address that triggered time extension"
+              "Address that triggered time extension."
             ],
             "type": {
               "option": "pubkey"

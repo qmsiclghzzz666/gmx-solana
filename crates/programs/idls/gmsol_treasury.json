@@ -3655,15 +3655,11 @@
             "type": "u64"
           },
           {
-            "name": "receiver_vault_out",
-            "type": "u64"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                248
+                256
               ]
             }
           },
@@ -4657,11 +4653,15 @@
             "type": "u64"
           },
           {
+            "name": "receiver_vault_out",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                56
               ]
             }
           }
