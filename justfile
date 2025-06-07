@@ -92,4 +92,10 @@ setup-localnet keeper oracle="42" time_window="600":
   sh {{SETUP_LOCALNET_SCRIPT}}
 
 cli *ARGS:
+  cargo run -p gmsol-cli --features execute,squads -- {{ARGS}}
+
+cli-devnet *ARGS:
   cargo run -p gmsol-cli --features devnet,execute,squads -- {{ARGS}}
+
+install-cli *ARGS:
+  cargo install --path crates/cli --features execute,squads --locked {{ARGS}}

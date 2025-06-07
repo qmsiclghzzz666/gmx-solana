@@ -142,16 +142,22 @@ To run all tests:
 just
 ```
 
+To use the `gmsol` CLI in development mode:
+
+```bash
+just cli
+```
+
 To install the `gmsol` CLI:
 
 ```bash
-cargo install-gmsol
+just install-cli
 ```
 
 Use the following command to verify the CLI is installed properly:
 
 ```bash
-gmsol --version
+gmsol -V
 ```
 
 ### Troubleshooting

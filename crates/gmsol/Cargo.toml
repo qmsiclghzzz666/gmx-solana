@@ -10,7 +10,7 @@ readme.workspace = true
 keywords.workspace = true
 
 [[bin]]
-name = "gmsol"
+name = "gmsol-legacy"
 path = "src/cli/main.rs"
 required-features = ["cli"]
 
