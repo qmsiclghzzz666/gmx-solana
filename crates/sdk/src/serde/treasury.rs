@@ -139,6 +139,8 @@ impl SerdeGtBank {
 pub struct SerdeGtBankBalance {
     /// Token amount.
     pub amount: Amount,
+    /// Receiver vault output amount.
+    pub receiver_vault_out: Amount,
 }
 
 impl SerdeGtBankBalance {
@@ -146,6 +148,7 @@ impl SerdeGtBankBalance {
     pub fn from_balance(balance: &TokenBalance, token_decimals: u8) -> Self {
         Self {
             amount: Amount::from_u64(balance.amount, token_decimals),
+            receiver_vault_out: Amount::from_u64(balance.receiver_vault_out, token_decimals),
         }
     }
 }
