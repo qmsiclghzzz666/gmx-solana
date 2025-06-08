@@ -26,9 +26,11 @@ enum Command {
         #[arg(long)]
         volume_threshold: Value,
         #[arg(long, value_parser = humantime::parse_duration)]
-        time_extension: Duration,
+        extension_duration: Duration,
         #[arg(long, value_parser = humantime::parse_duration)]
-        max_extension: Duration,
+        extension_cap: Duration,
+        #[arg(long)]
+        only_count_increase: bool,
     },
     /// Fetch a competition.
     Get { address: Pubkey },
@@ -53,8 +55,9 @@ impl super::Command for Competition {
                 start,
                 end,
                 volume_threshold,
-                time_extension,
-                max_extension,
+                extension_duration,
+                extension_cap,
+                only_count_increase,
             } => {
                 let (tx, competition) = client
                     .initialize_competition(
@@ -62,8 +65,9 @@ impl super::Command for Competition {
                             .start_time(start.unix_timestamp())
                             .end_time(end.unix_timestamp())
                             .volume_threshold(volume_threshold.to_u128()?)
-                            .time_extension(time_extension.as_secs().try_into()?)
-                            .max_extension(max_extension.as_secs().try_into()?)
+                            .extension_duration(extension_duration.as_secs().try_into()?)
+                            .extension_cap(extension_cap.as_secs().try_into()?)
+                            .only_count_increase(*only_count_increase)
                             .build(),
                     )
                     .swap_output(());
