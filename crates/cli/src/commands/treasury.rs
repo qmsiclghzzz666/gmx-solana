@@ -8,11 +8,15 @@ use anchor_spl::{
     token_interface::TokenAccount,
 };
 use eyre::OptionExt;
+use futures_util::{stream::FuturesUnordered, TryStreamExt};
 use gmsol_sdk::{
     client::ops::treasury::CreateTreasurySwapOptions,
     core::token_config::{TokenFlag, TokenMapAccess},
     model::{BalanceExt, BaseMarket, MarketModel},
-    ops::{system::SystemProgramOps, token_account::TokenAccountOps, treasury::TreasuryOps},
+    ops::{
+        system::SystemProgramOps, token_account::TokenAccountOps, treasury::TreasuryOps,
+        AddressLookupTableOps,
+    },
     programs::anchor_lang::prelude::Pubkey,
     serde::StringPubkey,
     solana_utils::bundle_builder::BundleOptions,
@@ -481,6 +485,18 @@ impl super::Command for Treasury {
                         let mut bundle = client.bundle_with_options(options.clone());
                         let mut claimed_tokens = HashMap::new();
 
+                        // Load Address Lookup Tables.
+                        let luts = ctx
+                            .config()
+                            .alts()
+                            .map(|address| client.alt(address))
+                            .collect::<FuturesUnordered<_>>()
+                            .try_filter_map(|lut| {
+                                std::future::ready(Ok(lut.map(|lut| (lut.key, lut.addresses))))
+                            })
+                            .try_collect::<HashMap<_, _>>()
+                            .await?;
+
                         for batch in batches {
                             let mut batch_builder = client.store_transaction();
 
@@ -505,7 +521,7 @@ impl super::Command for Treasury {
                                     amount.to_u64(token_config.token_decimals)?;
                             }
 
-                            bundle.push(batch_builder)?;
+                            bundle.push(batch_builder.lookup_tables(luts.clone()))?;
                         }
 
                         // Add deposit instructions if --deposit is specified
