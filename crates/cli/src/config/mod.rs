@@ -1,6 +1,8 @@
 mod output;
 mod store_address;
 
+use std::num::NonZeroUsize;
+
 use eyre::OptionExt;
 use gmsol_sdk::{
     client::ClientOptions,
@@ -8,7 +10,7 @@ use gmsol_sdk::{
     programs::anchor_lang::prelude::Pubkey,
     serde::StringPubkey,
     solana_utils::{
-        bundle_builder::BundleOptions,
+        bundle_builder::{BundleOptions, DEFAULT_MAX_INSTRUCTIONS_FOR_ONE_TX},
         cluster::Cluster,
         compute_budget::ComputeBudget,
         signer::{local_signer, LocalSignerRef},
@@ -110,6 +112,10 @@ pub struct Config {
     #[arg(long, global = true)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     force_one_tx: Option<bool>,
+    /// Max instructions per transaction.
+    #[arg(long, global = true)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    max_transaction_instructions: Option<NonZeroUsize>,
     /// Priority fee lamports.
     #[arg(long, global = true)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -285,7 +291,10 @@ impl Config {
         BundleOptions {
             force_one_transaction: self.force_one_tx.unwrap_or(false),
             max_packet_size: self.max_transaction_size,
-            ..Default::default()
+            max_instructions_for_one_tx: self
+                .max_transaction_instructions
+                .map(|m| m.get())
+                .unwrap_or(DEFAULT_MAX_INSTRUCTIONS_FOR_ONE_TX),
         }
     }
 

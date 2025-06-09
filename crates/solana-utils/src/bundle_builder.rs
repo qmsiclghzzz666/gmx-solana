@@ -15,7 +15,8 @@ use crate::{
 };
 
 const TRANSACTION_SIZE_LIMIT: usize = PACKET_DATA_SIZE;
-const DEFAULT_MAX_INSTRUCTIONS_FOR_ONE_TX: usize = 14;
+/// Default max instruction for one transaction.
+pub const DEFAULT_MAX_INSTRUCTIONS_FOR_ONE_TX: usize = 14;
 
 /// Bundle Options.
 #[derive(Debug, Clone)]
