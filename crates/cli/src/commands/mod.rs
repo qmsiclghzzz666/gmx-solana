@@ -389,7 +389,9 @@ impl CommandClient {
         bundle: BundleBuilder<'_, LocalSignerRef>,
     ) -> gmsol_sdk::Result<()> {
         self.send_or_serialize_with_callback(bundle, |signatures, err| {
-            tracing::info!("{signatures:#?}");
+            signatures.iter().enumerate().for_each(|(idx, signature)| {
+                println!("Transaction {idx}: {signature}");
+            });
             match err {
                 None => Ok(()),
                 Some(err) => Err(err),
@@ -414,9 +416,9 @@ fn before_sign(
     message: &VersionedMessage,
 ) -> Result<(), gmsol_sdk::SolanaUtilsError> {
     use gmsol_sdk::solana_utils::solana_sdk::hash::hash;
-    *idx += 1;
     println!(
-        "[{idx}/{steps}] Signing transaction: hash = {}{}",
+        "[{}/{steps}] Signing transaction {idx}: hash = {}{}",
+        *idx + 1,
         hash(&message.serialize()),
         if verbose {
             format!(", message = {}", inspect_transaction(message, None, true))
@@ -424,6 +426,7 @@ fn before_sign(
             String::new()
         }
     );
+    *idx += 1;
 
     Ok(())
 }
