@@ -8,15 +8,11 @@ use anchor_spl::{
     token_interface::TokenAccount,
 };
 use eyre::OptionExt;
-use futures_util::{stream::FuturesUnordered, TryStreamExt};
 use gmsol_sdk::{
     client::ops::treasury::CreateTreasurySwapOptions,
     core::token_config::{TokenFlag, TokenMapAccess},
     model::{BalanceExt, BaseMarket, MarketModel},
-    ops::{
-        system::SystemProgramOps, token_account::TokenAccountOps, treasury::TreasuryOps,
-        AddressLookupTableOps,
-    },
+    ops::{system::SystemProgramOps, token_account::TokenAccountOps, treasury::TreasuryOps},
     programs::anchor_lang::prelude::Pubkey,
     serde::StringPubkey,
     solana_utils::bundle_builder::BundleOptions,
@@ -334,6 +330,9 @@ impl super::Command for Treasury {
                 } else {
                     #[cfg(feature = "execute")]
                     {
+                        use futures_util::{stream::FuturesUnordered, TryStreamExt};
+                        use gmsol_sdk::ops::AddressLookupTableOps;
+
                         // Batch processing mode with Pyth support
                         let markets = client.markets(store).await?;
                         let mut claimable_fees = Vec::new();

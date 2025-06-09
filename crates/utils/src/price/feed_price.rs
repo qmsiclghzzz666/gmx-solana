@@ -67,7 +67,7 @@ impl PriceFeedPrice {
         self.flags.get_flag(PriceFlag::Open)
     }
 
-    /// Try converting to [`Price`](gmsol_utils::Price).
+    /// Try converting to [`Price`].
     pub fn try_to_price(&self, token_config: &TokenConfig) -> Result<Price, DecimalError> {
         let token_decimals = token_config.token_decimals();
         let precision = token_config.precision();

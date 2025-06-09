@@ -497,6 +497,7 @@ impl Args {
                 if let Some(feed) = feeds.chainlink_feed {
                     builder = builder
                         .update_price_feed(
+                            #[allow(deprecated)]
                             &PriceProviderKind::Chainlink,
                             feed,
                             Some(feeds.chainlink_feed_timestamp_adjustment),
@@ -1048,6 +1049,7 @@ impl<'a> TryFrom<&'a TokenConfig> for UpdateTokenConfigParams {
         if let Some(chainlink_feed) = config.feeds.chainlink_feed {
             builder = builder
                 .update_price_feed(
+                    #[allow(deprecated)]
                     &PriceProviderKind::Chainlink,
                     chainlink_feed,
                     Some(config.feeds.chainlink_feed_timestamp_adjustment),
