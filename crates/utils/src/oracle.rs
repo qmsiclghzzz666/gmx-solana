@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{price::Decimal, token_config::TokenConfig, Price};
@@ -44,6 +46,7 @@ pub enum PriceProviderKind {
     /// Pyth Oracle V2.
     Pyth = 1,
     /// Chainlink Data Feed.
+    #[deprecated(since = "0.6.0", note = "use `ChainlinkDataStreams` instead")]
     Chainlink = 2,
     /// Switchboard On-Demand (V3) Data Feed.
     Switchboard = 3,

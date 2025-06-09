@@ -479,7 +479,6 @@ impl<'info> ExecuteGlvShift<'info> {
             &self.token_map,
             &tokens,
             remaining_accounts,
-            self.chainlink_program.as_ref(),
             |oracle, _remaining_accounts| builder.oracle(oracle).build().unchecked_execute(),
         )
     }

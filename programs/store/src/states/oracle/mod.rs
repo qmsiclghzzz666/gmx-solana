@@ -99,7 +99,6 @@ impl Oracle {
         map: &TokenMapRef,
         tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
-        chainlink: Option<&Program<'info, Chainlink>>,
     ) -> Result<()> {
         require!(self.is_cleared(), CoreError::PricesAreAlreadySet);
         require!(self.primary.is_empty(), CoreError::PricesAreAlreadySet);
@@ -119,12 +118,8 @@ impl Oracle {
 
             require!(token_config.is_enabled(), CoreError::TokenConfigDisabled);
 
-            let oracle_price = OraclePrice::parse_from_feed_account(
-                validator.clock(),
-                token_config,
-                chainlink,
-                feed,
-            )?;
+            let oracle_price =
+                OraclePrice::parse_from_feed_account(validator.clock(), token_config, feed)?;
 
             validator.validate_one(
                 token_config,
@@ -190,7 +185,6 @@ impl Oracle {
         token_map: &AccountLoader<'info, TokenMapHeader>,
         tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
-        chainlink: Option<&Program<'info, Chainlink>>,
         f: impl FnOnce(&mut Self, &'info [AccountInfo<'info>]) -> Result<T>,
     ) -> Result<T> {
         let validator = PriceValidator::try_from(store.load()?.deref())?;
@@ -203,7 +197,7 @@ impl Oracle {
         let remaining_accounts = &remaining_accounts[tokens.len()..];
         let res = {
             let token_map = token_map.load_token_map()?;
-            self.set_prices_from_remaining_accounts(validator, &token_map, tokens, feeds, chainlink)
+            self.set_prices_from_remaining_accounts(validator, &token_map, tokens, feeds)
         };
         match res {
             Ok(()) => {
@@ -301,7 +295,6 @@ impl OraclePrice {
     fn parse_from_feed_account<'info>(
         clock: &Clock,
         token_config: &TokenConfig,
-        chainlink: Option<&Program<'info, Chainlink>>,
         account: &'info AccountInfo<'info>,
     ) -> Result<Self> {
         let (provider, parsed) = match from_program_id(account.owner) {
@@ -335,16 +328,8 @@ impl OraclePrice {
                 (oracle_slot, oracle_ts, price)
             }
             PriceProviderKind::Chainlink => {
-                require_keys_eq!(*feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
-                let program =
-                    chainlink.ok_or_else(|| error!(CoreError::ChainlinkProgramIsRequired))?;
-                let (oracle_slot, oracle_ts, price) = Chainlink::check_and_get_chainlink_price(
-                    clock,
-                    program,
-                    token_config,
-                    account,
-                )?;
-                (oracle_slot, oracle_ts, price)
+                msg!("[Oracle] Chainlink Data Feeds are no longer supported as of this version");
+                return err!(CoreError::Deprecated);
             }
             PriceProviderKind::Switchboard => {
                 require_keys_eq!(*feed_id, account.key(), CoreError::InvalidPriceFeedAccount);

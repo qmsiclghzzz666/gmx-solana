@@ -229,7 +229,6 @@ impl<'info> ExecuteShift<'info> {
             &self.token_map,
             &tokens,
             remaining_accounts,
-            self.chainlink_program.as_ref(),
             |oracle, _remaining_accounts| ops.oracle(oracle).build().execute(),
         )?;
 

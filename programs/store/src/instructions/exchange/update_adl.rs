@@ -50,7 +50,6 @@ pub(crate) fn unchecked_update_adl_state<'info>(
         &ctx.accounts.token_map,
         &tokens,
         ctx.remaining_accounts,
-        ctx.accounts.chainlink_program.as_ref(),
         |oracle, _remaining_accounts| market.update_adl_state(oracle, is_long),
     )?;
 

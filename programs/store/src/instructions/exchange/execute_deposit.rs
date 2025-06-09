@@ -349,7 +349,6 @@ impl<'info> ExecuteDeposit<'info> {
             &self.token_map,
             &feeds.tokens,
             remaining_accounts,
-            self.chainlink_program.as_ref(),
             |oracle, remaining_accounts| {
                 ops.oracle(oracle)
                     .remaining_accounts(remaining_accounts)

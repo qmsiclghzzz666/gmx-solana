@@ -308,7 +308,6 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         &accounts.token_map,
         &tokens,
         remaining_accounts,
-        accounts.chainlink_program.as_ref(),
         |oracle, _remaining_accounts| ops.oracle(oracle).build().execute(),
     )?;
 

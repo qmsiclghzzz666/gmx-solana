@@ -760,7 +760,6 @@ impl<'info> ExecuteGlvWithdrawal<'info> {
             &self.token_map,
             &splitted.tokens,
             splitted.remaining_accounts,
-            self.chainlink_program.as_ref(),
             |oracle, remaining_accounts| {
                 builder
                     .oracle(oracle)

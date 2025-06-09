@@ -494,7 +494,6 @@ impl<'info> ExecuteIncreaseOrSwapOrderV2<'info> {
             &self.token_map,
             &feeds.tokens,
             remaining_accounts,
-            None,
             |oracle, remaining_accounts| {
                 ops.oracle(oracle)
                     .remaining_accounts(remaining_accounts)
@@ -866,7 +865,6 @@ impl<'info> ExecuteDecreaseOrderV2<'info> {
             &self.token_map,
             &feeds.tokens,
             remaining_accounts,
-            None,
             #[inline(never)]
             |oracle, remaining_accounts| {
                 ops.oracle(oracle)
@@ -1292,7 +1290,6 @@ mod deprecated {
                 &self.token_map,
                 &feeds.tokens,
                 remaining_accounts,
-                self.chainlink_program.as_ref(),
                 |oracle, remaining_accounts| {
                     ops.oracle(oracle)
                         .remaining_accounts(remaining_accounts)
@@ -1648,7 +1645,6 @@ mod deprecated {
                 &self.token_map,
                 &feeds.tokens,
                 remaining_accounts,
-                self.chainlink_program.as_ref(),
                 #[inline(never)]
                 |oracle, remaining_accounts| {
                     ops.oracle(oracle)

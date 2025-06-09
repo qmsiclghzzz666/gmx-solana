@@ -979,7 +979,6 @@ impl<'info> ExecuteGlvDeposit<'info> {
             &self.token_map,
             tokens,
             remaining_accounts,
-            self.chainlink_program.as_ref(),
             |oracle, remaining_accounts| {
                 builder
                     .oracle(oracle)
