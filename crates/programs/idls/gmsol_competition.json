@@ -1608,14 +1608,6 @@
       ],
       "type": "bytes",
       "value": "[112, 97, 114, 116, 105, 99, 105, 112, 97, 110, 116]"
-    },
-    {
-      "name": "START_TIME_BUFFER",
-      "docs": [
-        "The buffer time in seconds for competition start time."
-      ],
-      "type": "i64",
-      "value": "10"
     }
   ]
 }
