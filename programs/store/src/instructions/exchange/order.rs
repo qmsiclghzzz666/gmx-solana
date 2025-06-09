@@ -254,7 +254,7 @@ pub struct CreateOrderV2<'info> {
     #[account(constraint = market.load()?.meta().short_token_mint == short_token.key())]
     pub short_token: Option<Box<Account<'info, Mint>>>,
     /// Initial collateral token escrow account.
-    /// Only requried by increase and swap orders.
+    /// Only required by increase and swap orders.
     #[account(
         mut,
         associated_token::mint = initial_collateral_token,
@@ -286,7 +286,7 @@ pub struct CreateOrderV2<'info> {
     )]
     pub short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
     /// The source initial token account.
-    /// Only requried by increase and swap orders.
+    /// Only required by increase and swap orders.
     #[account(
         mut,
         token::mint = initial_collateral_token,
@@ -1025,7 +1025,7 @@ impl UpdateOrderV2<'_> {
             .next_order_id()?;
         ctx.accounts.order.load_mut()?.update(id, params)?;
         ctx.accounts.emit_event(ctx.bumps.event_authority)?;
-        ctx.accounts.hanlde_updated()?;
+        ctx.accounts.handle_updated()?;
         Ok(())
     }
 
@@ -1038,7 +1038,7 @@ impl UpdateOrderV2<'_> {
     }
 
     #[inline(never)]
-    fn hanlde_updated(&self) -> Result<()> {
+    fn handle_updated(&self) -> Result<()> {
         match self.order.load()?.header.callback_kind()? {
             ActionCallbackKind::Disabled => {}
             ActionCallbackKind::General => {
@@ -1197,7 +1197,7 @@ mod deprecated {
         #[account(constraint = market.load()?.meta().short_token_mint == short_token.key())]
         pub short_token: Option<Box<Account<'info, Mint>>>,
         /// Initial collateral token escrow account.
-        /// Only requried by increase and swap orders.
+        /// Only required by increase and swap orders.
         #[account(
         mut,
         associated_token::mint = initial_collateral_token,
@@ -1229,7 +1229,7 @@ mod deprecated {
     )]
         pub short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
         /// The source initial token account.
-        /// Only requried by increase and swap orders.
+        /// Only required by increase and swap orders.
         #[account(
         mut,
         token::mint = initial_collateral_token,

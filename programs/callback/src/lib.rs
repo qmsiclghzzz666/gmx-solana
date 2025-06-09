@@ -1,4 +1,4 @@
-//! This crate defines the callback interface for the GMX-Solana procotol
+//! This crate defines the callback interface for the GMX-Solana protocol
 //! and provide an example implementation.
 
 /// Definition of the core structure.

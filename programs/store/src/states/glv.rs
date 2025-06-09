@@ -556,7 +556,7 @@ impl Glv {
         self.shift_max_price_impact_factor
     }
 
-    /// Get min shift vaule.
+    /// Get min shift value.
     pub fn shift_min_value(&self) -> u128 {
         self.shift_min_value
     }

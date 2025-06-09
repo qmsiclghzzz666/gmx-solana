@@ -24,7 +24,7 @@ pub trait TokenAccountOps<C> {
         amount: u64,
     ) -> TransactionBuilder<C>;
 
-    /// Close a claimable account if it is emtpy.
+    /// Close a claimable account if it is empty.
     fn close_empty_claimable_account(
         &self,
         store: &Pubkey,

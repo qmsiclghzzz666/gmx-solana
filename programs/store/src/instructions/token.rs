@@ -80,7 +80,7 @@ pub struct UseClaimableAccount<'info> {
     /// Owner.
     /// CHECK: check by CPI.
     pub owner: UncheckedAccount<'info>,
-    /// The claimble account.
+    /// The claimable account.
     #[account(
         init_if_needed,
         payer = authority,

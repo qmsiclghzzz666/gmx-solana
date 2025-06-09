@@ -76,7 +76,7 @@ impl InitializeGt<'_> {
 
 /// The accounts defintions for GT configuration instructions.
 #[derive(Accounts)]
-pub struct ConfigurateGt<'info> {
+pub struct ConfigureGt<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
@@ -87,7 +87,7 @@ pub struct ConfigurateGt<'info> {
     pub store: AccountLoader<'info, Store>,
 }
 
-impl<'info> internal::Authentication<'info> for ConfigurateGt<'info> {
+impl<'info> internal::Authentication<'info> for ConfigureGt<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
@@ -99,7 +99,7 @@ impl<'info> internal::Authentication<'info> for ConfigurateGt<'info> {
 
 /// CHECK: only MARKET_KEEPER is authorized to use this instruction.
 pub(crate) fn unchecked_gt_set_order_fee_discount_factors(
-    ctx: Context<ConfigurateGt>,
+    ctx: Context<ConfigureGt>,
     factors: &[u128],
 ) -> Result<()> {
     ctx.accounts
@@ -111,7 +111,7 @@ pub(crate) fn unchecked_gt_set_order_fee_discount_factors(
 
 /// CHECK: only GT_CONTROLLER is authorized to use this instruction.
 pub(crate) fn unchecked_gt_set_referral_reward_factors(
-    ctx: Context<ConfigurateGt>,
+    ctx: Context<ConfigureGt>,
     factors: &[u128],
 ) -> Result<()> {
     ctx.accounts
@@ -124,7 +124,7 @@ pub(crate) fn unchecked_gt_set_referral_reward_factors(
 /// CHECK: only GT_CONTROLLER is authorized to use this instruction.
 #[cfg(feature = "test-only")]
 pub(crate) fn unchecked_gt_set_exchange_time_window(
-    ctx: Context<ConfigurateGt>,
+    ctx: Context<ConfigureGt>,
     window: u32,
 ) -> Result<()> {
     ctx.accounts

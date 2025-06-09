@@ -127,7 +127,7 @@
 //! #### Instructions for token accounts
 //! - [`initialize_market_vault`]: Initialize the market vault for the given token.
 //! - [`use_claimable_account`]: Prepare a claimable account to receive tokens during the order execution.
-//! - [`close_empty_claimable_account`]: Close a empty claimble account.
+//! - [`close_empty_claimable_account`]: Close a empty claimable account.
 //! - [`prepare_associated_token_account`](gmsol_store::prepare_associated_token_account): Prepare an ATA.
 //!
 //! ## Exchange
@@ -2856,20 +2856,20 @@ pub mod gmsol_store {
     /// Set order fee discount factors.
     ///
     /// # Accounts
-    /// *[See the documentation for the accounts.](ConfigurateGt)*
+    /// *[See the documentation for the accounts.](ConfigureGt)*
     ///
     /// # Arguments
     /// - `factors`: The order fee discount factors for each user rank.
     ///
     /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have the MARKET_KEEPER role in the `store`.
-    /// - The [`store`](ConfigurateGt::store) must be initialized.
+    /// - The [`authority`](ConfigureGt::authority) must be a signer and have the MARKET_KEEPER role in the `store`.
+    /// - The [`store`](ConfigureGt::store) must be initialized.
     /// - The GT state of the `store` must be initialized.
     /// - The number of `factors` must match the number of ranks defined in GT state.
     /// - Each factor must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT)(i.e., 100%).
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn gt_set_order_fee_discount_factors(
-        ctx: Context<ConfigurateGt>,
+        ctx: Context<ConfigureGt>,
         factors: Vec<u128>,
     ) -> Result<()> {
         instructions::unchecked_gt_set_order_fee_discount_factors(ctx, &factors)
@@ -2878,21 +2878,21 @@ pub mod gmsol_store {
     /// Set referral reward factors.
     ///
     /// # Accounts
-    /// *[See the documentation for the accounts.](ConfigurateGt)*
+    /// *[See the documentation for the accounts.](ConfigureGt)*
     ///
     /// # Arguments
     /// - `factors`: The referral reward factors for each user rank.
     ///
     /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and a
+    /// - The [`authority`](ConfigureGt::authority) must be a signer and a
     ///   GT_CONTROLLER in the store.
-    /// - The [`store`](ConfigurateGt::store) must be initialized.
+    /// - The [`store`](ConfigureGt::store) must be initialized.
     /// - The GT state of the `store` must be initialized.
     /// - The number of `factors` must match the number of ranks defined in GT state.
     /// - Each factor must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT)(i.e., 100%).
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_referral_reward_factors(
-        ctx: Context<ConfigurateGt>,
+        ctx: Context<ConfigureGt>,
         factors: Vec<u128>,
     ) -> Result<()> {
         instructions::unchecked_gt_set_referral_reward_factors(ctx, &factors)
@@ -2901,18 +2901,18 @@ pub mod gmsol_store {
     /// Set GT exchange time window (in seconds).
     ///
     /// # Accounts
-    /// *[See the documentation for the accounts.](ConfigurateGt)*
+    /// *[See the documentation for the accounts.](ConfigureGt)*
     ///
     /// # Arguments
     /// - `window`: The time window in seconds for one GT exchange period.
     ///
     /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
-    /// - The [`store`](ConfigurateGt::store) must be properly initialized.
+    /// - The [`authority`](ConfigureGt::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
+    /// - The [`store`](ConfigureGt::store) must be properly initialized.
     /// - The GT state of the `store` must be initialized.
     /// - The `window` must be greater than 0 seconds to ensure a valid exchange period.
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
-    pub fn gt_set_exchange_time_window(ctx: Context<ConfigurateGt>, window: u32) -> Result<()> {
+    pub fn gt_set_exchange_time_window(ctx: Context<ConfigureGt>, window: u32) -> Result<()> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "test-only")] {
                 instructions::unchecked_gt_set_exchange_time_window(ctx, window)
@@ -3312,7 +3312,7 @@ pub mod gmsol_store {
     ///   - Must be enabled
     /// - The [`vault`](InsertGlvMarket::vault) must be either:
     ///   - The ATA of `market_token` owned by `glv`, or
-    ///   - Unintialized ATA account of `market_token` owned by `glv`
+    ///   - Uninitialized ATA account of `market_token` owned by `glv`
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn insert_glv_market(ctx: Context<InsertGlvMarket>) -> Result<()> {
         instructions::unchecked_insert_glv_market(ctx)
@@ -3825,7 +3825,7 @@ pub enum CoreError {
     // ===========================================
     //                Common Errors
     // ===========================================
-    /// Non-defualt store is not allowed.
+    /// Non-default store is not allowed.
     #[msg("non-default store is not allowed")]
     NonDefaultStore,
     /// Internal error.
@@ -3984,7 +3984,7 @@ pub enum CoreError {
     /// Max price age exceeded.
     #[msg("max price age exceeded")]
     MaxPriceAgeExceeded,
-    /// Max prcie's timestamp exceeded.
+    /// Max price's timestamp exceeded.
     #[msg("max price timestamp exceeded")]
     MaxPriceTimestampExceeded,
     /// Negative price.
@@ -4014,7 +4014,7 @@ pub enum CoreError {
     /// Price is already set.
     #[msg("price is already set")]
     PriceIsAlreadySet,
-    /// Token config is diabled.
+    /// Token config is disabled.
     #[msg("token config is disabled")]
     TokenConfigDisabled,
     /// Synthetic token price is not allowed.
@@ -4045,13 +4045,13 @@ pub enum CoreError {
     //               Withdrawal Errors
     // ===========================================
     /// Empty Withdrawal.
-    #[msg("emtpy withdrawal")]
+    #[msg("empty withdrawal")]
     EmptyWithdrawal,
     // ===========================================
     //                 Order Errors
     // ===========================================
     /// Empty Order.
-    #[msg("emtpy order")]
+    #[msg("empty order")]
     EmptyOrder,
     /// Invalid min output amount for limit swap.
     #[msg("invalid min output amount for limit swap order")]
@@ -4126,7 +4126,7 @@ pub enum CoreError {
     #[msg("invalid ADL")]
     InvalidAdl,
     /// The output token and the secondary output token are the same,
-    /// but the token amounts are not merged togather.
+    /// but the token amounts are not merged together.
     #[msg("same output tokens not merged")]
     SameOutputTokensNotMerged,
     /// Event buffer is not provided.
@@ -4136,7 +4136,7 @@ pub enum CoreError {
     //                 Shift Errors
     // ===========================================
     /// Empty Shift.
-    #[msg("emtpy shift")]
+    #[msg("empty shift")]
     EmptyShift,
     /// Invalid Shift Markets
     #[msg("invalid shift markets")]

@@ -130,7 +130,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
         factors: Vec<u128>,
     ) -> TransactionBuilder<C> {
         self.store_transaction()
-            .anchor_accounts(accounts::ConfigurateGt {
+            .anchor_accounts(accounts::ConfigureGt {
                 authority: self.payer(),
                 store: *store,
             })
@@ -143,7 +143,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
         factors: Vec<u128>,
     ) -> TransactionBuilder<C> {
         self.store_transaction()
-            .anchor_accounts(accounts::ConfigurateGt {
+            .anchor_accounts(accounts::ConfigureGt {
                 authority: self.payer(),
                 store: *store,
             })
@@ -152,7 +152,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
 
     fn gt_set_exchange_time_window(&self, store: &Pubkey, window: u32) -> TransactionBuilder<C> {
         self.store_transaction()
-            .anchor_accounts(accounts::ConfigurateGt {
+            .anchor_accounts(accounts::ConfigureGt {
                 authority: self.payer(),
                 store: *store,
             })

@@ -194,7 +194,7 @@ mod tests {
         let receiver = Pubkey::new_unique();
         let rent_receiver = Pubkey::new_unique();
         let referrer = Some(Pubkey::new_unique().into());
-        let initial_collatearl_token = Some(NATIVE_MINT.into());
+        let initial_collateral_token = Some(NATIVE_MINT.into());
         let final_output_token = None;
         let long_token = Some(Pubkey::new_unique().into());
         let short_token = Some(Pubkey::new_unique().into());
@@ -208,7 +208,7 @@ mod tests {
                     .receiver(receiver)
                     .rent_receiver(rent_receiver)
                     .referrer(referrer)
-                    .initial_collateral_token(initial_collatearl_token)
+                    .initial_collateral_token(initial_collateral_token)
                     .final_output_token(final_output_token)
                     .long_token(long_token)
                     .short_token(short_token)

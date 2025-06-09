@@ -815,12 +815,12 @@ impl<'info> ConfirmGtBuyback<'info> {
             }
         }
 
-        let total_vaule = treasury_value
+        let total_value = treasury_value
             .checked_add(gt_bank_value)
             .ok_or_else(|| error!(CoreError::ValueOverflow))?;
         let buyback_factor = self.config.load()?.buyback_factor();
         let max_buyback_value = apply_factor::<_, { gmsol_store::constants::MARKET_DECIMALS }>(
-            &total_vaule,
+            &total_value,
             &buyback_factor,
         )
         .ok_or_else(|| error!(CoreError::ValueOverflow))?;

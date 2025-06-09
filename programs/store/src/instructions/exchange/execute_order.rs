@@ -234,7 +234,7 @@ pub struct ExecuteIncreaseOrSwapOrderV2<'info> {
         associated_token::authority = order,
     )]
     pub short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
-    /// Initial collatearl token vault.
+    /// Initial collateral token vault.
     #[account(
         mut,
         token::mint = initial_collateral_token,
@@ -1045,7 +1045,7 @@ mod deprecated {
         associated_token::authority = order,
     )]
         pub short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
-        /// Initial collatearl token vault.
+        /// Initial collateral token vault.
         #[account(
         mut,
         token::mint = initial_collateral_token,

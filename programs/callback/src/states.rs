@@ -13,7 +13,7 @@ pub const CONFIG_SEED: &[u8] = b"config";
 
 /// The seed for [`ActionStats`] account.
 #[constant]
-pub const ACTION_STATS_SEED: &[u8] = b"pending";
+pub const ACTION_STATS_SEED: &[u8] = b"action_stats";
 
 /// Config account.
 #[account]

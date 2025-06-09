@@ -5,7 +5,7 @@ use anchor_spl::{
 };
 use gmsol_store::{
     cpi::{
-        accounts::{ClaimFeesFromMarket, ConfigurateGt, TransferReceiver as StoreTransferReceiver},
+        accounts::{ClaimFeesFromMarket, ConfigureGt, TransferReceiver as StoreTransferReceiver},
         claim_fees_from_market, gt_set_referral_reward_factors, transfer_receiver,
     },
     program::GmsolStore,
@@ -246,10 +246,10 @@ impl<'info> CpiAuthentication<'info> for SetReferralReward<'info> {
 }
 
 impl<'info> SetReferralReward<'info> {
-    fn configurate_gt_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ConfigurateGt<'info>> {
+    fn configurate_gt_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ConfigureGt<'info>> {
         CpiContext::new(
             self.store_program.to_account_info(),
-            ConfigurateGt {
+            ConfigureGt {
                 authority: self.config.to_account_info(),
                 store: self.store.to_account_info(),
             },

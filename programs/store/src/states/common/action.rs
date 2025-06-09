@@ -360,7 +360,7 @@ impl ActionHeader {
 
     /// Set whether the native token should be unwrapped.
     ///
-    /// Returns the previous vaule.
+    /// Returns the previous value.
     fn set_should_unwrap_native_token(&mut self, should_unwrap: bool) -> bool {
         self.flags
             .set_flag(ActionFlag::ShouldUnwrapNativeToken, should_unwrap)
@@ -415,7 +415,7 @@ pub trait Action {
     fn header(&self) -> &ActionHeader;
 }
 
-/// Extentsion trait for [`Action`].
+/// Extension trait for [`Action`].
 pub trait ActionExt: Action {
     /// Action signer.
     fn signer(&self) -> ActionSigner

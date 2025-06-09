@@ -117,7 +117,7 @@ pub(crate) struct CreateOrderOperation<'a, 'info> {
         default,
         setter(
             strip_option,
-            doc = "Set the creator of this order. CHECK: It must be the address derving the order account",
+            doc = "Set the creator of this order. CHECK: It must be the address deriving the order account",
         )
     )]
     creator: Option<AccountInfo<'info>>,
@@ -1589,7 +1589,7 @@ fn execute_decrease_position(
         // Only required when the order is an ADL order.
         let mut pnl_factor_before_execution = None;
 
-        // Validate the liqudiation is a fully close.
+        // Validate the liquidation is a fully close.
         if is_liquidation_order {
             require_gte!(
                 size_delta_usd,
@@ -1907,7 +1907,7 @@ impl PositionCutOperation<'_, '_> {
             .short_token(self.short_token_account)
             .build()
             .execute()?;
-        // Make sure the discrimator is written to the account data.
+        // Make sure the discriminator is written to the account data.
         self.order.exit(&crate::ID)?;
         Ok(())
     }

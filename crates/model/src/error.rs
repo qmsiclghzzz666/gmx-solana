@@ -84,7 +84,7 @@ pub enum Error {
     #[error("unable to get borrowing factor for empty pool value")]
     UnableToGetBorrowingFactorEmptyPoolValue,
     /// Insufficient reserve.
-    #[error("insufficient reserve, requried={0}, max={1}")]
+    #[error("insufficient reserve, required={0}, max={1}")]
     InsufficientReserve(String, String),
     /// Insufficient reserve for open interest.
     #[error("insufficient reserve for open interest, required={0}, max={1}")]

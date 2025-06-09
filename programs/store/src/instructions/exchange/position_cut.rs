@@ -211,7 +211,7 @@ pub struct PositionCut<'info> {
         bump,
     )]
     pub claimable_pnl_token_account_for_holding: Box<Account<'info, TokenAccount>>,
-    /// Initial collatearl token vault.
+    /// Initial collateral token vault.
     /// The system program.
     pub system_program: Program<'info, System>,
     /// The token program.
