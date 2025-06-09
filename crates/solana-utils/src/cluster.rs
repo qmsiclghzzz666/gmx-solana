@@ -14,7 +14,7 @@ use solana_sdk::commitment_config::CommitmentConfig;
 /// Cluster.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
+#[cfg_attr(feature = "serde", serde(try_from = "String", into = "String"))]
 pub enum Cluster {
     /// Testnet.
     Testnet,
@@ -80,6 +80,20 @@ impl std::fmt::Display for Cluster {
             Cluster::Custom(url, _ws_url) => url,
         };
         write!(f, "{clust_str}")
+    }
+}
+
+impl TryFrom<String> for Cluster {
+    type Error = <Self as FromStr>::Err;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+impl From<Cluster> for String {
+    fn from(value: Cluster) -> Self {
+        value.to_string()
     }
 }
 

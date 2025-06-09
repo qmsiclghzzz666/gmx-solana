@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk(solana-utils): Introduced a `before_sign` callback in transaction construction methods.
 - sdk(sdk): Removed the `Copy` implementation from `CloseOrderHint`.
 - sdk(sdk): Added callback support for the new order instruction builders.
+- sdk(solana-utils): Updated `Cluster` serialization to match CLI behavior.
 - cli(gmsol): Renamed the legacy CLI binary from `gmsol` to `gmsol-legacy`.
 
 ### Added
