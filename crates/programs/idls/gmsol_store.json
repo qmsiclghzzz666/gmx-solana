@@ -686,7 +686,7 @@
         {
           "name": "system_program",
           "docs": [
-            "Initial collatearl token vault.",
+            "Initial collateral token vault.",
             "The system program."
           ],
           "address": "11111111111111111111111111111111"
@@ -7833,7 +7833,11 @@
         "not a valid escrow account for `final_output_token`, or not owned by the `order`.",
         "- The feature for creating this kind of order is not enabled.",
         "- The remaining market accounts do not match the swap parameters, not all enabled or owned",
-        "by the `store`."
+        "by the `store`.",
+        "",
+        "# Notes",
+        "- Unlike [`create_order_v2`], this instruction cannot emit a CPI Event due to the lack of required accounts for CPI.",
+        "As a result, it does not guarantee that an order will always have a corresponding `OrderUpdated` event."
       ],
       "discriminator": [
         141,
@@ -7988,7 +7992,7 @@
           "name": "initial_collateral_token_escrow",
           "docs": [
             "Initial collateral token escrow account.",
-            "Only requried by increase and swap orders."
+            "Only required by increase and swap orders."
           ],
           "writable": true,
           "optional": true,
@@ -8368,7 +8372,7 @@
           "name": "initial_collateral_token_source",
           "docs": [
             "The source initial token account.",
-            "Only requried by increase and swap orders."
+            "Only required by increase and swap orders."
           ],
           "writable": true,
           "optional": true
@@ -8617,7 +8621,7 @@
           "name": "initial_collateral_token_escrow",
           "docs": [
             "Initial collateral token escrow account.",
-            "Only requried by increase and swap orders."
+            "Only required by increase and swap orders."
           ],
           "writable": true,
           "optional": true,
@@ -8997,7 +9001,7 @@
           "name": "initial_collateral_token_source",
           "docs": [
             "The source initial token account.",
-            "Only requried by increase and swap orders."
+            "Only required by increase and swap orders."
           ],
           "writable": true,
           "optional": true
@@ -14523,7 +14527,7 @@
         {
           "name": "initial_collateral_token_vault",
           "docs": [
-            "Initial collatearl token vault."
+            "Initial collateral token vault."
           ],
           "writable": true,
           "optional": true,
@@ -15318,7 +15322,7 @@
         {
           "name": "initial_collateral_token_vault",
           "docs": [
-            "Initial collatearl token vault."
+            "Initial collateral token vault."
           ],
           "writable": true,
           "optional": true,
@@ -16760,14 +16764,14 @@
         "Set GT exchange time window (in seconds).",
         "",
         "# Accounts",
-        "*[See the documentation for the accounts.](ConfigurateGt)*",
+        "*[See the documentation for the accounts.](ConfigureGt)*",
         "",
         "# Arguments",
         "- `window`: The time window in seconds for one GT exchange period.",
         "",
         "# Errors",
-        "- The [`authority`](ConfigurateGt::authority) must be a signer and have the GT_CONTROLLER role in the `store`.",
-        "- The [`store`](ConfigurateGt::store) must be properly initialized.",
+        "- The [`authority`](ConfigureGt::authority) must be a signer and have the GT_CONTROLLER role in the `store`.",
+        "- The [`store`](ConfigureGt::store) must be properly initialized.",
         "- The GT state of the `store` must be initialized.",
         "- The `window` must be greater than 0 seconds to ensure a valid exchange period."
       ],
@@ -16810,14 +16814,14 @@
         "Set order fee discount factors.",
         "",
         "# Accounts",
-        "*[See the documentation for the accounts.](ConfigurateGt)*",
+        "*[See the documentation for the accounts.](ConfigureGt)*",
         "",
         "# Arguments",
         "- `factors`: The order fee discount factors for each user rank.",
         "",
         "# Errors",
-        "- The [`authority`](ConfigurateGt::authority) must be a signer and have the MARKET_KEEPER role in the `store`.",
-        "- The [`store`](ConfigurateGt::store) must be initialized.",
+        "- The [`authority`](ConfigureGt::authority) must be a signer and have the MARKET_KEEPER role in the `store`.",
+        "- The [`store`](ConfigureGt::store) must be initialized.",
         "- The GT state of the `store` must be initialized.",
         "- The number of `factors` must match the number of ranks defined in GT state.",
         "- Each factor must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT)(i.e., 100%)."
@@ -16863,15 +16867,15 @@
         "Set referral reward factors.",
         "",
         "# Accounts",
-        "*[See the documentation for the accounts.](ConfigurateGt)*",
+        "*[See the documentation for the accounts.](ConfigureGt)*",
         "",
         "# Arguments",
         "- `factors`: The referral reward factors for each user rank.",
         "",
         "# Errors",
-        "- The [`authority`](ConfigurateGt::authority) must be a signer and a",
+        "- The [`authority`](ConfigureGt::authority) must be a signer and a",
         "GT_CONTROLLER in the store.",
-        "- The [`store`](ConfigurateGt::store) must be initialized.",
+        "- The [`store`](ConfigureGt::store) must be initialized.",
         "- The GT state of the `store` must be initialized.",
         "- The number of `factors` must match the number of ranks defined in GT state.",
         "- Each factor must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT)(i.e., 100%)."
@@ -18356,7 +18360,7 @@
         "- Must be enabled",
         "- The [`vault`](InsertGlvMarket::vault) must be either:",
         "- The ATA of `market_token` owned by `glv`, or",
-        "- Unintialized ATA account of `market_token` owned by `glv`"
+        "- Uninitialized ATA account of `market_token` owned by `glv`"
       ],
       "discriminator": [
         31,
@@ -19076,7 +19080,7 @@
         {
           "name": "system_program",
           "docs": [
-            "Initial collatearl token vault.",
+            "Initial collateral token vault.",
             "The system program."
           ],
           "address": "11111111111111111111111111111111"
@@ -22750,7 +22754,11 @@
         "- In a pending state",
         "- The order type must support updates",
         "- The feature must be enabled in the `store` for updating the given kind of `order`.",
-        "- The updated parameters must be valid for the order type."
+        "- The updated parameters must be valid for the order type.",
+        "",
+        "# Notes",
+        "- Unlike [`update_order_v2`], this instruction cannot emit a CPI Event due to the lack of required accounts for CPI.",
+        "As a result, it does not guarantee that an order will always have a corresponding `OrderUpdated` event."
       ],
       "discriminator": [
         54,
@@ -23126,7 +23134,7 @@
         {
           "name": "account",
           "docs": [
-            "The claimble account."
+            "The claimable account."
           ],
           "writable": true
         },
@@ -24082,12 +24090,12 @@
     {
       "code": 6069,
       "name": "EmptyWithdrawal",
-      "msg": "emtpy withdrawal"
+      "msg": "empty withdrawal"
     },
     {
       "code": 6070,
       "name": "EmptyOrder",
-      "msg": "emtpy order"
+      "msg": "empty order"
     },
     {
       "code": 6071,
@@ -24222,7 +24230,7 @@
     {
       "code": 6097,
       "name": "EmptyShift",
-      "msg": "emtpy shift"
+      "msg": "empty shift"
     },
     {
       "code": 6098,
@@ -30105,7 +30113,14 @@
     {
       "name": "OrderUpdated",
       "docs": [
-        "An event indicating that an order is updated."
+        "An event indicating that an order is created or updated.",
+        "",
+        "# Notes",
+        "- For compatibility reasons, the [`OrderUpdated`] event is not emitted",
+        "by the [`create_order`](crate::gmsol_store::create_order) and",
+        "[`update_order`](crate::gmsol_store::update_order) instructions.",
+        "As a result, there is no guarantee that every order will have",
+        "corresponding [`OrderUpdated`] events."
       ],
       "type": {
         "kind": "struct",
