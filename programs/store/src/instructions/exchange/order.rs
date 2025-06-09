@@ -1859,9 +1859,10 @@ mod deprecated {
         ctx: Context<UpdateOrder>,
         params: &UpdateOrderParams,
     ) -> Result<()> {
-        // Validate feature enabled.
         {
             let order = ctx.accounts.order.load()?;
+
+            // Validate feature enabled.
             ctx.accounts
                 .store
                 .load()?
@@ -1875,6 +1876,17 @@ mod deprecated {
                         .map_err(|err| error!(err))?,
                     ActionDisabledFlag::Update,
                 )?;
+
+            // Only orders without callback set are allowed to be updated
+            // by this instruction.
+            require_eq!(
+                order.header().callback_kind()?,
+                ActionCallbackKind::Disabled,
+                {
+                    msg!("[Deprecated] use `update_order_v2` instead");
+                    CoreError::Deprecated
+                },
+            );
         }
 
         let id = ctx
