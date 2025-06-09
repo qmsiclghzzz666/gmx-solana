@@ -752,6 +752,11 @@ impl super::Command for Exchange {
                                 ("enabled", "Is Enabled"),
                                 ("state.long_token_balance", "◎ Long Token"),
                                 ("state.short_token_balance", "◎ Short Token"),
+                                ("pools.claimable_fee.long_amount", "◎ Claimable Long Token"),
+                                (
+                                    "pools.claimable_fee.short_amount",
+                                    "◎ Claimable Short Token"
+                                ),
                             ]),
                         )?
                     );
