@@ -1118,7 +1118,7 @@ impl<'info> internal::Authentication<'info> for CancelOrderIfNoPosition<'info> {
     }
 }
 
-#[deprecated(since = "0.6.0", note = "Use v2 instructions instead.")]
+#[deprecated(since = "0.6.0", note = "use v2 instructions instead.")]
 mod deprecated {
     use super::*;
 

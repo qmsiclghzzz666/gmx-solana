@@ -2054,7 +2054,7 @@ pub mod gmsol_store {
     /// # Notes
     /// - Unlike [`create_order_v2`], this instruction cannot emit a CPI Event due to the lack of required accounts for CPI.  
     ///   As a result, it does not guarantee that an order will always have a corresponding `OrderUpdated` event.
-    #[deprecated(since = "0.6.0", note = "Use `create_order_v2` instead.")]
+    #[deprecated(since = "0.6.0", note = "use `create_order_v2` instead.")]
     pub fn create_order<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
         nonce: [u8; 32],
@@ -2140,7 +2140,7 @@ pub mod gmsol_store {
     /// - The addresses of the ATAs must be valid.
     /// - The `order` must be cancelled or completed if the `executor` is not the owner.
     /// - The feature must be enabled for closing the given kind of `order`.
-    #[deprecated(since = "0.6.0", note = "Use `close_order_v2` instead.")]
+    #[deprecated(since = "0.6.0", note = "use `close_order_v2` instead.")]
     pub fn close_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseOrder<'info>>,
         reason: String,
@@ -2326,7 +2326,7 @@ pub mod gmsol_store {
     #[allow(rustdoc::broken_intra_doc_links)]
     #[deprecated(
         since = "0.6.0",
-        note = "Use `execute_increase_or_swap_order_v2` instead."
+        note = "use `execute_increase_or_swap_order_v2` instead."
     )]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_increase_or_swap_order<'info>(
@@ -2451,7 +2451,7 @@ pub mod gmsol_store {
     /// - If `throw_on_execution_error` is true, any execution failure will throw an error.
     // Note: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
-    #[deprecated(since = "0.6.0", note = "Use `execute_decrease_order_v2` instead.")]
+    #[deprecated(since = "0.6.0", note = "use `execute_decrease_order_v2` instead.")]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_decrease_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDecreaseOrder<'info>>,
