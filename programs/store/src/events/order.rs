@@ -269,7 +269,14 @@ impl TryFrom<&Order> for OrderParamsForEvent {
     }
 }
 
-/// An event indicating that an order is updated.
+/// An event indicating that an order is created or updated.
+///
+/// # Notes
+/// - For compatibility reasons, the [`OrderUpdated`] event is not emitted
+///   by the [`create_order`](crate::gmsol_store::create_order) and
+///   [`update_order`](crate::gmsol_store::update_order) instructions.
+///   As a result, there is no guarantee that every order will have
+///   corresponding [`OrderUpdated`] events.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(Clone, InitSpace)]

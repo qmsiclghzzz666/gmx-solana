@@ -2050,6 +2050,10 @@ pub mod gmsol_store {
     /// - The feature for creating this kind of order is not enabled.
     /// - The remaining market accounts do not match the swap parameters, not all enabled or owned
     ///   by the `store`.
+    ///
+    /// # Notes
+    /// - Unlike [`create_order_v2`], this instruction cannot emit a CPI Event due to the lack of required accounts for CPI.  
+    ///   As a result, it does not guarantee that an order will always have a corresponding `OrderUpdated` event.
     #[deprecated(since = "0.6.0", note = "Use `create_order_v2` instead.")]
     pub fn create_order<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
@@ -2237,6 +2241,10 @@ pub mod gmsol_store {
     ///   - The order type must support updates
     /// - The feature must be enabled in the `store` for updating the given kind of `order`.
     /// - The updated parameters must be valid for the order type.
+    ///
+    /// # Notes
+    /// - Unlike [`update_order_v2`], this instruction cannot emit a CPI Event due to the lack of required accounts for CPI.  
+    ///   As a result, it does not guarantee that an order will always have a corresponding `OrderUpdated` event.
     #[deprecated(since = "0.6.0", note = "use `update_order_v2` instead")]
     pub fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
         instructions::update_order(ctx, &params)
