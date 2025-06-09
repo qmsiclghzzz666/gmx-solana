@@ -112,10 +112,10 @@ enum Command {
         #[arg(long, short, default_value_t = Amount::ZERO)]
         min_amount: Amount,
         #[cfg(feature = "execute")]
-        #[arg(long, default_value_t = Amount(Decimal::from(1000)))]
+        #[arg(long, default_value_t = Amount(Decimal::from(1)))]
         min_value_per_batch: Amount,
         #[cfg(feature = "execute")]
-        #[arg(long, default_value_t = NonZeroU8::new(3).unwrap())]
+        #[arg(long, default_value_t = NonZeroU8::new(6).unwrap())]
         batch: NonZeroU8,
     },
     /// Deposit into treasury vault.
