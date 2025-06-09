@@ -1,4 +1,4 @@
-use anchor_lang::CheckId;
+use anchor_lang::{prelude::Pubkey, pubkey, Ids};
 
 pub use crate::{
     cpi::{accounts::OnCallback, on_closed, on_created, on_executed},
@@ -6,12 +6,22 @@ pub use crate::{
     CALLBACK_AUTHORITY_SEED,
 };
 
+#[cfg(not(feature = "no-competition"))]
+const COMPETITION_ID: Pubkey = pubkey!("2AxuNr6euZPKQbTwNsLBjzFTZFAevA85F4PW9m9Dv8pc");
+
 /// Callback interface for GMX-Solana.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CallbackInterface;
 
-impl CheckId for CallbackInterface {
-    fn check_id(_id: &anchor_lang::prelude::Pubkey) -> anchor_lang::Result<()> {
-        Ok(())
+impl Ids for CallbackInterface {
+    fn ids() -> &'static [Pubkey] {
+        static IDS: &[Pubkey] = &[
+            #[cfg(feature = "test-only")]
+            crate::ID,
+            #[cfg(not(feature = "no-competition"))]
+            COMPETITION_ID,
+        ];
+
+        IDS
     }
 }

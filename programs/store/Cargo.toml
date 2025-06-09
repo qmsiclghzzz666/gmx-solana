@@ -36,7 +36,8 @@ migration = []
 mock = ["gmsol-chainlink-datastreams/mock"]
 multi-store = []
 devnet = ["gmsol-utils/devnet"]
-test-only = []
+test-only = ["gmsol-callback/test-only"]
+no-competition = ["gmsol-callback/no-competition"]
 
 [dependencies]
 gmsol-model = { workspace = true, features = ["u128", "solana", "strum"] }
