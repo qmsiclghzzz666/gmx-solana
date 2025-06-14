@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use anchor_spl::token::Mint;
 use gmsol_model::{
     params::{
@@ -57,6 +59,32 @@ impl gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for Market {
             PoolKind::CollateralSumForShort
         };
         self.try_pool(kind)
+    }
+
+    fn virtual_inventory_for_swaps_pool(
+        &self,
+    ) -> gmsol_model::Result<Option<impl Deref<Target = Self::Pool>>> {
+        match self.virtual_inventory_for_swaps() {
+            Some(_) => {
+                Err(gmsol_model::Error::InvalidArgument("virtual inventory for the swaps feature is not enabled when the market is used directly"))
+            },
+            None => {
+                Ok(None::<&Self::Pool>)
+            }
+        }
+    }
+
+    fn virtual_inventory_for_positions_pool(
+        &self,
+    ) -> gmsol_model::Result<Option<impl Deref<Target = Self::Pool>>> {
+        match self.virtual_inventory_for_positions() {
+            Some(_) => {
+                Err(gmsol_model::Error::InvalidArgument("virtual inventory for the positions feature is not enabled when the market is used directly"))
+            },
+            None => {
+                Ok(None::<&Self::Pool>)
+            }
+        }
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
@@ -377,6 +405,18 @@ where
 
     fn collateral_sum_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
         self.market.collateral_sum_pool(is_long)
+    }
+
+    fn virtual_inventory_for_swaps_pool(
+        &self,
+    ) -> gmsol_model::Result<Option<impl Deref<Target = Self::Pool>>> {
+        self.market.virtual_inventory_for_swaps_pool()
+    }
+
+    fn virtual_inventory_for_positions_pool(
+        &self,
+    ) -> gmsol_model::Result<Option<impl Deref<Target = Self::Pool>>> {
+        self.market.virtual_inventory_for_positions_pool()
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {

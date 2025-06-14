@@ -3,6 +3,7 @@
 use std::{
     collections::HashMap,
     fmt,
+    ops::{Deref, DerefMut},
     time::{Duration, Instant},
 };
 
@@ -31,7 +32,7 @@ use crate::{
 use num_traits::{CheckedSub, Signed};
 
 /// Test Pool.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct TestPool<T> {
     long_amount: T,
     short_amount: T,
@@ -498,6 +499,18 @@ where
         }
     }
 
+    fn virtual_inventory_for_swaps_pool(
+        &self,
+    ) -> crate::Result<Option<impl Deref<Target = Self::Pool>>> {
+        Ok(None::<&Self::Pool>)
+    }
+
+    fn virtual_inventory_for_positions_pool(
+        &self,
+    ) -> crate::Result<Option<impl Deref<Target = Self::Pool>>> {
+        Ok(None::<&Self::Pool>)
+    }
+
     fn usd_to_amount_divisor(&self) -> Self::Num {
         self.value_to_amount_divisor.clone()
     }
@@ -545,6 +558,12 @@ where
 
     fn claimable_fee_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
         Ok(&mut self.fee)
+    }
+
+    fn virtual_inventory_for_swaps_pool_mut(
+        &mut self,
+    ) -> crate::Result<Option<impl DerefMut<Target = Self::Pool>>> {
+        Ok(None::<&mut Self::Pool>)
     }
 }
 
@@ -807,6 +826,12 @@ where
         Ok(&mut self.total_borrowing)
     }
 
+    fn virtual_inventory_for_positions_pool_mut(
+        &mut self,
+    ) -> crate::Result<Option<impl DerefMut<Target = Self::Pool>>> {
+        Ok(None::<&mut Self::Pool>)
+    }
+
     fn just_passed_in_seconds_for_funding(&mut self) -> crate::Result<u64> {
         self.just_passed_in_seconds(ClockKind::Funding)
     }
@@ -963,7 +988,7 @@ where
         ty: DecreasePositionSwapType,
         report: &crate::action::swap::SwapReport<Self::Num, <Self::Num as Unsigned>::Signed>,
     ) -> crate::Result<()> {
-        println!("swapped: ty={ty}, report={report:?}");
+        println!("swapped: ty={ty:?}, report={report:?}");
         Ok(())
     }
 
@@ -972,7 +997,7 @@ where
         ty: DecreasePositionSwapType,
         error: crate::Error,
     ) -> crate::Result<()> {
-        eprintln!("swap error: ty={ty}, err={error}");
+        eprintln!("swap error: ty={ty:?}, err={error}");
         Ok(())
     }
 }

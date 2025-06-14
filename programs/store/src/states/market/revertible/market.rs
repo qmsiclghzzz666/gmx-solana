@@ -1,4 +1,8 @@
-use std::{borrow::Borrow, cell::RefMut};
+use std::{
+    borrow::Borrow,
+    cell::RefMut,
+    ops::{Deref, DerefMut},
+};
 
 use anchor_lang::prelude::*;
 use gmsol_model::{
@@ -23,7 +27,10 @@ use crate::{
     CoreError,
 };
 
-use super::{Revertible, Revision};
+use super::{
+    revertible_virtual_inventory::RevertibleVirtualInventory, Revertible,
+    RevertibleVirtualInventories, Revision,
+};
 
 /// Swap Pricing Kind.
 #[derive(Clone, Copy)]
@@ -41,6 +48,8 @@ pub enum SwapPricingKind {
 /// Revertible Market.
 pub struct RevertibleMarket<'a, 'info> {
     pub(super) market: RefMut<'a, Market>,
+    virtual_inventory_for_swaps: Option<&'a RevertibleVirtualInventory<'info>>,
+    virtual_inventory_for_positions: Option<&'a RevertibleVirtualInventory<'info>>,
     order_fee_discount_factor: u128,
     event_emitter: EventEmitter<'a, 'info>,
     swap_pricing: SwapPricingKind,
@@ -65,14 +74,43 @@ impl AsRef<Market> for RevertibleMarket<'_, '_> {
 }
 
 impl<'a, 'info> RevertibleMarket<'a, 'info> {
+    /// Create a new [`RevertibleMarket`].
+    ///
+    /// # Notes
+    /// - Virtual inventory feature is disable when `virtual_inventories` is `None`.
     pub(crate) fn new(
         market: &'a AccountLoader<'info, Market>,
+        virtual_inventories: Option<&'a RevertibleVirtualInventories<'info>>,
         event_emitter: EventEmitter<'a, 'info>,
     ) -> Result<Self> {
         let mut market = market.load_mut()?;
         market.buffer.start_revertible_operation();
+
+        let get_enabled_virtual_inventory = |key| {
+            virtual_inventories?
+                .get(key)
+                .ok_or_else(|| error!(CoreError::InvalidArgument))
+                .and_then(|vi| {
+                    // A disabled virtual inventory is considered as not being configured.
+                    Ok((!vi.is_disabled()?).then_some(vi))
+                })
+                .transpose()
+        };
+
+        let virtual_inventory_for_swaps = market
+            .virtual_inventory_for_swaps()
+            .and_then(get_enabled_virtual_inventory)
+            .transpose()?;
+
+        let virtual_inventory_for_positions = market
+            .virtual_inventory_for_positions()
+            .and_then(get_enabled_virtual_inventory)
+            .transpose()?;
+
         Ok(Self {
             market,
+            virtual_inventory_for_swaps,
+            virtual_inventory_for_positions,
             order_fee_discount_factor: 0,
             event_emitter,
             swap_pricing: SwapPricingKind::Swap,
@@ -225,14 +263,21 @@ impl<'a, 'info> RevertibleMarket<'a, 'info> {
 }
 
 impl Revertible for RevertibleMarket<'_, '_> {
-    fn commit(mut self) {
+    fn commit(self) {
+        let Self {
+            mut market,
+            event_emitter,
+            ..
+        } = self;
+
         let Market {
             meta,
             state,
             buffer,
             ..
-        } = &mut *self.market;
-        buffer.commit_to_storage(state, &meta.market_token_mint, &self.event_emitter);
+        } = &mut *market;
+        buffer.commit_to_storage(state, &meta.market_token_mint, &event_emitter);
+
         debug_msg!(
             "[Balance committed] {}: {},{}",
             meta.market_token_mint,
@@ -323,6 +368,34 @@ impl gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarke
         })
     }
 
+    fn virtual_inventory_for_swaps_pool(
+        &self,
+    ) -> gmsol_model::Result<Option<impl Deref<Target = Self::Pool>>> {
+        self.virtual_inventory_for_swaps
+            .as_ref()
+            .map(|vi| vi.pool())
+            .transpose()
+            .map_err(|_| {
+                gmsol_model::Error::InvalidArgument(
+                    "internal: failed to get virtual inventory for swaps pool",
+                )
+            })
+    }
+
+    fn virtual_inventory_for_positions_pool(
+        &self,
+    ) -> gmsol_model::Result<Option<impl Deref<Target = Self::Pool>>> {
+        self.virtual_inventory_for_positions
+            .as_ref()
+            .map(|vi| vi.pool())
+            .transpose()
+            .map_err(|_| {
+                gmsol_model::Error::InvalidArgument(
+                    "internal: failed to get virtual inventory for positions pool",
+                )
+            })
+    }
+
     fn usd_to_amount_divisor(&self) -> Self::Num {
         self.market.usd_to_amount_divisor()
     }
@@ -363,6 +436,20 @@ impl gmsol_model::BaseMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMa
 
     fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.pool_mut(PoolKind::ClaimableFee)
+    }
+
+    fn virtual_inventory_for_swaps_pool_mut(
+        &mut self,
+    ) -> gmsol_model::Result<Option<impl DerefMut<Target = Self::Pool>>> {
+        self.virtual_inventory_for_swaps
+            .as_mut()
+            .map(|vi| vi.pool_mut())
+            .transpose()
+            .map_err(|_| {
+                gmsol_model::Error::InvalidArgument(
+                    "internal: failed to get virtual inventory for swaps pool mutably",
+                )
+            })
     }
 }
 
@@ -585,6 +672,20 @@ impl gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMa
 
     fn total_borrowing_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.pool_mut(PoolKind::TotalBorrowing)
+    }
+
+    fn virtual_inventory_for_positions_pool_mut(
+        &mut self,
+    ) -> gmsol_model::Result<Option<impl DerefMut<Target = Self::Pool>>> {
+        self.virtual_inventory_for_positions
+            .as_mut()
+            .map(|vi| vi.pool_mut())
+            .transpose()
+            .map_err(|_| {
+                gmsol_model::Error::InvalidArgument(
+                    "internal: failed to get virtual inventory for positions pool mutably",
+                )
+            })
     }
 
     fn on_insufficient_funding_fee_payment(

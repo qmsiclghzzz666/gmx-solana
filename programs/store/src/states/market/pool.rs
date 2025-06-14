@@ -33,7 +33,7 @@ impl PoolStorage {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(derive_more::Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(BorshSerialize, BorshDeserialize, InitSpace)]
+#[derive(BorshSerialize, BorshDeserialize, InitSpace, PartialEq, Eq)]
 pub struct Pool {
     /// Whether the pool only contains one kind of token,
     /// i.e. a pure pool.
@@ -132,6 +132,31 @@ impl gmsol_model::Pool for Pool {
             ans.apply_delta_to_short_amount(amount)?;
         }
         Ok(ans)
+    }
+
+    fn checked_cancel_amounts(&self) -> gmsol_model::Result<Self>
+    where
+        Self::Signed: gmsol_model::num_traits::CheckedSub,
+    {
+        let mut ans = *self;
+        if self.is_pure() {
+            ans.long_token_amount &= 1;
+        } else {
+            (ans.long_token_amount, ans.short_token_amount) =
+                cancel_amounts(ans.long_token_amount, ans.short_token_amount);
+        }
+
+        Ok(ans)
+    }
+}
+
+pub(crate) fn cancel_amounts(long_amount: u128, short_amount: u128) -> (u128, u128) {
+    let is_long_side_left = long_amount >= short_amount;
+    let leftover_amount = long_amount.abs_diff(short_amount);
+    if is_long_side_left {
+        (leftover_amount, 0)
+    } else {
+        (0, leftover_amount)
     }
 }
 
@@ -258,6 +283,7 @@ impl Pools {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use crate::events::EventPool;
 
@@ -287,5 +313,80 @@ mod tests {
             .expect("failed to serialize `EventPool`");
 
         assert_eq!(data, event_data);
+    }
+
+    #[cfg(feature = "debug")]
+    #[test]
+    fn cancel_amounts() -> gmsol_model::Result<()> {
+        use bytemuck::Zeroable;
+        use gmsol_model::{Balance, Delta, Pool};
+
+        let pool = super::Pool::zeroed();
+
+        let pool_1 = pool.checked_apply_delta(Delta::new_both_sides(true, &1_000, &3_000))?;
+        let expected_1 = pool.checked_apply_delta(Delta::new_both_sides(true, &0, &2_000))?;
+        assert_eq!(pool_1.checked_cancel_amounts()?, expected_1);
+
+        let pool_2 = pool.checked_apply_delta(Delta::new_both_sides(true, &3_005, &3_000))?;
+        let expected_2 = pool.checked_apply_delta(Delta::new_both_sides(true, &5, &0))?;
+        assert_eq!(pool_2.checked_cancel_amounts()?, expected_2);
+
+        let pool_3 = pool.checked_apply_delta(Delta::new_both_sides(true, &3_000, &3_000))?;
+        let expected_3 = pool.checked_apply_delta(Delta::new_both_sides(true, &0, &0))?;
+        assert_eq!(pool_3.checked_cancel_amounts()?, expected_3);
+
+        let pool_4 = pool
+            .checked_apply_delta(Delta::new_both_sides(true, &i128::MAX, &i128::MAX))?
+            .checked_apply_delta(Delta::new_both_sides(true, &i128::MAX, &i128::MAX))?
+            .checked_apply_delta(Delta::new_both_sides(true, &1, &1))?;
+        let expected_4 = pool.checked_apply_delta(Delta::new_both_sides(true, &0, &0))?;
+        assert_eq!(pool_4.long_amount()?, u128::MAX);
+        assert_eq!(pool_4.short_amount()?, u128::MAX);
+        assert_eq!(pool_4.checked_cancel_amounts()?, expected_4);
+
+        let pool_5 =
+            pool.checked_apply_delta(Delta::new_both_sides(true, &i128::MAX, &i128::MAX))?;
+        let expected_5 = pool.checked_apply_delta(Delta::new_both_sides(true, &0, &0))?;
+        assert_eq!(pool_5.checked_cancel_amounts()?, expected_5);
+        let pool_5 = pool
+            .checked_apply_delta(Delta::new_both_sides(true, &i128::MAX, &i128::MAX))?
+            .checked_apply_delta(Delta::new_both_sides(true, &i128::MAX, &0))?
+            .checked_apply_delta(Delta::new_both_sides(true, &1, &0))?;
+        let expected_5 = pool
+            .checked_apply_delta(Delta::new_both_sides(true, &i128::MAX, &0))?
+            .checked_apply_delta(Delta::new_both_sides(true, &1, &0))?;
+        assert_eq!(pool_5.long_amount()?, u128::MAX);
+        assert_eq!(pool_5.short_amount()?, i128::MAX.unsigned_abs());
+        assert_eq!(pool_5.checked_cancel_amounts()?, expected_5);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "debug")]
+    #[test]
+    fn cancel_amounts_for_pure_pools() -> gmsol_model::Result<()> {
+        use bytemuck::Zeroable;
+        use gmsol_model::{Balance, Delta, Pool};
+
+        let mut pool = super::Pool::zeroed();
+        pool.set_is_pure(true);
+
+        let pool_1 = pool.checked_apply_delta(Delta::new_both_sides(true, &1_001, &3_000))?;
+        let expected_1 = pool.checked_apply_delta(Delta::new_both_sides(true, &1, &0))?;
+        assert_eq!(pool_1.checked_cancel_amounts()?, expected_1);
+
+        let pool_2 = pool.checked_apply_delta(Delta::new_both_sides(true, &3_005, &3005))?;
+        let expected_2 = pool.checked_apply_delta(Delta::new_both_sides(true, &0, &0))?;
+        assert_eq!(pool_2.checked_cancel_amounts()?, expected_2);
+
+        let pool_3 = pool
+            .checked_apply_delta(Delta::new_both_sides(true, &i128::MAX, &i128::MAX))?
+            .checked_apply_delta(Delta::new_both_sides(true, &0, &1))?;
+        let expected_3 = pool.checked_apply_delta(Delta::new_both_sides(true, &1, &0))?;
+        assert_eq!(pool_3.long_amount()?, u128::MAX / 2 + 1);
+        assert_eq!(pool_3.short_amount()?, u128::MAX / 2);
+        assert_eq!(pool_3.checked_cancel_amounts()?, expected_3);
+
+        Ok(())
     }
 }
