@@ -81,7 +81,7 @@ pub trait BaseMarketMut<const DECIMALS: u8>: BaseMarket<DECIMALS> {
     /// - This method must return `Ok` if [`BaseMarket::liquidity_pool`] does.
     /// # Notes
     /// - Avoid using this function directly unless necessary.
-    ///   Use [`BaseMarketMut::apply_delta`] instead.
+    ///   Use [`BaseMarketMutExt::apply_delta`] instead.
     fn liquidity_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
 
     /// Get the mutable reference of the claimable fee pool.

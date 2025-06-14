@@ -104,7 +104,8 @@ pub trait PerpMarketMut<const DECIMALS: u8>:
 
     /// Get virtual inventory for positions mutably.
     /// # Requirements
-    /// - This method must return `Ok(Some(_))` if [`BaseMarket::virtual_inventory_for_positions_pool`] does.
+    /// - This method must return `Ok(Some(_))` if
+    ///   [`BaseMarket::virtual_inventory_for_positions_pool`](crate::BaseMarket::virtual_inventory_for_positions_pool) does.
     fn virtual_inventory_for_positions_pool_mut(
         &mut self,
     ) -> crate::Result<Option<impl DerefMut<Target = Self::Pool>>>;
