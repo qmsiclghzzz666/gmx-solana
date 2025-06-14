@@ -4999,7 +4999,7 @@
     {
       "name": "close_virtual_inventory",
       "docs": [
-        "Close a unused [`VirtualInventory`](crate::states::market::virtual_inventory::VirtualInventory) account."
+        "Close an unused [`VirtualInventory`](crate::states::market::virtual_inventory::VirtualInventory) account."
       ],
       "discriminator": [
         129,
@@ -5064,7 +5064,7 @@
         {
           "name": "virtual_inventory",
           "docs": [
-            "The virutal inventory account to close."
+            "The virtual inventory account to close."
           ],
           "writable": true
         }
@@ -9708,7 +9708,7 @@
         {
           "name": "virtual_inventory",
           "docs": [
-            "The virutal inventory account to create."
+            "The virtual inventory account to create."
           ],
           "writable": true,
           "pda": {
@@ -9788,7 +9788,7 @@
         {
           "name": "virtual_inventory",
           "docs": [
-            "The virutal inventory account to create."
+            "The virtual inventory account to create."
           ],
           "writable": true,
           "pda": {
@@ -10362,7 +10362,6 @@
           "docs": [
             "Authority."
           ],
-          "writable": true,
           "signer": true
         },
         {
@@ -10377,7 +10376,7 @@
         {
           "name": "virtual_inventory",
           "docs": [
-            "The virutal inventory account to close."
+            "The virtual inventory account to close."
           ],
           "writable": true
         }
@@ -18885,7 +18884,7 @@
     {
       "name": "join_virtual_inventory_for_positions",
       "docs": [
-        "Join a [`VirtualInventory`](crate::states::market::virtual_inventory::VirtualInventory) account for swaps."
+        "Join a [`VirtualInventory`](crate::states::market::virtual_inventory::VirtualInventory) account for positions."
       ],
       "discriminator": [
         49,
@@ -19097,7 +19096,7 @@
     {
       "name": "leave_virtual_inventory_for_positions",
       "docs": [
-        "Leave a [`VirtualInventory`](crate::states::market::virtual_inventory::VirtualInventory) account for swaps."
+        "Leave a [`VirtualInventory`](crate::states::market::virtual_inventory::VirtualInventory) account for positions."
       ],
       "discriminator": [
         177,
