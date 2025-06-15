@@ -71,7 +71,7 @@ impl<'info> RemainingAccountsForMarket<'info> {
     }
 }
 
-/// Operation for transferring funds into market valut.
+/// Operation for transferring funds into market vault.
 #[derive(TypedBuilder)]
 pub(crate) struct MarketTransferInOperation<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
