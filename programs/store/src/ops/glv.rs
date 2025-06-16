@@ -410,7 +410,7 @@ impl ExecuteGlvDepositOperation<'_, '_> {
 
             // Calculate GLV token amount to mint.
             let glv_amount = {
-                let maximize_value = true;
+                let is_value_maximized = true;
                 let glv_supply = self.glv_token_mint.supply;
                 let glv_value = unchecked_get_glv_value(
                     &*self.glv.load()?,
@@ -418,7 +418,7 @@ impl ExecuteGlvDepositOperation<'_, '_> {
                     &op,
                     self.markets,
                     self.market_tokens,
-                    maximize_value,
+                    is_value_maximized,
                 )?;
 
                 let (received_value, market_pool_value, market_token_supply) = {
@@ -468,7 +468,7 @@ impl ExecuteGlvDepositOperation<'_, '_> {
                     glv_token: self.glv_token_mint.key(),
                     market_token: market_token_mint.key(),
                     supply: glv_supply,
-                    value_maximized: maximize_value,
+                    is_value_maximized,
                     value: glv_value,
                     input_amount: market_token_amount,
                     input_value: received_value,
@@ -842,7 +842,7 @@ impl ExecuteGlvWithdrawalOperation<'_, '_> {
 
             // Calculate market token amount to withdrawal.
             let market_token_amount = {
-                let maximize_value = false;
+                let is_value_maximized = false;
                 let glv_supply = self.glv_token_mint.supply;
                 let glv_value = unchecked_get_glv_value(
                     &*self.glv.load()?,
@@ -850,7 +850,7 @@ impl ExecuteGlvWithdrawalOperation<'_, '_> {
                     &op,
                     self.markets,
                     self.market_tokens,
-                    maximize_value,
+                    is_value_maximized,
                 )?;
 
                 let market_token_value = market_token_amount_to_usd(
@@ -880,7 +880,7 @@ impl ExecuteGlvWithdrawalOperation<'_, '_> {
                     glv_token: self.glv_token_mint.key(),
                     market_token: market_token_mint.key(),
                     supply: glv_supply,
-                    value_maximized: maximize_value,
+                    is_value_maximized,
                     value: glv_value,
                     input_amount: glv_token_amount,
                     input_value: market_token_value,
