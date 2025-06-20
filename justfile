@@ -1,5 +1,5 @@
 IDL_OUT_DIR := "idl-out"
-FEATURES := "cli,u128"
+FEATURES := "u128"
 DEVNET_FEATURES := "devnet,test-only,migration"
 INTEGRATION_TEST_FEATURES := "integration-test"
 SCRIPTS := "./scripts"

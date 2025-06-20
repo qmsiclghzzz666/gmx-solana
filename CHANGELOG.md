@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - model: Added support for virtual inventories and virtual price impact.
 - program(store): Introduced virtual inventory mechanism and related instructions.
 
+### Removed
+
+- sdk: Removed the `gmsol` crate and `gmsol-legacy` cli.
+
 ## [0.6.0] - 2025-06-23
 
 ### Breaking Changes
