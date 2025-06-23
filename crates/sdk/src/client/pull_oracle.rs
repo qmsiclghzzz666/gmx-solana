@@ -190,6 +190,11 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PriceUpdateInstructions<'a, C> 
         Ok(())
     }
 
+    /// Get the mutable references to the [`BundleBuilder`]s.
+    pub fn split_mut(&mut self) -> (&mut BundleBuilder<'a, C>, &mut BundleBuilder<'a, C>) {
+        (&mut self.post, &mut self.close)
+    }
+
     /// Push a close instruction.
     #[allow(clippy::result_large_err)]
     pub fn try_push_close(

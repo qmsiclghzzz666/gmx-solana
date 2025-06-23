@@ -200,22 +200,24 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
         }
 
         // Post price updates.
-        for (feed_id, (proof, update)) in updates {
-            let price_update = Keypair::new();
-            let vaa = utils::get_vaa_buffer(proof);
-            let Some((encoded_vaa, _)) = vaas.get(vaa) else {
-                continue;
-            };
-            let (post_price_update, price_update) = pyth
-                .post_price_update(price_update, update, encoded_vaa)?
-                .swap_output(());
-            prices.insert(Pubkey::new_from_array(feed_id.to_bytes()), price_update);
-            ixns.try_push_post(post_price_update)
-                .map_err(|(_, err)| err)?;
-            ixns.try_push_close(pyth.reclaim_rent(&price_update))
-                .map_err(|(_, err)| err)?;
+        let (post, close) = ixns.split_mut();
+        {
+            let mut post = post.push_parallel();
+            let mut close = close.push_parallel();
+            for (feed_id, (proof, update)) in updates {
+                let price_update = Keypair::new();
+                let vaa = utils::get_vaa_buffer(proof);
+                let Some((encoded_vaa, _)) = vaas.get(vaa) else {
+                    continue;
+                };
+                let (post_price_update, price_update) = pyth
+                    .post_price_update(price_update, update, encoded_vaa)?
+                    .swap_output(());
+                prices.insert(Pubkey::new_from_array(feed_id.to_bytes()), price_update);
+                post.add(post_price_update);
+                close.add(pyth.reclaim_rent(&price_update));
+            }
         }
-
         Ok((ixns, HashMap::from([(PriceProviderKind::Pyth, prices)])))
     }
 }

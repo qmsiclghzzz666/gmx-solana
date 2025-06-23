@@ -16,7 +16,7 @@ use crate::{
     transaction_builder::{default_before_sign, TransactionBuilder},
     transaction_group::TransactionGroupOptions,
     utils::{inspect_transaction, WithSlot},
-    ParallelGroup, TransactionGroup,
+    AtomicGroup, ParallelGroup, TransactionGroup,
 };
 
 const TRANSACTION_SIZE_LIMIT: usize = PACKET_DATA_SIZE;
@@ -156,9 +156,31 @@ impl<C> BundleBuilder<'_, C> {
             options: self.options.clone(),
         }))
     }
+
+    /// Push a [`ParallelGroup`].
+    pub fn push_parallel_group(&mut self, group: ParallelGroup) -> &mut Self {
+        if !group.is_empty() {
+            self.groups.push(group);
+        }
+        self
+    }
 }
 
 impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
+    fn register_transaction_builder(
+        &mut self,
+        txn: TransactionBuilder<'a, C>,
+        options: AtomicGroupOptions,
+    ) -> AtomicGroup {
+        let ag = txn.into_atomic_group(
+            &mut self.ctx.cfg_signers,
+            &mut self.ctx.signers,
+            &mut self.luts,
+            options,
+        );
+        ag
+    }
+
     /// Push a [`TransactionBuilder`] with options.
     #[allow(clippy::result_large_err)]
     pub fn try_push_with_opts(
@@ -166,21 +188,32 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
         txn: TransactionBuilder<'a, C>,
         new_transaction: bool,
     ) -> Result<&mut Self, (TransactionBuilder<'a, C>, crate::Error)> {
-        let ag = txn.into_atomic_group(
-            &mut self.ctx.cfg_signers,
-            &mut self.ctx.signers,
-            &mut self.luts,
+        let ag = self.register_transaction_builder(
+            txn,
             AtomicGroupOptions {
                 is_mergeable: !new_transaction,
             },
         );
-        self.groups.push(ParallelGroup::with_options(
+        self.push_parallel_group(ParallelGroup::with_options(
             [ag],
             ParallelGroupOptions {
                 is_mergeable: !new_transaction,
             },
         ));
         Ok(self)
+    }
+
+    /// Push multiple transactions that can be sent simultaneously.
+    pub fn push_parallel(&mut self) -> PushParallel<'_, 'a, C> {
+        self.push_parallel_with_options(Default::default())
+    }
+
+    /// Push multiple transactions that can be sent simultaneously with the given options.
+    pub fn push_parallel_with_options(
+        &mut self,
+        options: ParallelGroupOptions,
+    ) -> PushParallel<'_, 'a, C> {
+        PushParallel::new(self, options)
     }
 
     /// Try to push a [`TransactionBuilder`] to the builder.
@@ -272,6 +305,47 @@ struct Ctx<'a, C> {
     client: RpcClient,
     cfg_signers: TransactionSigners<C>,
     signers: HashMap<Pubkey, &'a dyn Signer>,
+}
+
+/// Push multiple transactions that can be sent simultaneously to the [`BundleBuilder`].
+pub struct PushParallel<'a, 'ctx, C> {
+    bundle: &'a mut BundleBuilder<'ctx, C>,
+    pg: Option<ParallelGroup>,
+}
+
+impl<'a, 'ctx, C> PushParallel<'a, 'ctx, C> {
+    fn new(bundle: &'a mut BundleBuilder<'ctx, C>, options: ParallelGroupOptions) -> Self {
+        Self {
+            bundle,
+            pg: Some(ParallelGroup::with_options([], options)),
+        }
+    }
+}
+
+impl<'a, 'ctx, C: Deref<Target = impl Signer> + Clone> PushParallel<'a, 'ctx, C> {
+    /// Add a [`TransactionBuilder`] to the parallel group with the given options.
+    pub fn add_with_options(
+        &mut self,
+        txn: TransactionBuilder<'ctx, C>,
+        options: AtomicGroupOptions,
+    ) -> &mut Self {
+        let ag = self.bundle.register_transaction_builder(txn, options);
+        self.pg.as_mut().expect("the builder is dropped").add(ag);
+        self
+    }
+
+    /// Add a [`TransactionBuilder`] to the parallel group.
+    pub fn add(&mut self, txn: TransactionBuilder<'ctx, C>) -> &mut Self {
+        self.add_with_options(txn, Default::default())
+    }
+}
+
+impl<'a, 'ctx, C> Drop for PushParallel<'a, 'ctx, C> {
+    fn drop(&mut self) {
+        if let Some(pg) = self.pg.take() {
+            self.bundle.push_parallel_group(pg);
+        }
+    }
 }
 
 /// A bundle of transactions.

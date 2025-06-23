@@ -327,80 +327,90 @@ impl<'a, C: Clone + Deref<Target = impl Signer>> PostPullOraclePrices<'a, C>
     )> {
         let mut ixns = PriceUpdateInstructions::new(self.gmsol, options);
         let mut prices = HashMap::default();
-        for update in price_updates {
-            let feeds = &update.feeds;
-            let price_signatures = &update.price_submissions;
-            let queue = update.queue;
-            let oracle_keys = &update.oracle_keys;
 
-            let queue_key = [queue];
-            let (oracle_luts_result, pull_feed_luts_result, queue_lut_result) = join!(
-                fetch_and_cache_luts::<OracleAccountData>(
-                    &self.client,
-                    self.ctx.clone(),
-                    oracle_keys
-                ),
-                fetch_and_cache_luts::<PullFeedAccountData>(&self.client, self.ctx.clone(), feeds),
-                fetch_and_cache_luts::<QueueAccountData>(
-                    &self.client,
-                    self.ctx.clone(),
-                    &queue_key
-                )
-            );
+        {
+            let mut pg = ixns.split_mut().0.push_parallel();
+            for update in price_updates {
+                let feeds = &update.feeds;
+                let price_signatures = &update.price_submissions;
+                let queue = update.queue;
+                let oracle_keys = &update.oracle_keys;
 
-            let oracle_luts = oracle_luts_result
-                .map_err(|_| crate::Error::custom("switchboard: fetching oracle luts failed"))?;
-            let pull_feed_luts = pull_feed_luts_result
-                .map_err(|_| crate::Error::custom("switchboard: fetching pull feed luts failed"))?;
-            let queue_lut = queue_lut_result
-                .map_err(|_| crate::Error::custom("switchboard: fetching queue lut failed"))?;
-
-            let mut luts = oracle_luts;
-            luts.extend(pull_feed_luts);
-            luts.extend(queue_lut);
-
-            let payer = self.gmsol.payer();
-
-            prices.extend(feeds.iter().map(|feed| (*feed, *feed)));
-
-            let ix_data = PullFeedSubmitResponseManyParams {
-                slot: update.slot,
-                submissions: price_signatures.clone(),
-            };
-
-            let feeds = feeds.iter().map(|pubkey| AccountMeta::new(*pubkey, false));
-            let oracles_and_stats = oracle_keys.iter().flat_map(|oracle| {
-                let stats_key = OracleAccountData::stats_key(oracle);
-                [
-                    AccountMeta::new_readonly(*oracle, false),
-                    AccountMeta::new(stats_key, false),
-                ]
-            });
-            let ix = self
-                .gmsol
-                .store_transaction()
-                .program(self.switchboard)
-                .args(ix_data.data())
-                .accounts(
-                    PullFeedSubmitResponseMany {
-                        queue,
-                        program_state: State::key(),
-                        recent_slothashes: solana_sdk::sysvar::slot_hashes::ID,
-                        payer,
-                        system_program: system_program::ID,
-                        reward_vault: get_associated_token_address(&queue, &NATIVE_MINT),
-                        token_program: SPL_TOKEN_PROGRAM_ID,
-                        token_mint: NATIVE_MINT,
-                    }
-                    .to_account_metas(None),
-                )
-                .accounts(feeds.chain(oracles_and_stats).collect())
-                .lookup_tables(
-                    luts.clone()
-                        .into_iter()
-                        .map(|x| (x.key, x.addresses.clone())),
+                let queue_key = [queue];
+                let (oracle_luts_result, pull_feed_luts_result, queue_lut_result) = join!(
+                    fetch_and_cache_luts::<OracleAccountData>(
+                        &self.client,
+                        self.ctx.clone(),
+                        oracle_keys
+                    ),
+                    fetch_and_cache_luts::<PullFeedAccountData>(
+                        &self.client,
+                        self.ctx.clone(),
+                        feeds
+                    ),
+                    fetch_and_cache_luts::<QueueAccountData>(
+                        &self.client,
+                        self.ctx.clone(),
+                        &queue_key
+                    )
                 );
-            ixns.try_push_post(ix).map_err(|(_, err)| err)?;
+
+                let oracle_luts = oracle_luts_result.map_err(|_| {
+                    crate::Error::custom("switchboard: fetching oracle luts failed")
+                })?;
+                let pull_feed_luts = pull_feed_luts_result.map_err(|_| {
+                    crate::Error::custom("switchboard: fetching pull feed luts failed")
+                })?;
+                let queue_lut = queue_lut_result
+                    .map_err(|_| crate::Error::custom("switchboard: fetching queue lut failed"))?;
+
+                let mut luts = oracle_luts;
+                luts.extend(pull_feed_luts);
+                luts.extend(queue_lut);
+
+                let payer = self.gmsol.payer();
+
+                prices.extend(feeds.iter().map(|feed| (*feed, *feed)));
+
+                let ix_data = PullFeedSubmitResponseManyParams {
+                    slot: update.slot,
+                    submissions: price_signatures.clone(),
+                };
+
+                let feeds = feeds.iter().map(|pubkey| AccountMeta::new(*pubkey, false));
+                let oracles_and_stats = oracle_keys.iter().flat_map(|oracle| {
+                    let stats_key = OracleAccountData::stats_key(oracle);
+                    [
+                        AccountMeta::new_readonly(*oracle, false),
+                        AccountMeta::new(stats_key, false),
+                    ]
+                });
+                let ix = self
+                    .gmsol
+                    .store_transaction()
+                    .program(self.switchboard)
+                    .args(ix_data.data())
+                    .accounts(
+                        PullFeedSubmitResponseMany {
+                            queue,
+                            program_state: State::key(),
+                            recent_slothashes: solana_sdk::sysvar::slot_hashes::ID,
+                            payer,
+                            system_program: system_program::ID,
+                            reward_vault: get_associated_token_address(&queue, &NATIVE_MINT),
+                            token_program: SPL_TOKEN_PROGRAM_ID,
+                            token_mint: NATIVE_MINT,
+                        }
+                        .to_account_metas(None),
+                    )
+                    .accounts(feeds.chain(oracles_and_stats).collect())
+                    .lookup_tables(
+                        luts.clone()
+                            .into_iter()
+                            .map(|x| (x.key, x.addresses.clone())),
+                    );
+                pg.add(ix);
+            }
         }
 
         Ok((

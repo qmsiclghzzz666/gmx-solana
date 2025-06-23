@@ -264,23 +264,27 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
         let mut map = HashMap::with_capacity(price_updates.len());
 
         let feeds = self.ctx.feeds.read().unwrap();
-        for (feed_id, update) in price_updates {
-            let feed_id = Pubkey::new_from_array(*feed_id);
-            tracing::info!("adding ix to post price update for {feed_id}");
-            let feed = feeds.get(&feed_id).ok_or_else(|| {
-                crate::Error::custom(format!(
-                    "feed account for the given `feed_id` is not provided, feed_id = {feed_id}"
-                ))
-            })?;
-            let rpc = self.gmsol.update_price_feed_with_chainlink(
-                &self.ctx.store,
-                feed,
-                &self.ctx.chainlink_program,
-                &self.ctx.access_controller,
-                &update.report_bytes()?,
-            )?;
-            txs.try_push_post(rpc).map_err(|(_, err)| err)?;
-            map.insert(feed_id, *feed);
+
+        {
+            let mut pg = txs.split_mut().0.push_parallel();
+            for (feed_id, update) in price_updates {
+                let feed_id = Pubkey::new_from_array(*feed_id);
+                tracing::info!("adding ix to post price update for {feed_id}");
+                let feed = feeds.get(&feed_id).ok_or_else(|| {
+                    crate::Error::custom(format!(
+                        "feed account for the given `feed_id` is not provided, feed_id = {feed_id}"
+                    ))
+                })?;
+                let rpc = self.gmsol.update_price_feed_with_chainlink(
+                    &self.ctx.store,
+                    feed,
+                    &self.ctx.chainlink_program,
+                    &self.ctx.access_controller,
+                    &update.report_bytes()?,
+                )?;
+                pg.add(rpc);
+                map.insert(feed_id, *feed);
+            }
         }
 
         Ok((
