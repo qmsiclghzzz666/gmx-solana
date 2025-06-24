@@ -172,13 +172,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
         txn: TransactionBuilder<'a, C>,
         options: AtomicGroupOptions,
     ) -> AtomicGroup {
-        let ag = txn.into_atomic_group(
+        txn.into_atomic_group(
             &mut self.ctx.cfg_signers,
             &mut self.ctx.signers,
             &mut self.luts,
             options,
-        );
-        ag
+        )
     }
 
     /// Push a [`TransactionBuilder`] with options.
@@ -322,7 +321,7 @@ impl<'a, 'ctx, C> PushParallel<'a, 'ctx, C> {
     }
 }
 
-impl<'a, 'ctx, C: Deref<Target = impl Signer> + Clone> PushParallel<'a, 'ctx, C> {
+impl<'ctx, C: Deref<Target = impl Signer> + Clone> PushParallel<'_, 'ctx, C> {
     /// Add a [`TransactionBuilder`] to the parallel group with the given options.
     pub fn add_with_options(
         &mut self,
@@ -340,7 +339,7 @@ impl<'a, 'ctx, C: Deref<Target = impl Signer> + Clone> PushParallel<'a, 'ctx, C>
     }
 }
 
-impl<'a, 'ctx, C> Drop for PushParallel<'a, 'ctx, C> {
+impl<C> Drop for PushParallel<'_, '_, C> {
     fn drop(&mut self) {
         if let Some(pg) = self.pg.take() {
             self.bundle.push_parallel_group(pg);
@@ -354,7 +353,7 @@ pub struct Bundle<'a, C> {
     group: TransactionGroup,
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> Bundle<'a, C> {
+impl<C: Deref<Target = impl Signer> + Clone> Bundle<'_, C> {
     /// Is empty.
     pub fn is_empty(&self) -> bool {
         self.group.is_empty()
