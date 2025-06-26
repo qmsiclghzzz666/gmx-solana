@@ -107,3 +107,6 @@ pub mod gmsol_timelock {
         )
     }
 }
+
+#[cfg(not(feature = "no-entrypoint"))]
+gmsol_utils::security_txt!("GMX-Solana Timelock Program");

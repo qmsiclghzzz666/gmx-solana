@@ -114,3 +114,6 @@ pub mod gmsol_competition {
         CloseParticipant::invoke(ctx)
     }
 }
+
+#[cfg(not(feature = "no-entrypoint"))]
+gmsol_utils::security_txt!("GMX-Solana Competition Program");

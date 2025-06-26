@@ -208,3 +208,6 @@ pub mod gmsol_treasury {
         instructions::unchecked_cancel_swap(ctx)
     }
 }
+
+#[cfg(not(feature = "no-entrypoint"))]
+gmsol_utils::security_txt!("GMX-Solana Treasury Program");

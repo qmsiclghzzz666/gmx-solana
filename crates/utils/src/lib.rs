@@ -61,16 +61,15 @@ pub mod user;
 #[cfg(feature = "instruction")]
 pub mod instruction;
 
+/// Utils for security-txt.
+#[cfg(feature = "security-txt")]
+pub mod security_txt;
+
 /// Convert a string to a seed.
 pub fn to_seed(key: &str) -> [u8; 32] {
     use anchor_lang::solana_program::hash::hash;
     hash(key.as_bytes()).to_bytes()
 }
-
-pub use self::{init_space::InitSpace, price::Price};
-pub use bitmaps;
-pub use paste;
-pub use static_assertions;
 
 /// General-purpose errors.
 #[anchor_lang::error_code]
@@ -82,3 +81,11 @@ pub enum GeneralError {
     #[msg("Exceed max length limit")]
     ExceedMaxLengthLimit,
 }
+
+pub use self::{init_space::InitSpace, price::Price};
+pub use bitmaps;
+pub use paste;
+pub use static_assertions;
+
+#[cfg(feature = "security-txt")]
+pub use solana_security_txt;

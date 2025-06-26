@@ -41,7 +41,7 @@ no-competition = ["gmsol-callback/no-competition"]
 
 [dependencies]
 gmsol-model = { workspace = true, features = ["u128", "solana", "strum"] }
-gmsol-utils = { workspace = true }
+gmsol-utils = { workspace = true, features = ["security-txt"] }
 gmsol-callback = { workspace = true, features = ["interface"] }
 gmsol-chainlink-datastreams = { workspace = true, features = ["gmsol"] }
 

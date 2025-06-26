@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - model: Added support for virtual inventories and virtual price impact.
 - program(store): Introduced virtual inventory mechanism and related instructions.
 - program(store): Added instructions to configure token metadata.
+- program: Added `security.txt` to all public programs.
 - sdk(sdk): Added support for the instructions to configure token metadata.
 
 ### Changed

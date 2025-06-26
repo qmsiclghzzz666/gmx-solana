@@ -107,6 +107,7 @@ etcetera = "0.10.0"
 enum_dispatch = "0.3.13"
 vergen-git2 = "1.0.0"
 mpl-token-metadata = "5"
+solana-security-txt = "1.1.1"
 
 [workspace.dependencies.chainlink-data-streams-report]
 version = "1.0.0"
