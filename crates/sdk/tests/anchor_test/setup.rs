@@ -37,8 +37,12 @@ use gmsol_solana_utils::{
     transaction_builder::default_before_sign,
 };
 use gmsol_utils::{
-    config::FactorKey, glv::GlvMarketFlag, market::MarketConfigKey, oracle::PriceProviderKind,
-    role::RoleKey, token_config::UpdateTokenConfigParams,
+    config::{AmountKey, FactorKey},
+    glv::GlvMarketFlag,
+    market::MarketConfigKey,
+    oracle::PriceProviderKind,
+    role::RoleKey,
+    token_config::UpdateTokenConfigParams,
 };
 use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use solana_client::rpc_config::RpcSendTransactionConfig;
@@ -750,7 +754,12 @@ impl Deployment {
                     .collect::<eyre::Result<Vec<_>>>()?,
                 false,
             )?
-            .push(client.initialize_oracle(store, &self.oracle, None).await?.0)?;
+            .push(client.initialize_oracle(store, &self.oracle, None).await?.0)?
+            .push(client.insert_global_amount_by_key(
+                store,
+                AmountKey::OracleMaxFutureTimestampExcess,
+                &1,
+            ))?;
 
         _ = builder.build()?
             .send_all(false)
