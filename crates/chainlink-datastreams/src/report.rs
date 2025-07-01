@@ -5,7 +5,7 @@ use ruint::aliases::U192;
 
 use chainlink_data_streams_report::{
     feed_id::ID,
-    report::{base::ReportError, v3::ReportDataV3},
+    report::{base::ReportError, v2::ReportDataV2, v3::ReportDataV3, v4::ReportDataV4},
 };
 
 type Sign = bool;
@@ -29,6 +29,18 @@ pub struct Report {
     bid: Signed,
     /// Simulated price impact of a sell order up to the X% depth of liquidity utilisation (8 or 18 decimals).
     ask: Signed,
+    market_status: MarketStatus,
+}
+
+/// Market status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarketStatus {
+    /// Unknown.
+    Unknown,
+    /// Closed.
+    Closed,
+    /// Open.
+    Open,
 }
 
 impl Report {
@@ -51,6 +63,11 @@ impl Report {
     pub fn non_negative_ask(&self) -> Option<U192> {
         non_negative(self.ask)
     }
+
+    /// Returns the market status.
+    pub fn market_status(&self) -> MarketStatus {
+        self.market_status
+    }
 }
 
 impl fmt::Debug for Report {
@@ -65,6 +82,7 @@ impl fmt::Debug for Report {
             .field("price", self.price.1.as_limbs())
             .field("bid", self.bid.1.as_limbs())
             .field("ask", self.ask.1.as_limbs())
+            .field("market_status", &self.market_status)
             .finish()
     }
 }
@@ -104,19 +122,78 @@ pub fn decode_compressed_full_report(compressed: &[u8]) -> Result<Report, Decode
 
 /// Decode Report.
 pub fn decode(data: &[u8]) -> Result<Report, DecodeError> {
-    let report = ReportDataV3::decode(data)?;
+    let feed_id = decode_feed_id(data)?;
+    let version = decode_version(&feed_id);
 
-    Ok(Report {
-        feed_id: report.feed_id,
-        valid_from_timestamp: report.valid_from_timestamp,
-        observations_timestamp: report.observations_timestamp,
-        native_fee: bigint_to_u192(report.native_fee)?,
-        link_fee: bigint_to_u192(report.link_fee)?,
-        expires_at: report.expires_at,
-        price: bigint_to_signed(report.benchmark_price)?,
-        bid: bigint_to_signed(report.bid)?,
-        ask: bigint_to_signed(report.ask)?,
-    })
+    match version {
+        2 => {
+            let report = ReportDataV2::decode(data)?;
+            let price = bigint_to_signed(report.benchmark_price)?;
+            Ok(Report {
+                feed_id: report.feed_id,
+                valid_from_timestamp: report.valid_from_timestamp,
+                observations_timestamp: report.observations_timestamp,
+                native_fee: bigint_to_u192(report.native_fee)?,
+                link_fee: bigint_to_u192(report.link_fee)?,
+                expires_at: report.expires_at,
+                price,
+                // Bid and ask values are not available for the report schema v2.
+                bid: price,
+                ask: price,
+                market_status: MarketStatus::Open,
+            })
+        }
+        3 => {
+            let report = ReportDataV3::decode(data)?;
+            Ok(Report {
+                feed_id: report.feed_id,
+                valid_from_timestamp: report.valid_from_timestamp,
+                observations_timestamp: report.observations_timestamp,
+                native_fee: bigint_to_u192(report.native_fee)?,
+                link_fee: bigint_to_u192(report.link_fee)?,
+                expires_at: report.expires_at,
+                price: bigint_to_signed(report.benchmark_price)?,
+                bid: bigint_to_signed(report.bid)?,
+                ask: bigint_to_signed(report.ask)?,
+                market_status: MarketStatus::Open,
+            })
+        }
+        4 => {
+            let report = ReportDataV4::decode(data)?;
+            let price = bigint_to_signed(report.price)?;
+            Ok(Report {
+                feed_id: report.feed_id,
+                valid_from_timestamp: report.valid_from_timestamp,
+                observations_timestamp: report.observations_timestamp,
+                native_fee: bigint_to_u192(report.native_fee)?,
+                link_fee: bigint_to_u192(report.link_fee)?,
+                expires_at: report.expires_at,
+                price,
+                // Bid and ask values are not available for the first iteration
+                // of the RWA report schema (v4).
+                bid: price,
+                ask: price,
+                market_status: decode_v4_market_status(report.market_status)?,
+            })
+        }
+        version => Err(DecodeError::UnsupportedVersion(version)),
+    }
+}
+
+fn decode_feed_id(data: &[u8]) -> Result<ID, DecodeError> {
+    if data.len() < Report::WORD_SIZE {
+        return Err(ReportError::DataTooShort("feed_id").into());
+    }
+    let feed_id = ID(data[..Report::WORD_SIZE]
+        .try_into()
+        .map_err(|_| ReportError::InvalidLength("feed_id (bytes32)"))?);
+    Ok(feed_id)
+}
+
+fn decode_version(id: &ID) -> u16 {
+    // This implementation is based on the `chainlink-data-streams-sdk`:
+    // https://docs.rs/chainlink-data-streams-sdk/1.0.0/chainlink_data_streams_sdk/feed/struct.Feed.html#method.version
+    u16::from_be_bytes((&id.0[0..2]).try_into().unwrap())
 }
 
 fn bigint_to_u192(num: BigInt) -> Result<U192, DecodeError> {
@@ -150,6 +227,15 @@ fn non_negative(num: Signed) -> Option<U192> {
     match num.0 {
         true => Some(num.1),
         false => None,
+    }
+}
+
+fn decode_v4_market_status(market_status: u32) -> Result<MarketStatus, DecodeError> {
+    match market_status {
+        0 => Ok(MarketStatus::Unknown),
+        1 => Ok(MarketStatus::Closed),
+        2 => Ok(MarketStatus::Open),
+        _ => Err(DecodeError::InvalidData),
     }
 }
 

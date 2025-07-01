@@ -1,6 +1,6 @@
 use gmsol_utils::price::{feed_price::PriceFeedPrice, find_divisor_decimals, PriceFlag, TEN, U192};
 
-use crate::Report;
+use crate::{report::MarketStatus, Report};
 
 impl super::FromChainlinkReport for PriceFeedPrice {
     fn from_chainlink_report(report: &Report) -> Result<Self, crate::Error> {
@@ -39,7 +39,14 @@ impl super::FromChainlinkReport for PriceFeedPrice {
             (ask / divisor).try_into().unwrap(),
         );
 
-        price.set_flag(PriceFlag::Open, true);
+        let is_open = match report.market_status() {
+            MarketStatus::Unknown => {
+                return Err(crate::Error::UnknownMarketStatus);
+            }
+            MarketStatus::Closed => false,
+            MarketStatus::Open => true,
+        };
+        price.set_flag(PriceFlag::Open, is_open);
 
         Ok(price)
     }
