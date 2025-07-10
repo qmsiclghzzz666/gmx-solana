@@ -128,6 +128,48 @@ For a working implementation, check out the [gmx-solana-programs][gmx-solana-pro
 [treasury-program-link]: https://explorer.solana.com/address/GTuvYD5SxkTq4FLG6JV1FQ5dkczr1AfgDcBHaFsBdtBg/anchor-program
 [gmx-solana-programs-link]: https://github.com/gmsol-labs/gmx-solana-programs
 
+## Known Issues
+
+### Keepers
+
+- Order keepers can use prices from different timestamps for limit orders with a swap, which would lead to different output amounts.
+
+- Order Keepers are expected to select an execution fee that does not exceed the actual network fee incurred. In addition, the execution fee that the Order Keeper can specify is capped by the program. Even if the actual network fee incurred exceeds this cap, it will not affect the executability of the request.
+
+- A malicious Order Keeper could potentially profit consistently by manipulating the execution order of orders, but this risk can be mitigated by deploying a sufficient number of high-frequency and trusted Order Keepers, since a successful attack would require the malicious Order Keeper to ensure that the orders it creates are not executed within the valid price time window, which is typically 30 seconds.
+
+- A malicious Order Keeper could potentially extract rent paid by other Order Keepers by closing claimable accounts created by them. However, since claimable accounts are typically created and closed within the same transaction that executes the order, such situations are extremely rare.
+
+- Orders may be prevented from execution by a malicious user intentionally causing a market to be unbalanced resulting in a high price impact, this should be costly and difficult to benefit from.
+
+### Price Impact
+
+- Price impact can be reduced by using positions and swaps and trading across markets, chains, forks, other protocols, this is partially mitigated with virtual inventory tracking.
+
+- A user can reduce price impact by using high leverage positions, this is partially mitigated with the MIN_COLLATERAL_FACTOR_FOR_OPEN_INTEREST_MULTIPLIER value.
+
+- Calculation of price impact values do not account for fees and the effects resulting from the price impact itself, for most cases the effect on the price impact calculation should be small.
+
+### Market Token Price
+
+- It is rare but possible for a pool's value to become negative, this can happen since the impactPoolAmount and pending PnL is subtracted from the worth of the tokens in the pool.
+
+- Due to the difference in positive and negative position price impact, there can be a build up of virtual token amounts in the position impact pool which would affect the pricing of market tokens, the position impact pool should be gradually distributed if needed.
+
+### Virtual Inventory
+
+- Virtual inventory (for swap) tracks the amount of tokens in pools, it must be ensured that the tokens in each grouping are the same type and have the same decimals, i.e. the long tokens across pools in the group should have the same decimals, the short tokens across pools in the group should have the same decimals, assuming USDC has 6 decimals and WBTC has 8 decimals, markets like WSOL-USDC, WSOL-WBTC should not be grouped.
+
+### GLV
+
+- The GLV shift feature can be exploited by temporarily increasing the utilization in a market that typically has low utilization. Once the keeper executes the shift, the attacker can lower the utilization back to its normal levels. Position fees and price impact should be configured in a way that makes this attack expensive enough to cover the GLV loss.
+
+- In GLV there may be GM markets which are above their maximum pnl_to_pool_factor_for_traders. If this GM market's max_pnl_factor_for_deposits is higher than max_pnl_factor_for_traders then the GM market is valued lower during deposits than it will be once traders have realized their capped profits. Malicious user may observe a GM market in such a condition and deposit into the GLV containing it in order to gain from ADLs which will soon follow. To avoid this max_pnl_factor_for_deposits should be less than or equal to max_pnl_factor_for_traders.
+
+- It's technically possible for market value to become negative. In this case the GLV would be unusable until the market value becomes positive.
+
+- GM tokens could become illiquid due to high pnl factor or high reserved usd. Users can deposit illiquid GM tokens into GLV and withdraw liquidity from a different market, leaving the GLV with illiquid tokens. The glv_max_market_token_value and glv_max_market_token_amount parameters should account for the riskiness of a market to avoid having too many GM tokens from a risky market.
+
 ## Development
 
 ### Prerequisites
