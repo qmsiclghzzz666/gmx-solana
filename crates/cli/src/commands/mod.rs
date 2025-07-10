@@ -37,6 +37,7 @@ use market::Market;
 use other::Other;
 #[cfg(feature = "remote-wallet")]
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
+use timelock::Timelock;
 use treasury::Treasury;
 use user::User;
 
@@ -54,6 +55,7 @@ mod init_config;
 mod inspect;
 mod market;
 mod other;
+mod timelock;
 mod treasury;
 mod user;
 
@@ -78,6 +80,8 @@ pub enum Commands {
     Alt(Alt),
     /// Administrative commands.
     Admin(Admin),
+    /// Timelock commands.
+    Timelock(Timelock),
     /// Treasury management commands.
     Treasury(Treasury),
     /// Market management commands.

@@ -126,6 +126,11 @@ impl<C: Deref<Target = impl Signer> + Clone> StoreOps<C> for crate::Client<C> {
 
     fn update_last_restarted_slot(&self, store: &Pubkey) -> TransactionBuilder<C> {
         let authority = self.payer();
-        self.store_transaction().anchor_args(args::UpdateLastRestartedSlot {}).anchor_accounts(accounts::UpdateLastRestartedSlot { authority, store: *store })
+        self.store_transaction()
+            .anchor_args(args::UpdateLastRestartedSlot {})
+            .anchor_accounts(accounts::UpdateLastRestartedSlot {
+                authority,
+                store: *store,
+            })
     }
 }
