@@ -24,7 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk(chainlink-datastreams): Added `market_status` field and corresponding method to the `Report` struct.
 - sdk(chainlink-datastreams): Added support for the report schema v2 and the RWA report schema (v4) for Chainlink Data Streams.
 
+### Fixed
+
+- program(timelock): Fixed incorrect data length validation for accounts field.
+
 ### Changed
+
 - sdk: Enabled oracle price updates to be posted in parallel.
 
 ### Removed
