@@ -2304,6 +2304,7 @@ version = "0.7.0"
 dependencies = [
  "anchor-spl",
  "anyhow",
+ "bincode",
  "bs58 0.5.1",
  "cfg-if",
  "clap",

@@ -62,6 +62,7 @@ bs58 = { workspace = true }
 hex = { workspace = true }
 futures-util = { workspace = true }
 rand = { workspace = true }
+bincode = { workspace = true }
 
 color-eyre = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, optional = true, features = [

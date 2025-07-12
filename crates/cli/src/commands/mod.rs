@@ -257,7 +257,6 @@ impl CommandClient {
             usize,
         ) -> gmsol_sdk::Result<()>,
     ) -> gmsol_sdk::Result<()> {
-        let options = self.send_bundle_options();
         let serialize_only = self.serialize_only;
         if let Some(format) = serialize_only {
             println!("\n[Transactions]");
@@ -347,7 +346,7 @@ impl CommandClient {
                             .swap_output(());
 
                         let txn_count = txn_idx + 1;
-                        println!("Adding a vault transaction {txn_idx}: id = {}", transaction,);
+                        println!("Adding a vault transaction {txn_idx}: id = {}", transaction);
                         println!(
                             "Inspector URL for transaction {txn_idx}: {}",
                             inspect_transaction(&message, Some(client.cluster()), false),
@@ -383,35 +382,9 @@ impl CommandClient {
                 tracing::info!("Cancelled");
                 return Ok(());
             }
-
-            let mut idx = 0;
-            let steps = bundle.len();
-            let (signatures, err) = match bundle
-                .build()?
-                .send_all_with_opts(options, |m| before_sign(&mut idx, steps, self.verbose, m))
-                .await
-            {
-                Ok(signatures) => {
-                    tracing::info!("successful transactions: {signatures:#?}");
-                    (signatures, None)
-                }
-                Err((signatures, error)) => {
-                    tracing::error!(%error, "successful transactions: {signatures:#?}");
-                    (signatures, Some(error))
-                }
-            };
-            display_signatures(signatures, err.map(Into::into), steps)?;
+            self.send_bundle_with_callback(bundle, callback).await?;
         } else {
-            let mut idx = 0;
-            let steps = bundle.len();
-            match bundle
-                .build()?
-                .send_all_with_opts(options, |m| before_sign(&mut idx, steps, self.verbose, m))
-                .await
-            {
-                Ok(signatures) => (callback)(signatures, None, steps)?,
-                Err((signatures, error)) => (callback)(signatures, Some(error.into()), steps)?,
-            }
+            self.send_bundle_with_callback(bundle, callback).await?;
         }
         Ok(())
     }
@@ -421,6 +394,60 @@ impl CommandClient {
         bundle: BundleBuilder<'_, LocalSignerRef>,
     ) -> gmsol_sdk::Result<()> {
         self.send_or_serialize_with_callback(bundle, display_signatures)
+            .await
+    }
+
+    #[cfg(feature = "squads")]
+    pub(crate) fn squads_ctx(&self) -> Option<(Pubkey, u8)> {
+        let ix_buffer_ctx = self.ix_buffer_ctx.as_ref()?;
+        if let InstructionBuffer::Squads {
+            multisig,
+            vault_index,
+        } = ix_buffer_ctx.buffer
+        {
+            Some((multisig, vault_index))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn host_client(&self) -> &Client<LocalSignerRef> {
+        if let Some(ix_buffer_ctx) = self.ix_buffer_ctx.as_ref() {
+            &ix_buffer_ctx.client
+        } else {
+            &self.client
+        }
+    }
+
+    async fn send_bundle_with_callback(
+        &self,
+        bundle: BundleBuilder<'_, LocalSignerRef>,
+        callback: impl FnOnce(
+            Vec<WithSlot<Signature>>,
+            Option<gmsol_sdk::Error>,
+            usize,
+        ) -> gmsol_sdk::Result<()>,
+    ) -> gmsol_sdk::Result<()> {
+        let mut idx = 0;
+        let steps = bundle.len();
+        match bundle
+            .build()?
+            .send_all_with_opts(self.send_bundle_options(), |m| {
+                before_sign(&mut idx, steps, self.verbose, m)
+            })
+            .await
+        {
+            Ok(signatures) => (callback)(signatures, None, steps)?,
+            Err((signatures, error)) => (callback)(signatures, Some(error.into()), steps)?,
+        }
+        Ok(())
+    }
+
+    pub(crate) async fn send_bundle(
+        &self,
+        bundle: BundleBuilder<'_, LocalSignerRef>,
+    ) -> gmsol_sdk::Result<()> {
+        self.send_bundle_with_callback(bundle, display_signatures)
             .await
     }
 }

@@ -314,7 +314,7 @@ impl Config {
 }
 
 #[cfg(feature = "squads")]
-fn parse_squads(data: &str) -> eyre::Result<(Pubkey, u8)> {
+pub(crate) fn parse_squads(data: &str) -> eyre::Result<(Pubkey, u8)> {
     let (multisig, vault_index) = match data.split_once(':') {
         Some((multisig, vault_index)) => (multisig, vault_index.parse()?),
         None => (data, 0),
