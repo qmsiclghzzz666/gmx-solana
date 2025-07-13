@@ -410,6 +410,7 @@ impl CommandClient {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn host_client(&self) -> &Client<LocalSignerRef> {
         if let Some(ix_buffer_ctx) = self.ix_buffer_ctx.as_ref() {
             &ix_buffer_ctx.client
@@ -442,6 +443,7 @@ impl CommandClient {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn send_bundle(
         &self,
         bundle: BundleBuilder<'_, LocalSignerRef>,
