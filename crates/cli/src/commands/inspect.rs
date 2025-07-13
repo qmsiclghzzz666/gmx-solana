@@ -261,7 +261,7 @@ impl super::Command for Inspect {
                     } else {
                         "is not approved".to_string()
                     };
-                    tracing::info!("[{idx}] {address}: {status}");
+                    println!("[{idx}] {address}: {status}");
 
                     instructions.push(
                         buffer
@@ -272,7 +272,7 @@ impl super::Command for Inspect {
 
                 let message = Message::new(&instructions, Some(&client.payer()));
                 println!(
-                    "{}",
+                    "Instructions: {}",
                     inspect_transaction(
                         &VersionedMessage::Legacy(message),
                         Some(client.cluster()),
