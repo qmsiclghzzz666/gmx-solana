@@ -1,6 +1,5 @@
 use std::{ops::Deref, path::PathBuf, time::Duration};
 
-use eyre::OptionExt;
 use gmsol_sdk::{
     core::oracle::PriceProviderKind,
     ops::{AddressLookupTableOps, TimelockOps},
@@ -222,6 +221,7 @@ impl super::Command for Timelock {
 
                 #[cfg(feature = "squads")]
                 {
+                    use eyre::OptionExt;
                     use gmsol_sdk::{
                         client::squads::{SquadsOps, VaultTransactionOptions},
                         solana_utils::{

@@ -11,7 +11,6 @@ use eyre::OptionExt;
 use get_pubkey::GetPubkey;
 use glv::Glv;
 use gmsol_sdk::{
-    client::squads::VaultTransactionOptions,
     ops::TimelockOps,
     programs::anchor_lang::prelude::Pubkey,
     solana_utils::{
@@ -315,7 +314,7 @@ impl CommandClient {
                         multisig,
                         vault_index,
                     } => {
-                        use gmsol_sdk::client::squads::SquadsOps;
+                        use gmsol_sdk::client::squads::{SquadsOps, VaultTransactionOptions};
                         use gmsol_sdk::solana_utils::utils::inspect_transaction;
 
                         let luts = tg.luts();
