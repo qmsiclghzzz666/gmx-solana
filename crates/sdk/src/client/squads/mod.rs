@@ -1,5 +1,6 @@
 mod utils;
 
+use std::borrow::Borrow;
 use std::{collections::HashMap, future::Future, ops::Deref};
 
 use anchor_lang::{AnchorSerialize, InstructionData, ToAccountMetas};
@@ -121,40 +122,66 @@ impl anchor_lang::AccountDeserialize for SquadsProposal {
     }
 }
 
+/// Vault transaction options.
+#[derive(Debug, Clone, Default)]
+pub struct VaultTransactionOptions {
+    /// Memo to create with the vault transcation.
+    pub memo: Option<String>,
+    /// Whether the vault transaction is a draft.
+    pub draft: bool,
+    /// The number of ephemeral signers to use.
+    pub ephemeral_signers: u8,
+}
+
 /// Squads Multisig Ops.
 pub trait SquadsOps<C> {
     /// Create Vault Transaction with the given transaction index and return the message.
-    fn squads_create_vault_transaction_and_return_data(
+    fn squads_create_vault_transaction_and_return_data<M: Borrow<VersionedMessage>>(
         &self,
         multisig: &Pubkey,
         vault_index: u8,
         transaction_index: u64,
-        message: &VersionedMessage,
-        memo: Option<String>,
-        draft: bool,
+        message_builder: impl FnOnce(&[Pubkey]) -> crate::Result<M>,
+        options: VaultTransactionOptions,
     ) -> crate::Result<TransactionBuilder<C, (Pubkey, VaultTransaction)>>;
 
     /// Create Vault Transaction with the given transaction index.
-    fn squads_create_vault_transaction_with_index(
+    fn squads_create_vault_transaction_with_index<M: Borrow<VersionedMessage>>(
         &self,
         multisig: &Pubkey,
         vault_index: u8,
         transaction_index: u64,
-        message: &VersionedMessage,
-        memo: Option<String>,
-        draft: bool,
+        message_builder: impl FnOnce(&[Pubkey]) -> crate::Result<M>,
+        options: VaultTransactionOptions,
     ) -> crate::Result<TransactionBuilder<C, Pubkey>>;
 
     /// Create Vault Transaction with next transaction index.
-    fn squads_create_vault_transaction(
+    fn squads_create_vault_transaction<M: Borrow<VersionedMessage>>(
+        &self,
+        multisig: &Pubkey,
+        vault_index: u8,
+        message_builder: impl FnOnce(&[Pubkey]) -> crate::Result<M>,
+        options: VaultTransactionOptions,
+        offset: Option<u64>,
+    ) -> impl Future<Output = crate::Result<TransactionBuilder<C, Pubkey>>>;
+
+    /// Create Vault Transaction with next transaction index with the given message.
+    fn squads_create_vault_transaction_with_message(
         &self,
         multisig: &Pubkey,
         vault_index: u8,
         message: &VersionedMessage,
-        memo: Option<String>,
-        draft: bool,
+        options: VaultTransactionOptions,
         offset: Option<u64>,
-    ) -> impl Future<Output = crate::Result<TransactionBuilder<C, Pubkey>>>;
+    ) -> impl Future<Output = crate::Result<TransactionBuilder<C, Pubkey>>> {
+        self.squads_create_vault_transaction(
+            multisig,
+            vault_index,
+            move |_| Ok(message),
+            options,
+            offset,
+        )
+    }
 
     /// Approve a proposal.
     fn squads_approve_proposal(
@@ -182,21 +209,31 @@ pub trait SquadsOps<C> {
 }
 
 impl<C: Deref<Target = impl Signer> + Clone> SquadsOps<C> for crate::Client<C> {
-    fn squads_create_vault_transaction_and_return_data(
+    fn squads_create_vault_transaction_and_return_data<M: Borrow<VersionedMessage>>(
         &self,
         multisig: &Pubkey,
         vault_index: u8,
         transaction_index: u64,
-        message: &VersionedMessage,
-        memo: Option<String>,
-        draft: bool,
+        message_builder: impl FnOnce(&[Pubkey]) -> crate::Result<M>,
+        options: VaultTransactionOptions,
     ) -> crate::Result<TransactionBuilder<C, (Pubkey, VaultTransaction)>> {
         let payer = self.payer();
         let transaction_pda = get_transaction_pda(multisig, transaction_index, Some(&ID));
         let proposal_pda = get_proposal_pda(multisig, transaction_index, Some(&ID)).0;
         let vault_pda = get_vault_pda(multisig, vault_index, Some(&ID));
 
-        let transaction_message = versioned_message_to_transaction_message(message);
+        let VaultTransactionOptions {
+            memo,
+            draft,
+            ephemeral_signers,
+        } = options;
+
+        let ephemeral_signer_accounts = (0..ephemeral_signers)
+            .map(|index| get_ephemeral_signer_pda(&transaction_pda.0, index, Some(&ID)).0)
+            .collect::<Vec<_>>();
+
+        let message = message_builder(&ephemeral_signer_accounts)?;
+        let transaction_message = versioned_message_to_transaction_message(message.borrow());
         let rpc = self.store_transaction().pre_instructions(
             vec![
                 Instruction {
@@ -211,7 +248,7 @@ impl<C: Deref<Target = impl Signer> + Clone> SquadsOps<C> for crate::Client<C> {
                     .to_account_metas(Some(false)),
                     data: args::VaultTransactionCreate {
                         args: VaultTransactionCreateArgs {
-                            ephemeral_signers: 0,
+                            ephemeral_signers,
                             vault_index,
                             memo,
                             transaction_message: transaction_message
@@ -257,36 +294,33 @@ impl<C: Deref<Target = impl Signer> + Clone> SquadsOps<C> for crate::Client<C> {
         Ok(rpc.output((transaction_pda.0, data)))
     }
 
-    fn squads_create_vault_transaction_with_index(
+    fn squads_create_vault_transaction_with_index<M: Borrow<VersionedMessage>>(
         &self,
         multisig: &Pubkey,
         vault_index: u8,
         transaction_index: u64,
-        message: &VersionedMessage,
-        memo: Option<String>,
-        draft: bool,
+        message_builder: impl FnOnce(&[Pubkey]) -> crate::Result<M>,
+        options: VaultTransactionOptions,
     ) -> crate::Result<TransactionBuilder<C, Pubkey>> {
         let (txn, (transaction, _)) = self
             .squads_create_vault_transaction_and_return_data(
                 multisig,
                 vault_index,
                 transaction_index,
-                message,
-                memo,
-                draft,
+                message_builder,
+                options,
             )?
             .swap_output(());
 
         Ok(txn.output(transaction))
     }
 
-    async fn squads_create_vault_transaction(
+    async fn squads_create_vault_transaction<M: Borrow<VersionedMessage>>(
         &self,
         multisig: &Pubkey,
         vault_index: u8,
-        message: &VersionedMessage,
-        memo: Option<String>,
-        draft: bool,
+        message_builder: impl FnOnce(&[Pubkey]) -> crate::Result<M>,
+        options: VaultTransactionOptions,
         offset: Option<u64>,
     ) -> crate::Result<TransactionBuilder<C, Pubkey>> {
         let multisig_data = get_multisig(&self.store_program().rpc(), multisig)
@@ -297,9 +331,8 @@ impl<C: Deref<Target = impl Signer> + Clone> SquadsOps<C> for crate::Client<C> {
             multisig,
             vault_index,
             multisig_data.transaction_index + 1 + offset.unwrap_or(0),
-            message,
-            memo,
-            draft,
+            message_builder,
+            options,
         )
     }
 
@@ -470,9 +503,8 @@ where
                     &self.multisig,
                     self.vault_index,
                     txn_idx,
-                    &message,
-                    None,
-                    false,
+                    |_| Ok(&message),
+                    Default::default(),
                 )
                 .map_err(gmsol_solana_utils::Error::custom)?
                 .swap_output(());

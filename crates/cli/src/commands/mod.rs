@@ -11,6 +11,7 @@ use eyre::OptionExt;
 use get_pubkey::GetPubkey;
 use glv::Glv;
 use gmsol_sdk::{
+    client::squads::VaultTransactionOptions,
     ops::TimelockOps,
     programs::anchor_lang::prelude::Pubkey,
     solana_utils::{
@@ -332,12 +333,14 @@ impl CommandClient {
                         )?;
 
                         let (rpc, transaction) = client
-                            .squads_create_vault_transaction(
+                            .squads_create_vault_transaction_with_message(
                                 multisig,
                                 *vault_index,
                                 &message,
-                                None,
-                                *is_draft,
+                                VaultTransactionOptions {
+                                    draft: *is_draft,
+                                    ..Default::default()
+                                },
                                 Some(txn_idx as u64),
                             )
                             .await?

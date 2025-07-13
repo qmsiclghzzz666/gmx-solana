@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - model: Changed trait definitions to support virtual inventories.
 - model: Included borrowing fee in `paid_order_fee_value` and rename it to `paid_order_and_borrowing_fee_value`.
-- sdk(solana-utils): remiplemented the `BundleBuilder`A to support the new transaction group API.
+- sdk(solana-utils): Remiplemented the `BundleBuilder`A to support the new transaction group API.
+- sdk(sdk): Updated `SquadsOps` methods to support ephemeral signers.
 
 ### Added
 
