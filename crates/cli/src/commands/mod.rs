@@ -429,9 +429,9 @@ impl CommandClient {
         ) -> gmsol_sdk::Result<()>,
     ) -> gmsol_sdk::Result<()> {
         let mut idx = 0;
+        let bundle = bundle.build()?;
         let steps = bundle.len();
         match bundle
-            .build()?
             .send_all_with_opts(self.send_bundle_options(), |m| {
                 before_sign(&mut idx, steps, self.verbose, m)
             })
