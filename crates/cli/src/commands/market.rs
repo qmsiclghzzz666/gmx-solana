@@ -213,7 +213,8 @@ enum Command {
     },
     /// Toggle GT minting.
     ToggleGtMinting {
-        market_token: Pubkey,
+        #[arg(required = true, num_args = 1..)]
+        market_tokens: Vec<Pubkey>,
         #[command(flatten)]
         toggle: ToggleValue,
     },
@@ -555,11 +556,16 @@ impl super::Command for Market {
                     .await?
             }
             Command::ToggleGtMinting {
-                market_token,
+                market_tokens,
                 toggle,
-            } => client
-                .toggle_gt_minting(store, market_token, toggle.is_enable())
-                .into_bundle_with_options(options)?,
+            } => {
+                let mut bundle = client.bundle_with_options(options);
+                for market_token in market_tokens {
+                    let rpc = client.toggle_gt_minting(store, market_token, toggle.is_enable());
+                    bundle.push(rpc)?;
+                }
+                bundle
+            }
             Command::InitGt {
                 decimals,
                 initial_minting_cost,

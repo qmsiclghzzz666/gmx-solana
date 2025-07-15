@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - sdk: Enabled oracle price updates to be posted in parallel.
 - cli: Automatically apply global ALTs to constructed transactions.
+- cli: Allowed `toggle-gt-minting` command to accept multiple market tokens.
 
 ### Removed
 
