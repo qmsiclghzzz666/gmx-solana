@@ -1,4 +1,4 @@
-use std::{ops::Deref, path::Path, sync::Arc};
+use std::{collections::BTreeSet, ops::Deref, path::Path, sync::Arc};
 
 use admin::Admin;
 use alt::Alt;
@@ -11,7 +11,7 @@ use eyre::OptionExt;
 use get_pubkey::GetPubkey;
 use glv::Glv;
 use gmsol_sdk::{
-    ops::TimelockOps,
+    ops::{AddressLookupTableOps, TimelockOps},
     programs::anchor_lang::prelude::Pubkey,
     solana_utils::{
         bundle_builder::{Bundle, BundleBuilder, BundleOptions, SendBundleOptions},
@@ -195,6 +195,7 @@ pub(crate) struct CommandClient {
     verbose: bool,
     priority_lamports: u64,
     skip_preflight: bool,
+    luts: BTreeSet<Pubkey>,
 }
 
 impl CommandClient {
@@ -233,6 +234,7 @@ impl CommandClient {
             verbose,
             priority_lamports: config.priority_lamports()?,
             skip_preflight: config.skip_preflight(),
+            luts: config.alts().copied().collect(),
         })
     }
 
@@ -249,7 +251,7 @@ impl CommandClient {
 
     pub(crate) async fn send_or_serialize_with_callback(
         &self,
-        bundle: BundleBuilder<'_, LocalSignerRef>,
+        mut bundle: BundleBuilder<'_, LocalSignerRef>,
         callback: impl FnOnce(
             Vec<WithSlot<Signature>>,
             Option<gmsol_sdk::Error>,
@@ -257,6 +259,15 @@ impl CommandClient {
         ) -> gmsol_sdk::Result<()>,
     ) -> gmsol_sdk::Result<()> {
         let serialize_only = self.serialize_only;
+        let luts = bundle.luts_mut();
+        for lut in self.luts.iter() {
+            if !luts.contains_key(lut) {
+                if let Some(lut) = self.alt(&lut).await? {
+                    luts.add(&lut);
+                }
+            }
+        }
+        let cache = luts.clone();
         if let Some(format) = serialize_only {
             println!("\n[Transactions]");
             let txns = to_transactions(bundle.build()?)?;
@@ -273,6 +284,7 @@ impl CommandClient {
             let ags = tg.groups().iter().flat_map(|pg| pg.iter());
 
             let mut bundle = client.bundle();
+            bundle.luts_mut().extend(cache);
             let len = tg.len();
             let steps = len + 1;
             for (txn_idx, txn) in ags.enumerate() {

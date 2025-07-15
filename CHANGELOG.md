@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - sdk: Enabled oracle price updates to be posted in parallel.
+- cli: Automatically apply global ALTs to constructed transactions.
 
 ### Removed
 
