@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk(sdk): Added support for the instructions to configure token metadata.
 - sdk(chainlink-datastreams): Added `market_status` field and corresponding method to the `Report` struct.
 - sdk(chainlink-datastreams): Added support for the report schema v2 and the RWA report schema (v4) for Chainlink Data Streams.
+- sdk(solana-utils): Added `luts` and `luts_mut` methods for `BundleBuilder`.
 
 ### Fixed
 

@@ -276,6 +276,16 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> BundleBuilder<'a, C> {
         Ok(())
     }
 
+    /// Get the reference of the address lookup table cache.
+    pub fn luts(&self) -> &AddressLookupTables {
+        &self.luts
+    }
+
+    /// Get the mutable reference of the address lookup table cache.
+    pub fn luts_mut(&mut self) -> &mut AddressLookupTables {
+        &mut self.luts
+    }
+
     /// Build the [`Bundle`].
     pub fn build(self) -> crate::Result<Bundle<'a, C>> {
         let Self {
