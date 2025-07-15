@@ -262,7 +262,7 @@ impl CommandClient {
         let luts = bundle.luts_mut();
         for lut in self.luts.iter() {
             if !luts.contains_key(lut) {
-                if let Some(lut) = self.alt(&lut).await? {
+                if let Some(lut) = self.alt(lut).await? {
                     luts.add(&lut);
                 }
             }
