@@ -142,14 +142,19 @@ impl PriceFeed {
             token_config.expected_provider().map_err(CoreError::from)?,
             provider
         );
-        let feed_id = token_config.get_feed(&provider).map_err(CoreError::from)?;
 
+        let feed_id = token_config.get_feed(&provider).map_err(CoreError::from)?;
         require_keys_eq!(self.feed_id, feed_id, CoreError::InvalidPriceFeedAccount);
-        require!(self.price.is_market_open(), CoreError::MarketNotOpen);
+
+        let current = clock.unix_timestamp;
+        let heartbeat_duration = token_config.heartbeat_duration();
+        require!(
+            self.price.is_market_open(current, heartbeat_duration),
+            CoreError::MarketNotOpen
+        );
 
         let timestamp = self.price.ts();
-        let current = clock.unix_timestamp;
-        if current > timestamp && current - timestamp > token_config.heartbeat_duration().into() {
+        if current > timestamp && current - timestamp > heartbeat_duration.into() {
             return Err(CoreError::PriceFeedNotUpdated.into());
         }
 

@@ -5,7 +5,9 @@ use ruint::aliases::U192;
 
 use chainlink_data_streams_report::{
     feed_id::ID,
-    report::{base::ReportError, v2::ReportDataV2, v3::ReportDataV3, v4::ReportDataV4},
+    report::{
+        base::ReportError, v2::ReportDataV2, v3::ReportDataV3, v4::ReportDataV4, v8::ReportDataV8,
+    },
 };
 
 type Sign = bool;
@@ -20,6 +22,7 @@ pub struct Report {
     pub valid_from_timestamp: u32,
     /// Latest timestamp for which price is applicable.
     pub observations_timestamp: u32,
+    last_update_timestamp: Option<u64>,
     native_fee: U192,
     link_fee: U192,
     expires_at: u32,
@@ -68,6 +71,13 @@ impl Report {
     pub fn market_status(&self) -> MarketStatus {
         self.market_status
     }
+
+    /// Returns timestamp of the last valid price update, in **nanoseconds**.
+    ///
+    /// Returns `None` if the feature is not enabled and the value should be ignored.
+    pub fn last_update_timestamp(&self) -> Option<u64> {
+        self.last_update_timestamp
+    }
 }
 
 impl fmt::Debug for Report {
@@ -76,6 +86,7 @@ impl fmt::Debug for Report {
             .field("feed_id", &self.feed_id)
             .field("valid_from_timestamp", &self.valid_from_timestamp)
             .field("observations_timestamp", &self.observations_timestamp)
+            .field("last_update_timestamp", &self.last_update_timestamp)
             .field("native_fee", self.native_fee.as_limbs())
             .field("link_fee", self.link_fee.as_limbs())
             .field("expires_at", &self.expires_at)
@@ -133,6 +144,7 @@ pub fn decode(data: &[u8]) -> Result<Report, DecodeError> {
                 feed_id: report.feed_id,
                 valid_from_timestamp: report.valid_from_timestamp,
                 observations_timestamp: report.observations_timestamp,
+                last_update_timestamp: None,
                 native_fee: bigint_to_u192(report.native_fee)?,
                 link_fee: bigint_to_u192(report.link_fee)?,
                 expires_at: report.expires_at,
@@ -149,6 +161,7 @@ pub fn decode(data: &[u8]) -> Result<Report, DecodeError> {
                 feed_id: report.feed_id,
                 valid_from_timestamp: report.valid_from_timestamp,
                 observations_timestamp: report.observations_timestamp,
+                last_update_timestamp: None,
                 native_fee: bigint_to_u192(report.native_fee)?,
                 link_fee: bigint_to_u192(report.link_fee)?,
                 expires_at: report.expires_at,
@@ -165,6 +178,7 @@ pub fn decode(data: &[u8]) -> Result<Report, DecodeError> {
                 feed_id: report.feed_id,
                 valid_from_timestamp: report.valid_from_timestamp,
                 observations_timestamp: report.observations_timestamp,
+                last_update_timestamp: None,
                 native_fee: bigint_to_u192(report.native_fee)?,
                 link_fee: bigint_to_u192(report.link_fee)?,
                 expires_at: report.expires_at,
@@ -173,7 +187,24 @@ pub fn decode(data: &[u8]) -> Result<Report, DecodeError> {
                 // of the RWA report schema (v4).
                 bid: price,
                 ask: price,
-                market_status: decode_v4_market_status(report.market_status)?,
+                market_status: decode_market_status(report.market_status)?,
+            })
+        }
+        8 => {
+            let report = ReportDataV8::decode(data)?;
+            let price = bigint_to_signed(report.mid_price)?;
+            Ok(Report {
+                feed_id: report.feed_id,
+                valid_from_timestamp: report.valid_from_timestamp,
+                observations_timestamp: report.observations_timestamp,
+                last_update_timestamp: Some(report.last_update_timestamp),
+                native_fee: bigint_to_u192(report.native_fee)?,
+                link_fee: bigint_to_u192(report.link_fee)?,
+                expires_at: report.expires_at,
+                price,
+                bid: price,
+                ask: price,
+                market_status: decode_market_status(report.market_status)?,
             })
         }
         version => Err(DecodeError::UnsupportedVersion(version)),
@@ -230,7 +261,7 @@ fn non_negative(num: Signed) -> Option<U192> {
     }
 }
 
-fn decode_v4_market_status(market_status: u32) -> Result<MarketStatus, DecodeError> {
+fn decode_market_status(market_status: u32) -> Result<MarketStatus, DecodeError> {
     match market_status {
         0 => Ok(MarketStatus::Unknown),
         1 => Ok(MarketStatus::Closed),

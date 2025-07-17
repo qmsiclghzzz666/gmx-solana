@@ -10,13 +10,16 @@ use crate::{
 
 crate::flags!(PriceFlag, MAX_PRICE_FLAG, u8);
 
+const NANOS_PER_SECOND: i64 = 1_000_000_000;
+
 /// Price structure for Price Feed.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct PriceFeedPrice {
     decimals: u8,
     flags: PriceFlagContainer,
-    padding: [u8; 6],
+    padding: [u8; 2],
+    last_update_diff_nanos: u32,
     ts: i64,
     price: u128,
     min_price: u128,
@@ -25,11 +28,19 @@ pub struct PriceFeedPrice {
 
 impl PriceFeedPrice {
     /// Create a new [`PriceFeedPrice`].
-    pub fn new(decimals: u8, ts: i64, price: u128, min_price: u128, max_price: u128) -> Self {
+    pub fn new(
+        decimals: u8,
+        ts: i64,
+        price: u128,
+        min_price: u128,
+        max_price: u128,
+        last_update_diff_nanos: u32,
+    ) -> Self {
         Self {
             decimals,
             flags: Default::default(),
-            padding: [0; 6],
+            padding: [0; 2],
+            last_update_diff_nanos,
             ts,
             price,
             min_price,
@@ -47,6 +58,11 @@ impl PriceFeedPrice {
         self.ts
     }
 
+    /// Returns `last_udpate_diff_nanos`.
+    pub fn last_update_diff_nanos(&self) -> u32 {
+        self.last_update_diff_nanos
+    }
+
     /// Get min price.
     pub fn min_price(&self) -> &u128 {
         &self.min_price
@@ -62,9 +78,49 @@ impl PriceFeedPrice {
         &self.price
     }
 
-    /// Is market open.
-    pub fn is_market_open(&self) -> bool {
-        self.flags.get_flag(PriceFlag::Open)
+    /// Returns whether the market is open.
+    pub fn is_market_open(&self, current_timestamp: i64, heartbeat_duration: u32) -> bool {
+        if !self.flags.get_flag(PriceFlag::Open) {
+            return false;
+        }
+
+        let last_update_diff_nanos = i64::from(self.last_update_diff_nanos);
+
+        if last_update_diff_nanos > 0 {
+            // The use of `saturating_sub` here is valid because:
+            //   - In the case of overflow, the function returns `false`,
+            //     and since `current_timestamp >= ts + i64::MAX`, it must
+            //     also hold that `current_timestamp >= ts + heartbeat_duration`,
+            //     and thus `current_timestamp > last_update + heartbeat_duration`.
+            //   - In the case of underflow, the function returns `true`,
+            //     and since `current_timestamp <= ts + i64::MIN`, it follows that
+            //     `current_timestamp <= ts - last_update_diff_secs`, and thus
+            //     `current_timestamp - last_update <= heartbeat_duration`.
+            // Therefore, we only need to check the case where no overflow or underflow occurs.
+            let current_diff = current_timestamp.saturating_sub(self.ts);
+            let heartbeat_duration = heartbeat_duration.into();
+            if current_diff >= heartbeat_duration {
+                return false;
+            }
+
+            last_update_diff_nanos
+                <= heartbeat_duration
+                    // The use of `saturating_sub` is valid because:
+                    //   - Underflow is impossible because of the check above, and in the case of
+                    //     overflow, the function returns `true`, and since
+                    //     `heartbeat_duration >= current_diff + i64::MAX`, it must also hold that
+                    //     `heartbeat_duration >= current_diff + last_update_diff_secs`, and thus
+                    //     `current_timestamp - last_update <= heartbeat_duration`.
+                    .saturating_sub(current_diff)
+                    // The use of `saturating_mul` is valid because:
+                    //   - Underflow is impossible because `heartbeat_duration > current_diff`,
+                    //     and in the case of overflow, the function returns `true`, and since
+                    //     `(heartbeat_duration - current_diff) * NANOS_PER_SECOND >= i64::MAX`, it must
+                    //     hold that `(heartbeat_duration - current_diff) * NANOS_PER_SECOND >= last_update_diff_nanos`.
+                    .saturating_mul(NANOS_PER_SECOND)
+        } else {
+            true
+        }
     }
 
     /// Try converting to [`Price`].
@@ -86,5 +142,43 @@ impl PriceFeedPrice {
         let token_decimals = token_config.token_decimals();
         let precision = token_config.precision();
         Decimal::try_from_price(self.price, self.decimals, token_decimals, precision)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_market_open() {
+        let mut price = PriceFeedPrice::new(0, 0, 1, 1, 1, 0);
+        assert!(!price.is_market_open(i64::MAX, 0));
+        price.set_flag(PriceFlag::Open, true);
+        assert!(price.is_market_open(i64::MAX, 0));
+
+        price.last_update_diff_nanos = u32::MAX;
+
+        price.ts = i64::MIN;
+        assert!(!price.is_market_open(i64::MAX, u32::MAX));
+
+        price.ts = i64::MAX;
+        assert!(price.is_market_open(i64::MIN, 0));
+
+        let delay = 10i64;
+        price.ts = i64::MAX - delay;
+        assert!(!price.is_market_open(i64::MAX, u32::MAX / NANOS_PER_SECOND as u32 + delay as u32));
+        assert!(price.is_market_open(
+            i64::MAX,
+            u32::MAX.div_ceil(NANOS_PER_SECOND as u32) + delay as u32
+        ));
+
+        let diff = 1i64;
+        price.ts = i64::MAX;
+        let current = i64::MAX - diff;
+        assert!(!price.is_market_open(current, u32::MAX / NANOS_PER_SECOND as u32 - diff as u32));
+        assert!(price.is_market_open(
+            current,
+            u32::MAX.div_ceil(NANOS_PER_SECOND as u32) - diff as u32
+        ));
     }
 }
