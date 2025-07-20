@@ -41,7 +41,12 @@ enum Command {
         market_tokens: Vec<Pubkey>,
     },
     /// Update Config.
-    UpdateConfig(UpdateGlvArgs),
+    UpdateConfig {
+        #[command(flatten)]
+        glv_token: GlvToken,
+        #[command(flatten)]
+        args: UpdateGlvArgs,
+    },
     /// Toggle GLV market flag.
     ToggleMarketFlag {
         #[command(flatten)]
@@ -178,8 +183,8 @@ impl super::Command for Glv {
                 println!("GLV Token: {glv_token}");
                 rpc.into_bundle_with_options(options)?
             }
-            Command::UpdateConfig(args) => {
-                let glv_token = args.glv_token.address(client, store);
+            Command::UpdateConfig { glv_token, args } => {
+                let glv_token = glv_token.address(client, store);
                 match &args.file {
                     Some(file) => {
                         let UpdateGlv { glv, market } = toml_from_file(file)?;
@@ -218,7 +223,7 @@ impl super::Command for Glv {
                         bundle
                     }
                     None => client
-                        .update_glv_config(store, &glv_token, args.into())
+                        .update_glv_config(store, &glv_token, args.try_into()?)
                         .into_bundle_with_options(options)?,
                 }
             }
@@ -309,33 +314,39 @@ impl GlvToken {
 #[derive(Debug, clap::Args)]
 #[group(required = true, multiple = true)]
 struct UpdateGlvArgs {
-    #[command(flatten)]
-    glv_token: GlvToken,
     /// Path to the update file (TOML).
     #[arg(long, short)]
     file: Option<PathBuf>,
     /// Minimum amount for the first GLV deposit.
     #[arg(long)]
-    min_tokens_for_first_deposit: Option<u64>,
+    min_tokens_for_first_deposit: Option<GmAmount>,
     /// Minimum shift interval seconds.
     #[arg(long)]
     shift_min_interval_secs: Option<u32>,
     /// Maximum price impact factor after shift.
     #[arg(long)]
-    shift_max_price_impact_factor: Option<u128>,
+    shift_max_price_impact_factor: Option<Value>,
     /// Minimum shift value.
     #[arg(long)]
-    shift_min_value: Option<u128>,
+    shift_min_value: Option<Value>,
 }
 
-impl<'a> From<&'a UpdateGlvArgs> for UpdateGlvParams {
-    fn from(args: &'a UpdateGlvArgs) -> Self {
-        Self {
-            min_tokens_for_first_deposit: args.min_tokens_for_first_deposit,
+impl<'a> TryFrom<&'a UpdateGlvArgs> for UpdateGlvParams {
+    type Error = eyre::Error;
+
+    fn try_from(args: &'a UpdateGlvArgs) -> Result<Self, Self::Error> {
+        Ok(Self {
+            min_tokens_for_first_deposit: args
+                .min_tokens_for_first_deposit
+                .map(|a| a.to_u64())
+                .transpose()?,
             shift_min_interval_secs: args.shift_min_interval_secs,
-            shift_max_price_impact_factor: args.shift_max_price_impact_factor,
-            shift_min_value: args.shift_min_value,
-        }
+            shift_max_price_impact_factor: args
+                .shift_max_price_impact_factor
+                .map(|v| v.to_u128())
+                .transpose()?,
+            shift_min_value: args.shift_min_value.map(|v| v.to_u128()).transpose()?,
+        })
     }
 }
 
@@ -352,7 +363,7 @@ impl MarketConfig {
     fn max_amount(&self) -> gmsol_sdk::Result<Option<u64>> {
         self.max_amount
             .as_ref()
-            .map(|f| f.0.try_into().map_err(gmsol_sdk::Error::custom))
+            .map(|f| f.to_u64().map_err(gmsol_sdk::Error::custom))
             .transpose()
     }
 
