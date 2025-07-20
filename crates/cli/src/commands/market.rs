@@ -18,7 +18,11 @@ use gmsol_sdk::{
         TokenConfigOps,
     },
     programs::{anchor_lang::prelude::Pubkey, gmsol_store::accounts::MarketConfigBuffer},
-    serde::{serde_market::SerdeMarketConfig, serde_token_map::SerdeTokenConfig, StringPubkey},
+    serde::{
+        serde_market::{SerdeMarketConfig, SerdeMarketConfigBuffer},
+        serde_token_map::SerdeTokenConfig,
+        StringPubkey,
+    },
     solana_utils::{
         bundle_builder::{BundleBuilder, BundleOptions},
         signer::LocalSignerRef,
@@ -61,6 +65,13 @@ enum Command {
         token: Option<Pubkey>,
         #[arg(long, group = "map-input")]
         header: bool,
+    },
+    /// Display the content of the given market config buffer.
+    Buffer {
+        address: Pubkey,
+        /// The expected market token to use for this buffer.
+        #[arg(long)]
+        market_token: Pubkey,
     },
     /// Create a new token map.
     CreateTokenMap {
@@ -354,6 +365,33 @@ impl super::Command for Market {
 
                 return Ok(());
             }
+            Command::Buffer {
+                address,
+                market_token,
+            } => {
+                let buffer = client
+                    .account::<MarketConfigBuffer>(address)
+                    .await?
+                    .ok_or(gmsol_sdk::Error::NotFound)?;
+                let token_map = client.authorized_token_map(store).await?;
+                let market = client.market_by_token(store, market_token).await?;
+                let decimals = MarketDecimals::new(&market.meta.into(), &token_map)?;
+                let buffer = SerdeMarketConfigBuffer::from_market_config_buffer(&buffer, decimals)?;
+                println!(
+                    "{}",
+                    output.display_keyed_account(
+                        address,
+                        &buffer,
+                        DisplayOptions::table_projection([
+                            ("pubkey", "Address"),
+                            ("store", "Store"),
+                            ("authority", "Authority"),
+                            ("expiry", "Expiry"),
+                        ])
+                    )?
+                );
+                return Ok(());
+            }
             Command::CreateTokenMap { keypair } => {
                 let token_map = keypair.to_keypair()?;
                 let (rpc, token_map) = client.initialize_token_map(store, &token_map);
@@ -456,17 +494,11 @@ impl super::Command for Market {
                 batch,
                 expire_after,
             } => {
-                let config: Either<MarketConfigs, SerdeMarketConfig> = toml_from_file(path)?;
-                let config = match config {
-                    Either::Left(configs) => {
-                        let config = configs
-                            .configs
-                            .get(market_token)
-                            .ok_or_eyre(format!("the config for `{market_token}` not found"))?;
-                        config.config.clone()
-                    }
-                    Either::Right(config) => config,
-                };
+                let configs: MarketConfigs = toml_from_file(path)?;
+                let config = configs
+                    .configs
+                    .get(market_token)
+                    .ok_or_eyre(format!("the config for `{market_token}` not found"))?;
                 assert!(buffer.is_none() == *init, "must hold");
                 let keypair = Keypair::new();
                 let buffer = match buffer {
@@ -477,7 +509,7 @@ impl super::Command for Market {
                     client,
                     buffer,
                     market_token,
-                    &config,
+                    &config.config,
                     expire_after,
                     *batch,
                     options,
