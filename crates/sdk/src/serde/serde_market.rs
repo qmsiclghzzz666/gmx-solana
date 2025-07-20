@@ -2,7 +2,7 @@ use gmsol_model::{ClockKind, PoolKind};
 use gmsol_programs::{
     constants::MARKET_DECIMALS,
     gmsol_store::{
-        accounts::Market,
+        accounts::{Market, MarketConfigBuffer},
         types::{Clocks, MarketConfig, MarketMeta, OtherState, Pool, Pools},
     },
 };
@@ -317,5 +317,43 @@ impl SerdeMarketConfig {
             .collect::<crate::Result<_>>()?;
 
         Ok(Self(map))
+    }
+}
+
+/// Serializable version of [`MarketConfigBuffer`].
+#[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone)]
+pub struct SerdeMarketConfigBuffer {
+    /// Store.
+    pub store: StringPubkey,
+    /// Authority.
+    pub authority: StringPubkey,
+    /// Expiry.
+    pub expiry: i64,
+    /// Config.
+    pub config: SerdeMarketConfig,
+}
+
+impl SerdeMarketConfigBuffer {
+    /// Create from [`MarketConfigBuffer`].
+    pub fn from_market_config_buffer(
+        buffer: &MarketConfigBuffer,
+        decimals: MarketDecimals,
+    ) -> crate::Result<Self> {
+        let map = buffer
+            .entries
+            .iter()
+            .map(|entry| {
+                let key: MarketConfigKey = entry.key.try_into().map_err(crate::Error::custom)?;
+                let amount = Amount::from_u128(entry.value, decimals.market_config_decimals(key)?)?;
+                Ok((key, amount))
+            })
+            .collect::<crate::Result<_>>()?;
+        Ok(Self {
+            store: buffer.store.into(),
+            authority: buffer.authority.into(),
+            expiry: buffer.expiry,
+            config: SerdeMarketConfig(map),
+        })
     }
 }
