@@ -18,6 +18,8 @@ pub enum OutputFormat {
     Table,
     /// JSON.
     Json,
+    /// TOML.
+    Toml,
 }
 
 impl OutputFormat {
@@ -37,8 +39,9 @@ impl OutputFormat {
         };
         let map = self.project(map, &options);
         match self {
-            Self::Json => Self::display_json_one(&map),
             Self::Table => Self::display_table_one(&map),
+            Self::Json => Self::display_json_one(&map),
+            Self::Toml => Self::display_toml_one(&map),
         }
     }
 
@@ -71,16 +74,17 @@ impl OutputFormat {
             })
             .collect::<eyre::Result<Vec<_>>>()?;
         match self {
-            Self::Json => Self::display_json_many(&items),
             Self::Table => {
                 Self::display_table_many(&items, || options.empty_message.unwrap_or_default())
             }
+            Self::Json => Self::display_json_many(&items),
+            Self::Toml => Self::display_toml_many(&items),
         }
     }
 
     fn projection<'a>(&self, options: &'a DisplayOptions) -> Option<&'a IndexMap<String, String>> {
         let proj = options.projection.as_ref()?;
-        if options.projection_table_only && matches!(self, Self::Json) {
+        if options.projection_table_only && !matches!(self, Self::Table) {
             None
         } else {
             Some(proj)
@@ -104,6 +108,10 @@ impl OutputFormat {
         Ok(serde_json::to_string_pretty(items)?)
     }
 
+    fn display_toml_many(items: &[Map<String, Value>]) -> eyre::Result<String> {
+        Ok(toml::to_string_pretty(items)?)
+    }
+
     fn display_table_many(
         items: &[Map<String, Value>],
         empty_msg: impl FnOnce() -> String,
@@ -125,6 +133,10 @@ impl OutputFormat {
 
     fn display_json_one(item: &Map<String, Value>) -> eyre::Result<String> {
         Ok(serde_json::to_string_pretty(item)?)
+    }
+
+    fn display_toml_one(item: &Map<String, Value>) -> eyre::Result<String> {
+        Ok(toml::to_string_pretty(item)?)
     }
 
     fn display_table_one(item: &Map<String, Value>) -> eyre::Result<String> {

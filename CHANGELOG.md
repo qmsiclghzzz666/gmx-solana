@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk(solana-utils): Added `luts` and `luts_mut` methods for `BundleBuilder`.
 - sdk(sdk): Added `SerdeMarketConfigBuffer`.
 - cli: Added `market buffer` command to display the content of given buffer account.
+- cli: Added TOML as output format.
 
 ### Fixed
 
