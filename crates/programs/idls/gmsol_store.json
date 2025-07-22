@@ -31647,7 +31647,7 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "paid_order_fee_value",
+            "name": "paid_order_and_borrowing_fee_value",
             "type": {
               "generic": "T"
             }
@@ -32015,9 +32015,13 @@
             "type": {
               "array": [
                 "u8",
-                6
+                2
               ]
             }
+          },
+          {
+            "name": "last_update_diff_nanos",
+            "type": "u32"
           },
           {
             "name": "ts",
