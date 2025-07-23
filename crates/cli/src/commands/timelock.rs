@@ -367,6 +367,8 @@ async fn decode_message<C: Deref<Target = impl Signer> + Clone>(
             VersionedMessage::V0(m) => {
                 let mut metas = decode_static_keys(&m.header, &m.account_keys)?.to_metas();
 
+                let mut writable = Vec::default();
+                let mut readonly = Vec::default();
                 for alt in &m.address_table_lookups {
                     let lut = client
                         .alt(&alt.account_key)
@@ -376,15 +378,18 @@ async fn decode_message<C: Deref<Target = impl Signer> + Clone>(
                         let pubkey = lut.addresses.get(usize::from(*idx)).ok_or_else(|| {
                             gmsol_sdk::Error::custom("invalid transaction messsage")
                         })?;
-                        metas.push(AccountMeta::new(*pubkey, false));
+                        writable.push(AccountMeta::new(*pubkey, false));
                     }
                     for idx in alt.readonly_indexes.iter() {
                         let pubkey = lut.addresses.get(usize::from(*idx)).ok_or_else(|| {
                             gmsol_sdk::Error::custom("invalid transaction messsage")
                         })?;
-                        metas.push(AccountMeta::new_readonly(*pubkey, false));
+                        readonly.push(AccountMeta::new_readonly(*pubkey, false));
                     }
                 }
+
+                metas.append(&mut writable);
+                metas.append(&mut readonly);
 
                 (metas, &m.instructions)
             }
