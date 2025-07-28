@@ -1105,8 +1105,27 @@ impl Deployment {
         let store = &self.store;
         let mut bundle = client.bundle();
         for (index, selectors) in for_swaps {
+            let mut selectors = selectors.into_iter().peekable();
+            let Some([_, long, short]) = selectors.peek() else {
+                continue;
+            };
+            let long_amount_decimals = self
+                .token(long.as_ref())
+                .ok_or_else(|| eyre::eyre!("long token not found"))?
+                .config
+                .decimals;
+            let short_amount_decimals = self
+                .token(short.as_ref())
+                .ok_or_else(|| eyre::eyre!("short token not found"))?
+                .config
+                .decimals;
             let (txn, virtual_inventory) = client
-                .create_virtual_inventory_for_swaps(store, index)?
+                .create_virtual_inventory_for_swaps(
+                    store,
+                    index,
+                    long_amount_decimals,
+                    short_amount_decimals,
+                )?
                 .swap_output(());
             bundle.push(txn)?;
             for [index, long, short] in selectors {
@@ -1114,11 +1133,11 @@ impl Deployment {
                     .market_token(index.as_ref(), long.as_ref(), short.as_ref())
                     .ok_or_else(|| eyre::eyre!("market token not found"))?;
                 let market = client.find_market_address(store, market_token);
-                bundle.push(client.join_virtual_inventory_for_swaps(
-                    store,
-                    &market,
-                    &virtual_inventory,
-                )?)?;
+                bundle.push(
+                    client
+                        .join_virtual_inventory_for_swaps(store, &market, &virtual_inventory, None)
+                        .await?,
+                )?;
             }
         }
         for (index_token, selectors) in for_positions {

@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{future::Future, ops::Deref};
 
 use anchor_lang::system_program;
 use gmsol_programs::gmsol_store::client::{accounts, args};
@@ -34,6 +34,8 @@ pub trait VirtualInventoryOps<C> {
         &self,
         store: &Pubkey,
         index: u32,
+        long_amount_decimals: u8,
+        short_amount_decimals: u8,
     ) -> crate::Result<TransactionBuilder<C, Pubkey>>;
 
     /// Join a virtual inventory for swaps.
@@ -42,7 +44,8 @@ pub trait VirtualInventoryOps<C> {
         store: &Pubkey,
         market: &Pubkey,
         virtual_inventory_for_swaps: &Pubkey,
-    ) -> crate::Result<TransactionBuilder<C>>;
+        hint_token_map: Option<&Pubkey>,
+    ) -> impl Future<Output = crate::Result<TransactionBuilder<C>>>;
 
     /// Leave a virtual inventory for swaps.
     fn leave_virtual_inventory_for_swaps(
@@ -133,6 +136,8 @@ impl<C: Deref<Target = impl Signer> + Clone> VirtualInventoryOps<C> for crate::C
         &self,
         store: &Pubkey,
         index: u32,
+        long_amount_decimals: u8,
+        short_amount_decimals: u8,
     ) -> crate::Result<TransactionBuilder<C, Pubkey>> {
         let virtual_inventory = self.find_virtual_inventory_for_swaps_address(store, index);
         let txn = self
@@ -143,22 +148,35 @@ impl<C: Deref<Target = impl Signer> + Clone> VirtualInventoryOps<C> for crate::C
                 virtual_inventory,
                 system_program: system_program::ID,
             })
-            .anchor_args(args::CreateVirtualInventoryForSwaps { index })
+            .anchor_args(args::CreateVirtualInventoryForSwaps {
+                index,
+                long_amount_decimals,
+                short_amount_decimals,
+            })
             .output(virtual_inventory);
         Ok(txn)
     }
 
-    fn join_virtual_inventory_for_swaps(
+    async fn join_virtual_inventory_for_swaps(
         &self,
         store: &Pubkey,
         market: &Pubkey,
         virtual_inventory_for_swaps: &Pubkey,
+        hint_token_map: Option<&Pubkey>,
     ) -> crate::Result<TransactionBuilder<C>> {
+        let token_map = match hint_token_map {
+            Some(address) => *address,
+            None => self
+                .authorized_token_map_address(store)
+                .await?
+                .ok_or(crate::Error::NotFound)?,
+        };
         let txn = self
             .store_transaction()
             .anchor_accounts(accounts::JoinVirtualInventoryForSwaps {
                 authority: self.payer(),
                 store: *store,
+                token_map,
                 virtual_inventory: *virtual_inventory_for_swaps,
                 market: *market,
             })

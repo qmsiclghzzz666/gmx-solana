@@ -3869,24 +3869,31 @@ pub mod gmsol_store {
     pub fn create_virtual_inventory_for_swaps(
         ctx: Context<CreateVirtualInventoryForSwaps>,
         index: u32,
+        long_amount_decimals: u8,
+        short_amount_decimals: u8,
     ) -> Result<()> {
-        CreateVirtualInventoryForSwaps::invoke_unchecked(ctx, index)
+        CreateVirtualInventoryForSwaps::invoke_unchecked(
+            ctx,
+            index,
+            long_amount_decimals,
+            short_amount_decimals,
+        )
     }
 
     /// Join a [`VirtualInventory`](crate::states::market::virtual_inventory::VirtualInventory) account for swaps.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn join_virtual_inventory_for_swaps(
-        ctx: Context<JoinOrLeaveVirtualInventoryForSwaps>,
+        ctx: Context<JoinVirtualInventoryForSwaps>,
     ) -> Result<()> {
-        JoinOrLeaveVirtualInventoryForSwaps::invoke_join_unchecked(ctx)
+        JoinVirtualInventoryForSwaps::invoke_unchecked(ctx)
     }
 
     /// Leave a [`VirtualInventory`](crate::states::market::virtual_inventory::VirtualInventory) account for swaps.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn leave_virtual_inventory_for_swaps(
-        ctx: Context<JoinOrLeaveVirtualInventoryForSwaps>,
+        ctx: Context<LeaveVirtualInventoryForSwaps>,
     ) -> Result<()> {
-        JoinOrLeaveVirtualInventoryForSwaps::invoke_leave_unchecked(ctx)
+        LeaveVirtualInventoryForSwaps::invoke_unchecked(ctx)
     }
 
     /// Create [`VirtualInventory`](crate::states::market::virtual_inventory::VirtualInventory) account for positions.

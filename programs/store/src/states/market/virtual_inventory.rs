@@ -24,9 +24,11 @@ pub struct VirtualInventory {
     version: u8,
     pub(crate) bump: u8,
     flags: VirtualInventoryFlagContainer,
+    long_amount_decimals: u8,
+    short_amount_decimals: u8,
     #[cfg_attr(feature = "debug", debug(skip))]
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
-    padding_0: [u8; 5],
+    padding_0: [u8; 3],
     ref_count: u32,
     pub(crate) index: u32,
     rev: u64,
@@ -40,10 +42,19 @@ pub struct VirtualInventory {
 }
 
 impl VirtualInventory {
-    pub(crate) fn init(&mut self, bump: u8, index: u32, store: Pubkey) {
+    pub(crate) fn init(
+        &mut self,
+        bump: u8,
+        index: u32,
+        store: Pubkey,
+        long_amount_decimals: u8,
+        short_amount_decimals: u8,
+    ) {
         self.bump = bump;
         self.index = index;
         self.store = store;
+        self.long_amount_decimals = long_amount_decimals;
+        self.short_amount_decimals = short_amount_decimals;
     }
 
     pub(crate) fn is_disabled(&self) -> bool {
@@ -58,6 +69,10 @@ impl VirtualInventory {
 
     pub(crate) fn ref_count(&self) -> u32 {
         self.ref_count
+    }
+
+    pub(crate) fn decimals(&self) -> (u8, u8) {
+        (self.long_amount_decimals, self.short_amount_decimals)
     }
 
     pub(crate) fn pool(&self) -> &PoolStorage {
@@ -80,6 +95,7 @@ impl VirtualInventory {
     ///
     /// # CHECK
     /// - It can only be called once the market is associated, and cannot be called again.
+    /// - The decimals must be validated to match the decimals of this VI.
     pub(crate) fn join_unchecked(&mut self, delta: Delta<&i128>) -> Result<()> {
         let pool = self.pool.pool_mut();
         let next_pool = pool.checked_apply_delta(delta).map_err(ModelError::from)?;

@@ -37,12 +37,14 @@ use gmsol_model::{
 use gmsol_utils::{
     market::{MarketError, MarketFlag, MAX_MARKET_FLAGS},
     pubkey::{optional_address, DEFAULT_PUBKEY},
+    token_config::TokenMapAccess,
 };
 use pool::cancel_amounts;
 use revertible::RevertibleBuffer;
 use virtual_inventory::VirtualInventory;
 
 use crate::{
+    constants::MARKET_DECIMALS,
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
     CoreError, ModelError,
 };
@@ -438,15 +440,35 @@ impl Market {
     /// # CHECK
     /// - The provided [`VirtualInventory`] must be used as a
     ///   virtual inventory for swaps.
+    /// - The provided token map must be authorized.
     pub fn join_virtual_inventory_for_swaps_unchecked(
         &mut self,
         address: &Pubkey,
         virtual_inventory_for_swaps: &mut VirtualInventory,
+        token_map: &impl TokenMapAccess,
     ) -> Result<()> {
         require_keys_neq!(*address, DEFAULT_PUBKEY);
         require!(
             self.virtual_inventory_for_swaps().is_none(),
             CoreError::PreconditionsAreNotMet
+        );
+        let long_amount_decimals = token_map
+            .get(&self.meta().long_token_mint)
+            .ok_or_else(|| {
+                msg!("long token not found in the token map");
+                error!(CoreError::Internal)
+            })?
+            .token_decimals();
+        let short_amount_decimals = token_map
+            .get(&self.meta().short_token_mint)
+            .ok_or_else(|| {
+                msg!("short token not found in the token map");
+                error!(CoreError::Internal)
+            })?
+            .token_decimals();
+        require!(
+            virtual_inventory_for_swaps.decimals() == (long_amount_decimals, short_amount_decimals),
+            CoreError::InvalidArgument,
         );
         self.virtual_inventory_for_swaps = *address;
         let liquidity_pool = self.liquidity_pool().map_err(ModelError::from)?;
@@ -537,6 +559,10 @@ impl Market {
         require!(
             self.virtual_inventory_for_positions().is_none(),
             CoreError::PreconditionsAreNotMet
+        );
+        require!(
+            virtual_inventory_for_positions.decimals() == (MARKET_DECIMALS, MARKET_DECIMALS),
+            CoreError::Internal
         );
         self.virtual_inventory_for_positions = *address;
         let open_interest = self.open_interest().map_err(ModelError::from)?;

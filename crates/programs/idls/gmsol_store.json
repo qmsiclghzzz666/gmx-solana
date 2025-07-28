@@ -9916,6 +9916,14 @@
         {
           "name": "index",
           "type": "u32"
+        },
+        {
+          "name": "long_amount_decimals",
+          "type": "u8"
+        },
+        {
+          "name": "short_amount_decimals",
+          "type": "u8"
         }
       ]
     },
@@ -19076,8 +19084,15 @@
             "Store account."
           ],
           "relations": [
+            "token_map",
             "virtual_inventory",
             "market"
+          ]
+        },
+        {
+          "name": "token_map",
+          "docs": [
+            "The token map account."
           ]
         },
         {
@@ -34635,11 +34650,19 @@
             }
           },
           {
+            "name": "long_amount_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "short_amount_decimals",
+            "type": "u8"
+          },
+          {
             "name": "padding_0",
             "type": {
               "array": [
                 "u8",
-                5
+                3
               ]
             }
           },

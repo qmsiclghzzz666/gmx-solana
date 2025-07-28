@@ -2,13 +2,14 @@ use anchor_lang::prelude::*;
 use gmsol_utils::InitSpace;
 
 use crate::{
+    constants::MARKET_DECIMALS,
     internal,
     states::{
         market::virtual_inventory::{
             VirtualInventory, VIRTUAL_INVENTORY_FOR_POSITIONS_SEED,
             VIRTUAL_INVENTORY_FOR_SWAPS_SEED,
         },
-        Market, Store,
+        Market, Store, TokenMapHeader, TokenMapLoader,
     },
     CoreError,
 };
@@ -161,11 +162,18 @@ impl CreateVirtualInventoryForSwaps<'_> {
     ///
     /// # CHECK
     /// - Only MARKET_KEEPER is allowed to invoke.
-    pub(crate) fn invoke_unchecked(ctx: Context<Self>, index: u32) -> Result<()> {
+    pub(crate) fn invoke_unchecked(
+        ctx: Context<Self>,
+        index: u32,
+        long_amount_decimals: u8,
+        short_amount_decimals: u8,
+    ) -> Result<()> {
         ctx.accounts.virtual_inventory.load_init()?.init(
             ctx.bumps.virtual_inventory,
             index,
             ctx.accounts.store.key(),
+            long_amount_decimals,
+            short_amount_decimals,
         );
         Ok(())
     }
@@ -182,10 +190,65 @@ impl<'info> internal::Authentication<'info> for CreateVirtualInventoryForSwaps<'
 }
 
 /// The accounts definitions for
-/// [`join_virtual_inventory_for_swaps`](crate::gmsol_store::join_virtual_inventory_for_swaps)
-/// and [`leave_virtual_inventory_for_swaps`](crate::gmsol_store::leave_virtual_inventory_for_swaps).
+/// [`join_virtual_inventory_for_swaps`](crate::gmsol_store::join_virtual_inventory_for_swaps).
 #[derive(Accounts)]
-pub struct JoinOrLeaveVirtualInventoryForSwaps<'info> {
+pub struct JoinVirtualInventoryForSwaps<'info> {
+    /// Authority.
+    pub authority: Signer<'info>,
+    /// Store account.
+    pub store: AccountLoader<'info, Store>,
+    /// The token map account.
+    #[account(has_one = store)]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// The virtual inventory account to join.
+    #[account(
+        mut,
+        seeds = [VIRTUAL_INVENTORY_FOR_SWAPS_SEED, store.key().as_ref(), &virtual_inventory.load()?.index.to_le_bytes()],
+        bump = virtual_inventory.load()?.bump,
+        has_one = store,
+        constraint = !virtual_inventory.load()?.is_disabled() @ CoreError::PreconditionsAreNotMet,
+    )]
+    pub virtual_inventory: AccountLoader<'info, VirtualInventory>,
+    /// The market to be added to the virtual inventory.
+    #[account(mut, has_one = store, constraint = !market.load()?.is_pure())]
+    pub market: AccountLoader<'info, Market>,
+}
+
+impl JoinVirtualInventoryForSwaps<'_> {
+    /// Add the market to the given virtual inventory.
+    ///
+    /// # CHECK
+    /// - Only MARKET_KEEPER is allowed to invoke.
+    pub(crate) fn invoke_unchecked(ctx: Context<Self>) -> Result<()> {
+        let address = ctx.accounts.virtual_inventory.key();
+        let mut virtual_inventory = ctx.accounts.virtual_inventory.load_mut()?;
+        let token_map = ctx.accounts.token_map.load_token_map()?;
+        ctx.accounts
+            .market
+            .load_mut()?
+            .join_virtual_inventory_for_swaps_unchecked(
+                &address,
+                &mut virtual_inventory,
+                &token_map,
+            )?;
+        Ok(())
+    }
+}
+
+impl<'info> internal::Authentication<'info> for JoinVirtualInventoryForSwaps<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// The accounts definitions for
+/// [`leave_virtual_inventory_for_swaps`](crate::gmsol_store::leave_virtual_inventory_for_swaps).
+#[derive(Accounts)]
+pub struct LeaveVirtualInventoryForSwaps<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store account.
@@ -204,26 +267,12 @@ pub struct JoinOrLeaveVirtualInventoryForSwaps<'info> {
     pub market: AccountLoader<'info, Market>,
 }
 
-impl JoinOrLeaveVirtualInventoryForSwaps<'_> {
-    /// Add the market to the given virtual inventory.
-    ///
-    /// # CHECK
-    /// - Only MARKET_KEEPER is allowed to invoke.
-    pub(crate) fn invoke_join_unchecked(ctx: Context<Self>) -> Result<()> {
-        let address = ctx.accounts.virtual_inventory.key();
-        let mut virtual_inventory = ctx.accounts.virtual_inventory.load_mut()?;
-        ctx.accounts
-            .market
-            .load_mut()?
-            .join_virtual_inventory_for_swaps_unchecked(&address, &mut virtual_inventory)?;
-        Ok(())
-    }
-
+impl LeaveVirtualInventoryForSwaps<'_> {
     /// Remove the market from the given virtual inventory.
     ///
     /// # CHECK
     /// - Only MARKET_KEEPER is allowed to invoke.
-    pub(crate) fn invoke_leave_unchecked(ctx: Context<Self>) -> Result<()> {
+    pub(crate) fn invoke_unchecked(ctx: Context<Self>) -> Result<()> {
         let address = ctx.accounts.virtual_inventory.key();
         let mut market = ctx.accounts.market.load_mut()?;
         let virtual_inventory_for_swaps = market
@@ -236,7 +285,7 @@ impl JoinOrLeaveVirtualInventoryForSwaps<'_> {
     }
 }
 
-impl<'info> internal::Authentication<'info> for JoinOrLeaveVirtualInventoryForSwaps<'info> {
+impl<'info> internal::Authentication<'info> for LeaveVirtualInventoryForSwaps<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
@@ -284,6 +333,8 @@ impl CreateVirtualInventoryForPositions<'_> {
             ctx.bumps.virtual_inventory,
             0,
             ctx.accounts.store.key(),
+            MARKET_DECIMALS,
+            MARKET_DECIMALS,
         );
         Ok(())
     }
