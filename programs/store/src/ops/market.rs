@@ -366,6 +366,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         params: &DepositActionParams,
         initial_tokens: (Option<Pubkey>, Option<Pubkey>),
         swap_pricing_kind: Option<SwapPricingKind>,
+        include_virtual_inventory_impact: bool,
     ) -> Result<Execute<'a, 'info, u64>> {
         self.validate_first_deposit(receiver, params)?;
 
@@ -415,7 +416,10 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             let report = self
                 .market
                 .deposit(long_token_amount.into(), short_token_amount.into(), prices)
-                .and_then(|d| d.execute())
+                .and_then(|d| {
+                    d.with_virtual_inventory_impact(include_virtual_inventory_impact)
+                        .execute()
+                })
                 .map_err(ModelError::from)?;
             self.market.validate_market_balances(0, 0)?;
 
@@ -592,6 +596,24 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
                 .map_err(ModelError::from)?;
         }
 
+        let include_virtual_inventory_impact = from_market
+            .market()
+            .base()
+            .as_ref()
+            .virtual_inventory_for_swaps()
+            .and_then(|from_vi| {
+                let to_vi = to_market
+                    .market()
+                    .base()
+                    .as_ref()
+                    .virtual_inventory_for_swaps()?;
+                // Price impact from changes in the same virtual inventory should be excluded
+                // since the action of withdrawing and depositing should not result in
+                // a net change of virtual inventory.
+                Some(from_vi != to_vi)
+            })
+            .unwrap_or(true);
+
         // Perform the shift-deposit.
         let (to_market, received) = {
             let (op, output) = to_market.take_output(());
@@ -605,6 +627,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
                 &deposit_params,
                 (None, None),
                 Some(SwapPricingKind::Shift),
+                include_virtual_inventory_impact,
             )?
             .take_output(output)
         };

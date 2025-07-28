@@ -275,6 +275,7 @@ impl ExecuteDepositOperation<'_, '_> {
                     deposit.tokens.initial_short_token.token(),
                 ),
                 None,
+                true,
             )?
             .commit();
             virtual_inventories.commit();

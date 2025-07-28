@@ -19,6 +19,10 @@ use super::MarketAction;
 pub struct Deposit<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
     market: M,
     params: DepositParams<M::Num>,
+    // NOTE: For now, this field hasn’t been included in `DepositParams`
+    // to avoid introducing breaking changes, but it should be added
+    // in the future when the timing is right.
+    include_virtual_inventory_impact: bool,
 }
 
 /// Deposit params.
@@ -166,7 +170,14 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
                 short_token_amount,
                 prices,
             },
+            include_virtual_inventory_impact: true,
         })
+    }
+
+    /// Configures whether virtual inventory impact is included (defaults to `true`).
+    pub fn with_virtual_inventory_impact(mut self, include: bool) -> Self {
+        self.include_virtual_inventory_impact = include;
+        self
     }
 
     /// Get the price impact USD value.
@@ -187,7 +198,9 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
             &self.params.long_token_price().mid(),
             &self.params.short_token_price().mid(),
         )?;
-        let price_impact = self.market.swap_impact_value(&delta, true)?;
+        let price_impact = self
+            .market
+            .swap_impact_value(&delta, self.include_virtual_inventory_impact)?;
         let delta = delta.delta();
         debug_assert!(!delta.long_value().is_negative(), "must be non-negative");
         debug_assert!(!delta.short_value().is_negative(), "must be non-negative");
