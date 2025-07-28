@@ -169,7 +169,7 @@ impl<C: Deref<Target = impl Signer + ?Sized>> TransactionSigners<C> {
         Ok(tx)
     }
 
-    /// Merge two [`TransactionSigner`]s.
+    /// Merge two [`TransactionSigners`]s.
     pub fn merge(&mut self, other: &mut Self) {
         self.signers.extend(std::mem::take(&mut other.signers));
     }

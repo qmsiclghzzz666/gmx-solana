@@ -532,6 +532,6 @@ impl<'a> crate::TransactionAccess for DecodedTransaction<'a> {
     }
 
     fn transaction_status_meta(&self) -> Option<&UiTransactionStatusMeta> {
-        Some(&self.transaction_status_meta)
+        Some(self.transaction_status_meta)
     }
 }
