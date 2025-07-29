@@ -531,12 +531,15 @@ impl Market {
             virtual_inventory.is_disabled(),
             CoreError::PreconditionsAreNotMet
         );
+
         if self.virtual_inventory_for_swaps() == Some(address) {
             self.virtual_inventory_for_swaps = DEFAULT_PUBKEY;
-        }
-        if self.virtual_inventory_for_positions() == Some(address) {
+        } else if self.virtual_inventory_for_positions() == Some(address) {
             self.virtual_inventory_for_positions = DEFAULT_PUBKEY;
         }
+
+        virtual_inventory.leave_unchecked(Delta::new(None, None))?;
+
         Ok(())
     }
 
