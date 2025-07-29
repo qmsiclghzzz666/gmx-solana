@@ -305,7 +305,7 @@ pub trait PerpMarketExt<const DECIMALS: u8>: PerpMarket<DECIMALS> {
         use crate::{market::PositionImpactMarketExt, num::UnsignedAbs, utils};
         use num_traits::{CheckedMul, Signed};
 
-        if impact.is_positive() {
+        if !impact.is_negative() {
             let impact_pool_amount = self.position_impact_pool_amount()?;
             // Cap price impact based on pool amount.
             let max_impact = impact_pool_amount
