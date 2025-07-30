@@ -96,6 +96,8 @@ pub fn convert_to_u128_storage(mut num: U192, decimals: u8) -> Option<(u128, u8)
 pub enum PriceFlag {
     /// Is Market Opened.
     Open,
+    /// Indicates whether the `last_update_diff_nanos` field is enabled.
+    LastUpdateDiffEnabled,
     // CHECK: should have no more than `MAX_PRICE_FLAG` of flags.
 }
 

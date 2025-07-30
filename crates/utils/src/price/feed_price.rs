@@ -58,9 +58,14 @@ impl PriceFeedPrice {
         self.ts
     }
 
-    /// Returns `last_udpate_diff_nanos`.
-    pub fn last_update_diff_nanos(&self) -> u32 {
-        self.last_update_diff_nanos
+    /// Returns the nanoseconds the last update time is earlier than the report time.
+    /// `None` means the field is disabled.
+    pub fn last_update_diff_nanos(&self) -> Option<u32> {
+        if self.flags.get_flag(PriceFlag::LastUpdateDiffEnabled) {
+            Some(self.last_update_diff_nanos)
+        } else {
+            None
+        }
     }
 
     /// Get min price.
@@ -84,43 +89,43 @@ impl PriceFeedPrice {
             return false;
         }
 
-        let last_update_diff_nanos = i64::from(self.last_update_diff_nanos);
+        let Some(last_update_diff_nanos) = self.last_update_diff_nanos() else {
+            return true;
+        };
 
-        if last_update_diff_nanos > 0 {
-            // The use of `saturating_sub` here is valid because:
-            //   - In the case of overflow, the function returns `false`,
-            //     and since `current_timestamp >= ts + i64::MAX`, it must
-            //     also hold that `current_timestamp >= ts + heartbeat_duration`,
-            //     and thus `current_timestamp > last_update + heartbeat_duration`.
-            //   - In the case of underflow, the function returns `true`,
-            //     and since `current_timestamp <= ts + i64::MIN`, it follows that
-            //     `current_timestamp <= ts - last_update_diff_secs`, and thus
-            //     `current_timestamp - last_update <= heartbeat_duration`.
-            // Therefore, we only need to check the case where no overflow or underflow occurs.
-            let current_diff = current_timestamp.saturating_sub(self.ts);
-            let heartbeat_duration = heartbeat_duration.into();
-            if current_diff >= heartbeat_duration {
-                return false;
-            }
+        let last_update_diff_nanos = i64::from(last_update_diff_nanos);
 
-            last_update_diff_nanos
-                <= heartbeat_duration
-                    // The use of `saturating_sub` is valid because:
-                    //   - Underflow is impossible because of the check above, and in the case of
-                    //     overflow, the function returns `true`, and since
-                    //     `heartbeat_duration >= current_diff + i64::MAX`, it must also hold that
-                    //     `heartbeat_duration >= current_diff + last_update_diff_secs`, and thus
-                    //     `current_timestamp - last_update <= heartbeat_duration`.
-                    .saturating_sub(current_diff)
-                    // The use of `saturating_mul` is valid because:
-                    //   - Underflow is impossible because `heartbeat_duration > current_diff`,
-                    //     and in the case of overflow, the function returns `true`, and since
-                    //     `(heartbeat_duration - current_diff) * NANOS_PER_SECOND >= i64::MAX`, it must
-                    //     hold that `(heartbeat_duration - current_diff) * NANOS_PER_SECOND >= last_update_diff_nanos`.
-                    .saturating_mul(NANOS_PER_SECOND)
-        } else {
-            true
+        // The use of `saturating_sub` here is valid because:
+        //   - In the case of overflow, the function returns `false`,
+        //     and since `current_timestamp >= ts + i64::MAX`, it must
+        //     also hold that `current_timestamp >= ts + heartbeat_duration`,
+        //     and thus `current_timestamp > last_update + heartbeat_duration`.
+        //   - In the case of underflow, the function returns `true`,
+        //     and since `current_timestamp <= ts + i64::MIN`, it follows that
+        //     `current_timestamp <= ts - last_update_diff_secs`, and thus
+        //     `current_timestamp - last_update <= heartbeat_duration`.
+        // Therefore, we only need to check the case where no overflow or underflow occurs.
+        let current_diff = current_timestamp.saturating_sub(self.ts);
+        let heartbeat_duration = heartbeat_duration.into();
+        if current_diff > heartbeat_duration {
+            return false;
         }
+
+        last_update_diff_nanos
+            <= heartbeat_duration
+                // The use of `saturating_sub` is valid because:
+                //   - Underflow is impossible because of the check above, and in the case of
+                //     overflow, the function returns `true`, and since
+                //     `heartbeat_duration >= current_diff + i64::MAX`, it must also hold that
+                //     `heartbeat_duration >= current_diff + last_update_diff_secs`, and thus
+                //     `current_timestamp - last_update <= heartbeat_duration`.
+                .saturating_sub(current_diff)
+                // The use of `saturating_mul` is valid because:
+                //   - Underflow is impossible because `heartbeat_duration >= current_diff`,
+                //     and in the case of overflow, the function returns `true`, and since
+                //     `(heartbeat_duration - current_diff) * NANOS_PER_SECOND >= i64::MAX`, it must
+                //     hold that `(heartbeat_duration - current_diff) * NANOS_PER_SECOND >= last_update_diff_nanos`.
+                .saturating_mul(NANOS_PER_SECOND)
     }
 
     /// Try converting to [`Price`].
@@ -156,6 +161,7 @@ mod tests {
         price.set_flag(PriceFlag::Open, true);
         assert!(price.is_market_open(i64::MAX, 0));
 
+        price.set_flag(PriceFlag::LastUpdateDiffEnabled, true);
         price.last_update_diff_nanos = u32::MAX;
 
         price.ts = i64::MIN;
