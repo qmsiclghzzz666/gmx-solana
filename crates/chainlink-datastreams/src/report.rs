@@ -137,7 +137,8 @@ pub fn decode(data: &[u8]) -> Result<Report, DecodeError> {
     let version = decode_version(&feed_id);
 
     match version {
-        2 => {
+        // NOTE: According to internal discussions with Chainlink, version 7 also uses the v2 schema.
+        2 | 7 => {
             let report = ReportDataV2::decode(data)?;
             let price = bigint_to_signed(report.benchmark_price)?;
             Ok(Report {
