@@ -78,6 +78,11 @@ impl Report {
     pub fn last_update_timestamp(&self) -> Option<u64> {
         self.last_update_timestamp
     }
+
+    /// Returns the expiry timestamp for the report.
+    pub fn expires_at(&self) -> u32 {
+        self.expires_at
+    }
 }
 
 impl fmt::Debug for Report {

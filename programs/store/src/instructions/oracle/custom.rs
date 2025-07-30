@@ -150,6 +150,13 @@ impl UpdatePriceFeedWithChainlink<'_> {
             CoreError::InvalidPriceReport
         );
 
+        let clock = Clock::get()?;
+        require_gte!(
+            i64::from(report.expires_at()),
+            clock.unix_timestamp,
+            CoreError::InvalidPriceReport
+        );
+
         PriceFeedPrice::from_chainlink_report(&report).map_err(|err| {
             msg!("Invalid report: {}", err);
             let err = match err {

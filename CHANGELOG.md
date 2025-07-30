@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - program(store): Introduced virtual inventory mechanism and related instructions.
 - program(store): Added instructions to configure token metadata.
 - program: Added `security.txt` to all public programs.
+- program: Added validation for Chainlink Data Streams report expiry timestamp.
 - model: Added `with_virtual_inventory_impact` function to configure whether virtual inventory impact is included.
 - sdk(sdk): Added support for the instructions to configure token metadata.
 - sdk(chainlink-datastreams): Added `market_status` field and corresponding method to the `Report` struct.
