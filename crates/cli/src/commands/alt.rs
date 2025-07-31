@@ -118,6 +118,8 @@ impl super::Command for Alt {
                     bundle.append(extend_txns, false)?;
                 }
 
+                println!("{alt}");
+
                 bundle
             }
         };
