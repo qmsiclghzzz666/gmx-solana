@@ -15,7 +15,7 @@ use gmsol_sdk::{
     },
     ops::{
         token_config::UpdateFeedConfig, ConfigOps, GtOps, MarketOps, OracleOps, StoreOps,
-        TokenConfigOps,
+        TokenAccountOps, TokenConfigOps,
     },
     programs::{anchor_lang::prelude::Pubkey, gmsol_store::accounts::MarketConfigBuffer},
     serde::{
@@ -254,6 +254,8 @@ enum Command {
     },
     /// Set referred discount.
     SetReferredDiscountFactor { factor: Value },
+    /// Create or update token metadata from file.
+    UpdateTokenMetadatas { path: PathBuf },
 }
 
 impl super::Command for Market {
@@ -656,6 +658,36 @@ impl super::Command for Market {
                     &factor.to_u128()?,
                 )
                 .into_bundle_with_options(options)?,
+            Command::UpdateTokenMetadatas { path } => {
+                let config: TokenMetadatas = toml_from_file(path)?;
+                let mut bundle = client.bundle_with_options(options);
+                for (mint, metadata) in config.0 {
+                    let rpc = if metadata.init {
+                        let (rpc, token_metadata) = client
+                            .create_token_metadata(
+                                store,
+                                &mint,
+                                metadata.name,
+                                metadata.symbol,
+                                metadata.uri,
+                            )
+                            .swap_output(());
+                        println!("Creating token metadata {token_metadata} for {mint}");
+                        rpc
+                    } else {
+                        client.update_token_metadata_by_mint(
+                            store,
+                            &mint,
+                            metadata.name,
+                            metadata.symbol,
+                            metadata.uri,
+                        )
+                    };
+                    bundle.push(rpc)?;
+                }
+
+                bundle
+            }
         };
 
         client.send_or_serialize(bundle).await?;
@@ -1019,4 +1051,16 @@ fn parse_hex_encoded_feed_id(feed_id: &str) -> eyre::Result<[u8; 32]> {
     hex::decode_to_slice(feed_id, &mut bytes)?;
 
     Ok(bytes)
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TokenMetadatas(IndexMap<StringPubkey, TokenMetadata>);
+
+#[derive(Debug, serde::Deserialize)]
+struct TokenMetadata {
+    name: String,
+    symbol: String,
+    uri: String,
+    #[serde(default)]
+    init: bool,
 }

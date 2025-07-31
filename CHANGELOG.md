@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - cli: Added `market buffer` command to display the content of given buffer account.
 - cli: Added TOML as output format.
 - cli: Added output of ALT address for `alt extend` command.
+- cli: Added `market update-token-metadatas` command to create or update token metadatas.
 
 ### Fixed
 
