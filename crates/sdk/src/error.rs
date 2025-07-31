@@ -57,6 +57,9 @@ pub enum Error {
     #[cfg(feature = "serde_json")]
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
+    /// Market closed error.
+    #[error("market closed: {0}")]
+    MarketClosed(String),
 }
 
 impl Error {
@@ -76,6 +79,11 @@ impl Error {
             return None;
         };
         Some(error.error_code_number)
+    }
+
+    /// Create a [`MarketClosed`](Error::MarketClosed) error.
+    pub fn market_closed(msg: impl ToString) -> Self {
+        Self::MarketClosed(msg.to_string())
     }
 }
 
