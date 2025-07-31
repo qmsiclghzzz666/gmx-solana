@@ -63,7 +63,7 @@ client = [
 ]
 decode = ["gmsol-decode"]
 chainlink = [
-    "gmsol-chainlink-datastreams",
+    "gmsol-chainlink-datastreams/gmsol",
     "reqwest",
     "reqwest-websocket",
     "sha2",
