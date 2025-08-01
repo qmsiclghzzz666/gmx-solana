@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, path::PathBuf};
+use std::{collections::BTreeMap, num::NonZeroUsize, path::PathBuf};
 
 use anchor_spl::associated_token::get_associated_token_address;
 use either::Either;
@@ -812,7 +812,7 @@ impl super::Command for Market {
                             .map(|(pubkey, vi)| {
                                 Ok((pubkey, SerdeVirtualInventory::new(pubkey, &vi.0)?))
                             })
-                            .collect::<gmsol_sdk::Result<IndexMap<_, _>>>()?;
+                            .collect::<gmsol_sdk::Result<BTreeMap<_, _>>>()?;
                         let msg = output.display_keyed_accounts(vis, Default::default())?;
                         println!("{msg}");
                     }
@@ -1326,6 +1326,8 @@ struct SerdeVirtualInventory {
     index: u32,
     long_amount: Amount,
     short_amount: Amount,
+    is_enabled: bool,
+    ref_count: u32,
     long_decimals: u8,
     short_decimals: u8,
     for_swaps: bool,
@@ -1338,10 +1340,13 @@ impl SerdeVirtualInventory {
         let pool = &vi.pool.pool;
         let for_swaps =
             find_virtual_inventory_for_swaps_address(&vi.store, vi.index, &ID).0 == *address;
+        let is_enabled = !vi.flags.get_flag(VirtualInventoryFlag::Disabled);
         Ok(Self {
             index: vi.index,
             long_amount: Amount::from_u128(pool.long_token_amount, vi.long_amount_decimals)?,
             short_amount: Amount::from_u128(pool.short_token_amount, vi.short_amount_decimals)?,
+            is_enabled,
+            ref_count: vi.ref_count,
             long_decimals: vi.long_amount_decimals,
             short_decimals: vi.short_amount_decimals,
             for_swaps,
