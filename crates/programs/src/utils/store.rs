@@ -3,7 +3,7 @@ use std::num::NonZeroU64;
 use bytemuck::Zeroable;
 
 use crate::gmsol_store::{
-    accounts::{Glv, GtExchange, Market, Position, ReferralCodeV2, Store},
+    accounts::{Glv, GtExchange, Market, Position, ReferralCodeV2, Store, VirtualInventory},
     types::{ActionHeader, EventPositionState, Pool, PositionState},
 };
 
@@ -11,6 +11,12 @@ use crate::gmsol_store::{
 pub type ReferralCodeBytes = [u8; 8];
 
 impl Default for Market {
+    fn default() -> Self {
+        Zeroable::zeroed()
+    }
+}
+
+impl Default for VirtualInventory {
     fn default() -> Self {
         Zeroable::zeroed()
     }
@@ -174,7 +180,10 @@ mod utils {
         fixed_str::bytes_to_fixed_str,
         glv::{GlvMarketFlag, MAX_GLV_MARKET_FLAGS},
         impl_fixed_map, impl_flags,
-        market::{self, HasMarketMeta, MarketConfigKey, MarketFlag, MAX_MARKET_FLAGS},
+        market::{
+            self, HasMarketMeta, MarketConfigKey, MarketFlag, VirtualInventoryFlag,
+            MAX_MARKET_FLAGS, MAX_VIRTUAL_INVENTORY_FLAGS,
+        },
         order::{self, PositionKind, TradeFlag, TradeFlagContainer},
         pubkey::{self, optional_address},
         swap::{self, HasSwapParams},
@@ -189,6 +198,7 @@ mod utils {
             GlvMarketsEntry, MarketConfig, MarketFlagContainer, MarketMeta, Members, MembersEntry,
             OrderActionParams, OrderKind, RoleMap, RoleMapEntry, RoleMetadata, RoleStore,
             SwapActionParams, TokenAndAccount, Tokens, TokensEntry, UpdateTokenConfigParams,
+            VirtualInventoryFlagContainer,
         },
     };
 
@@ -213,6 +223,7 @@ mod utils {
     impl_flags!(ActionFlag, MAX_ACTION_FLAGS, u8);
     impl_flags!(MarketFlag, MAX_MARKET_FLAGS, u8);
     impl_flags!(GlvMarketFlag, MAX_GLV_MARKET_FLAGS, u8);
+    impl_flags!(VirtualInventoryFlag, MAX_VIRTUAL_INVENTORY_FLAGS, u8);
 
     impl From<SwapActionParams> for swap::SwapActionParams {
         fn from(params: SwapActionParams) -> Self {

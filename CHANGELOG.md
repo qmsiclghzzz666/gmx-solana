@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - cli: Added TOML as output format.
 - cli: Added output of ALT address for `alt extend` command.
 - cli: Added `market update-token-metadatas` command to create or update token metadatas.
+- cli: Added commands for virtual inventory management.
 
 ### Fixed
 

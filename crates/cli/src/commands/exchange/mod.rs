@@ -750,21 +750,8 @@ impl super::Command for Exchange {
                     serde_markets.sort_by_key(|(_, m)| m.enabled);
                     println!(
                         "{}",
-                        output.display_keyed_accounts(
-                            serde_markets,
-                            DisplayOptions::table_projection([
-                                ("name", "Name"),
-                                ("meta.market_token", "Market Token"),
-                                ("enabled", "Is Enabled"),
-                                ("state.long_token_balance", "◎ Long Token"),
-                                ("state.short_token_balance", "◎ Short Token"),
-                                ("pools.claimable_fee.long_amount", "◎ Claimable Long Token"),
-                                (
-                                    "pools.claimable_fee.short_amount",
-                                    "◎ Claimable Short Token"
-                                ),
-                            ]),
-                        )?
+                        output
+                            .display_keyed_accounts(serde_markets, display_options_for_markets(),)?
                     );
                 } else {
                     let address = if let Some(address) = address {
@@ -2323,4 +2310,19 @@ fn to_unix_timestamp(ts: &humantime::Timestamp) -> eyre::Result<i64> {
         .duration_since(SystemTime::UNIX_EPOCH)?
         .as_secs()
         .try_into()?)
+}
+
+pub(crate) fn display_options_for_markets() -> DisplayOptions {
+    DisplayOptions::table_projection([
+        ("name", "Name"),
+        ("meta.market_token", "Market Token"),
+        ("enabled", "Is Enabled"),
+        ("state.long_token_balance", "◎ Long Token"),
+        ("state.short_token_balance", "◎ Short Token"),
+        ("pools.claimable_fee.long_amount", "◎ Claimable Long Token"),
+        (
+            "pools.claimable_fee.short_amount",
+            "◎ Claimable Short Token",
+        ),
+    ])
 }

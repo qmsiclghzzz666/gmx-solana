@@ -104,7 +104,8 @@ use gmsol_decode::{gmsol::programs::GMSOLCPIEvent, Decode};
 #[cfg(feature = "decode")]
 use gmsol_programs::gmsol_store::events as store_events;
 
-const DISC_OFFSET: usize = 8;
+/// Discriminator offset.
+pub const DISC_OFFSET: usize = 8;
 
 /// Options for [`Client`].
 #[derive(Debug, Clone, TypedBuilder)]

@@ -4,9 +4,10 @@ use anchor_spl::associated_token::get_associated_token_address;
 use either::Either;
 use eyre::OptionExt;
 use gmsol_sdk::{
+    client::{StoreFilter, DISC_OFFSET},
     core::{
         config::FactorKey,
-        market::MarketConfigFlag,
+        market::{MarketConfigFlag, VirtualInventoryFlag},
         oracle::PriceProviderKind,
         token_config::{
             TokenMapAccess, UpdateTokenConfigParams, DEFAULT_HEARTBEAT_DURATION, DEFAULT_PRECISION,
@@ -15,25 +16,34 @@ use gmsol_sdk::{
     },
     ops::{
         token_config::UpdateFeedConfig, ConfigOps, GtOps, MarketOps, OracleOps, StoreOps,
-        TokenAccountOps, TokenConfigOps,
+        TokenAccountOps, TokenConfigOps, VirtualInventoryOps,
     },
-    programs::{anchor_lang::prelude::Pubkey, gmsol_store::accounts::MarketConfigBuffer},
+    pda::find_virtual_inventory_for_swaps_address,
+    programs::{
+        anchor_lang::prelude::Pubkey,
+        bytemuck,
+        gmsol_store::accounts::{MarketConfigBuffer, VirtualInventory},
+    },
     serde::{
-        serde_market::{SerdeMarketConfig, SerdeMarketConfigBuffer},
+        serde_market::{SerdeMarket, SerdeMarketConfig, SerdeMarketConfigBuffer},
         serde_token_map::SerdeTokenConfig,
         StringPubkey,
     },
     solana_utils::{
         bundle_builder::{BundleBuilder, BundleOptions},
         signer::LocalSignerRef,
+        solana_client::rpc_filter::{Memcmp, RpcFilterType},
         solana_sdk::{signature::Keypair, signer::Signer},
     },
-    utils::{market::MarketDecimals, Amount, Value},
+    utils::{market::MarketDecimals, zero_copy::ZeroCopy, Amount, Value},
 };
 use indexmap::{IndexMap, IndexSet};
 use rust_decimal::Decimal;
 
-use crate::{commands::utils::toml_from_file, config::DisplayOptions};
+use crate::{
+    commands::{exchange::display_options_for_markets, utils::toml_from_file},
+    config::DisplayOptions,
+};
 
 use super::{
     utils::{KeypairArgs, Side, ToggleValue},
@@ -256,6 +266,55 @@ enum Command {
     SetReferredDiscountFactor { factor: Value },
     /// Create or update token metadata from file.
     UpdateTokenMetadatas { path: PathBuf },
+    /// Display virtual inventories.
+    VirtualInventories {
+        address: Option<Pubkey>,
+        /// Displays the market list associated with the given VI.
+        #[arg(long, requires = "address")]
+        markets: bool,
+    },
+    /// Create a virtual inventory for swaps.
+    CreateVirtualInventoryForSwaps {
+        #[arg(long)]
+        index: u32,
+        #[arg(long, short)]
+        long_amount_decimals: u8,
+        #[arg(long, short)]
+        short_amount_decimals: u8,
+    },
+    /// Create a virtual inventory for positions.
+    CreateVirtualInventoryForPositions { index_token: Pubkey },
+    /// Disable virtual inventories.
+    DisableVirtualInventories {
+        #[arg(required = true, num_args = 1..)]
+        addresses: Vec<Pubkey>,
+    },
+    /// Join the given virtual inventory for swaps.
+    JoinVirtualInventoryForSwaps {
+        #[arg(required = true, num_args = 1..)]
+        market_tokens: Vec<Pubkey>,
+        #[arg(long)]
+        virtual_inventory: Pubkey,
+    },
+    /// Join the given virtual inventory for positions.
+    JoinVirtualInventoryForPositions {
+        #[arg(required = true, num_args = 1..)]
+        market_tokens: Vec<Pubkey>,
+        #[arg(long)]
+        virtual_inventory: Pubkey,
+    },
+    /// Leave the given virtual inventory.
+    LeaveVirtualInventory {
+        #[arg(required = true, num_args = 1..)]
+        market_tokens: Vec<Pubkey>,
+        #[arg(long)]
+        virtual_inventory: Pubkey,
+    },
+    /// Close virtual inventories.
+    CloseVirtualInventories {
+        #[arg(required = true, num_args = 1..)]
+        addresses: Vec<Pubkey>,
+    },
 }
 
 impl super::Command for Market {
@@ -688,6 +747,203 @@ impl super::Command for Market {
 
                 bundle
             }
+            Command::VirtualInventories { address, markets } => {
+                use gmsol_sdk::programs::gmsol_store::accounts::Market as MarketAccount;
+
+                match address {
+                    Some(address) => {
+                        let vi = client
+                            .account::<ZeroCopy<VirtualInventory>>(address)
+                            .await?
+                            .ok_or(gmsol_sdk::Error::NotFound)?;
+                        let vi = SerdeVirtualInventory::new(address, &vi.0)?;
+                        if *markets {
+                            let offset = if vi.for_swaps {
+                                bytemuck::offset_of!(MarketAccount, virtual_inventory_for_swaps)
+                            } else {
+                                bytemuck::offset_of!(MarketAccount, virtual_inventory_for_positions)
+                            };
+                            let token_map = client.authorized_token_map(store).await?;
+                            let markets = client
+                                .store_accounts::<ZeroCopy<MarketAccount>>(
+                                    Some(StoreFilter::new(
+                                        store,
+                                        bytemuck::offset_of!(MarketAccount, store),
+                                    )),
+                                    Some(RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+                                        DISC_OFFSET + offset,
+                                        address.as_ref(),
+                                    ))),
+                                )
+                                .await?;
+                            let mut serde_markets = markets
+                                .iter()
+                                .map(|(p, m)| {
+                                    SerdeMarket::from_market(&m.0, &token_map).map(|m| (p, m))
+                                })
+                                .collect::<gmsol_sdk::Result<Vec<(_, _)>>>()?;
+                            serde_markets.sort_by(|(_, a), (_, b)| a.name.cmp(&b.name));
+                            serde_markets.sort_by_key(|(_, m)| m.enabled);
+                            println!(
+                                "{}",
+                                output.display_keyed_accounts(
+                                    serde_markets,
+                                    display_options_for_markets(),
+                                )?
+                            );
+                        } else {
+                            let msg =
+                                output.display_keyed_account(address, &vi, Default::default())?;
+                            println!("{msg}");
+                        }
+                    }
+                    None => {
+                        let vis = client
+                            .store_accounts::<ZeroCopy<VirtualInventory>>(
+                                Some(StoreFilter::new(
+                                    store,
+                                    bytemuck::offset_of!(VirtualInventory, store),
+                                )),
+                                None,
+                            )
+                            .await?;
+                        let vis = vis
+                            .iter()
+                            .map(|(pubkey, vi)| {
+                                Ok((pubkey, SerdeVirtualInventory::new(pubkey, &vi.0)?))
+                            })
+                            .collect::<gmsol_sdk::Result<IndexMap<_, _>>>()?;
+                        let msg = output.display_keyed_accounts(vis, Default::default())?;
+                        println!("{msg}");
+                    }
+                }
+
+                return Ok(());
+            }
+            Command::CreateVirtualInventoryForSwaps {
+                index,
+                long_amount_decimals,
+                short_amount_decimals,
+            } => {
+                let (rpc, vi) = client
+                    .create_virtual_inventory_for_swaps(
+                        store,
+                        *index,
+                        *long_amount_decimals,
+                        *short_amount_decimals,
+                    )?
+                    .swap_output(());
+                println!("{vi}");
+                rpc.into_bundle_with_options(options)?
+            }
+            Command::CreateVirtualInventoryForPositions { index_token } => {
+                let (rpc, vi) = client
+                    .create_virtual_inventory_for_positions(store, index_token)?
+                    .swap_output(());
+                println!("{vi}");
+                rpc.into_bundle_with_options(options)?
+            }
+            Command::DisableVirtualInventories { addresses } => {
+                let mut bundle = client.bundle_with_options(options);
+                for address in addresses {
+                    let rpc = client.disable_virtual_inventory(store, address)?;
+                    bundle.push(rpc)?;
+                }
+                bundle
+            }
+            Command::JoinVirtualInventoryForSwaps {
+                market_tokens,
+                virtual_inventory,
+            } => {
+                let mut bundle = client.bundle_with_options(options);
+                let token_map = client
+                    .authorized_token_map_address(store)
+                    .await?
+                    .ok_or(gmsol_sdk::Error::NotFound)?;
+                for market_token in market_tokens {
+                    let market = client.find_market_address(store, market_token);
+                    let rpc = client
+                        .join_virtual_inventory_for_swaps(
+                            store,
+                            &market,
+                            virtual_inventory,
+                            Some(&token_map),
+                        )
+                        .await?;
+                    bundle.push(rpc)?;
+                }
+                bundle
+            }
+            Command::JoinVirtualInventoryForPositions {
+                market_tokens,
+                virtual_inventory,
+            } => {
+                let mut bundle = client.bundle_with_options(options);
+                for market_token in market_tokens {
+                    let market = client.find_market_address(store, market_token);
+                    let rpc = client.join_virtual_inventory_for_positions(
+                        store,
+                        &market,
+                        virtual_inventory,
+                    )?;
+                    bundle.push(rpc)?;
+                }
+                bundle
+            }
+            Command::LeaveVirtualInventory {
+                market_tokens,
+                virtual_inventory,
+            } => {
+                let mut bundle = client.bundle_with_options(options);
+                let vi = client
+                    .account::<ZeroCopy<VirtualInventory>>(virtual_inventory)
+                    .await?
+                    .ok_or(gmsol_sdk::Error::NotFound)?
+                    .0;
+                let markets = market_tokens
+                    .iter()
+                    .map(|token| client.find_market_address(store, token))
+                    .collect::<Vec<_>>();
+                if vi.flags.get_flag(VirtualInventoryFlag::Disabled) {
+                    for market in &markets {
+                        bundle.push(client.leave_disabled_virtual_inventory(
+                            store,
+                            market,
+                            virtual_inventory,
+                        )?)?;
+                    }
+                } else {
+                    let first = markets.first().expect("must exist");
+                    let market = client.market(first).await?;
+                    if market.virtual_inventory_for_swaps == *virtual_inventory {
+                        for market in &markets {
+                            bundle.push(client.leave_virtual_inventory_for_swaps(
+                                store,
+                                market,
+                                virtual_inventory,
+                            )?)?;
+                        }
+                    } else if market.virtual_inventory_for_positions == *virtual_inventory {
+                        for market in &markets {
+                            bundle.push(client.leave_virtual_inventory_for_positions(
+                                store,
+                                market,
+                                virtual_inventory,
+                            )?)?;
+                        }
+                    } else {
+                        eyre::bail!("the first market has not included this virtual inventory.");
+                    }
+                }
+                bundle
+            }
+            Command::CloseVirtualInventories { addresses } => {
+                let mut bundle = client.bundle_with_options(options);
+                for address in addresses {
+                    bundle.push(client.close_virtual_inventory_account(store, address)?)?;
+                }
+                bundle
+            }
         };
 
         client.send_or_serialize(bundle).await?;
@@ -1063,4 +1319,32 @@ struct TokenMetadata {
     uri: String,
     #[serde(default)]
     init: bool,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct SerdeVirtualInventory {
+    index: u32,
+    long_amount: Amount,
+    short_amount: Amount,
+    long_decimals: u8,
+    short_decimals: u8,
+    for_swaps: bool,
+}
+
+impl SerdeVirtualInventory {
+    fn new(address: &Pubkey, vi: &VirtualInventory) -> gmsol_sdk::Result<Self> {
+        use gmsol_sdk::programs::gmsol_store::ID;
+
+        let pool = &vi.pool.pool;
+        let for_swaps =
+            find_virtual_inventory_for_swaps_address(&vi.store, vi.index, &ID).0 == *address;
+        Ok(Self {
+            index: vi.index,
+            long_amount: Amount::from_u128(pool.long_token_amount, vi.long_amount_decimals)?,
+            short_amount: Amount::from_u128(pool.short_token_amount, vi.short_amount_decimals)?,
+            long_decimals: vi.long_amount_decimals,
+            short_decimals: vi.short_amount_decimals,
+            for_swaps,
+        })
+    }
 }
