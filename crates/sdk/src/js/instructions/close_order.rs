@@ -20,7 +20,9 @@ use wasm_bindgen::prelude::*;
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct CloseOrderArgs {
     recent_blockhash: String,
+    #[serde(default)]
     compute_unit_price_micro_lamports: Option<u64>,
+    #[serde(default)]
     compute_unit_min_priority_lamports: Option<u64>,
     payer: StringPubkey,
     orders: HashMap<StringPubkey, CloseOrderHint>,
