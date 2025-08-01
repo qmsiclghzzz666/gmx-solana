@@ -13,7 +13,7 @@ keywords.workspace = true
 default = []
 gmsol = ["gmsol-store/debug", "gmsol-store/display"]
 gmsol-programs = ["dep:gmsol-programs"]
-solana-decoder = ["solana-transaction-status", "bs58"]
+solana-decoder = ["bs58"]
 
 [dependencies]
 gmsol-store = { workspace = true, optional = true }
@@ -27,8 +27,8 @@ base64 = { workspace = true }
 bytemuck = { workspace = true }
 paste = { workspace = true }
 cfg-if = { workspace = true }
+solana-transaction-status = { workspace = true }
 
-solana-transaction-status = { workspace = true, optional = true }
 bs58 = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]
