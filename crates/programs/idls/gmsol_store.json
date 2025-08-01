@@ -34675,15 +34675,11 @@
             "type": "u32"
           },
           {
-            "name": "rev",
-            "type": "u64"
-          },
-          {
             "name": "padding_1",
             "type": {
               "array": [
                 "u8",
-                8
+                16
               ]
             }
           },
