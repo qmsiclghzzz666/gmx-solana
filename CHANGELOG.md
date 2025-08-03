@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk(sdk): Added `SerdeMarketConfigBuffer`.
 - sdk(decode): Added `TransactionAccess` trait to abstract transaction decoding logic.
 - sdk(sdk): Added `MarketClosed` error type.
+- sdk(js): Added support for creating orders with callbacks.
 - cli: Added `market buffer` command to display the content of given buffer account.
 - cli: Added TOML as output format.
 - cli: Added output of ALT address for `alt extend` command.

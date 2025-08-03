@@ -8,6 +8,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     builders::{
+        callback::Callback,
         order::{CreateOrder, CreateOrderHint, CreateOrderKind, CreateOrderParams},
         token::{PrepareTokenAccounts, WrapNative},
         user::PrepareUser,
@@ -42,6 +43,8 @@ pub struct CreateOrderOptions {
     skip_wrap_native_on_pay: Option<bool>,
     #[serde(default)]
     skip_unwrap_native_on_receive: Option<bool>,
+    #[serde(default)]
+    callback: Option<Callback>,
     #[serde(default)]
     transaction_group: TransactionGroupOptions,
 }
@@ -103,6 +106,7 @@ pub fn create_orders(
                 .unwrap_native_on_receive(
                     !options.skip_unwrap_native_on_receive.unwrap_or_default(),
                 )
+                .callback(options.callback.clone())
                 .build()
                 .into_atomic_group(hint)?;
 
