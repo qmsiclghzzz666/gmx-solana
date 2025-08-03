@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - program(timelock): Fixed incorrect data length validation for accounts field.
 - cli: Fixed bugs of `glv update-config` command.
+- cli: Fixed the auto-wrap functionality for GLV deposits.
 
 ### Changed
 

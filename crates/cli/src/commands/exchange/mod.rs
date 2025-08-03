@@ -2040,7 +2040,15 @@ impl super::Command for Exchange {
                     }
                 };
 
-                txn.into_bundle_with_options(options)?
+                txn.pre_instructions(
+                    collector
+                        .as_ref()
+                        .map(|c| c.to_instructions(owner))
+                        .transpose()?
+                        .unwrap_or_default(),
+                    false,
+                )
+                .into_bundle_with_options(options)?
             }
             #[cfg(feature = "execute")]
             Command::Execute {
