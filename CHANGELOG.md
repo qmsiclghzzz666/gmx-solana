@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sdk(solana-utils): Remiplemented the `BundleBuilder`A to support the new transaction group API.
 - sdk(sdk): Updated `SquadsOps` methods to support ephemeral signers.
 - sdk(decode): Added `Visitor::visit_transaction` to support transaction decoding.
+- sdk(decode): Removed support for `gmsol-store` types.
 - cli: Changed the `market push-to-buffer` command to accept only input in the `MarketConfigs` format.
 
 ### Added

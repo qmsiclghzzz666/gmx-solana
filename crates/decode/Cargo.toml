@@ -11,12 +11,10 @@ keywords.workspace = true
 
 [features]
 default = []
-gmsol = ["gmsol-store/debug", "gmsol-store/display"]
 gmsol-programs = ["dep:gmsol-programs"]
 solana-decoder = ["bs58"]
 
 [dependencies]
-gmsol-store = { workspace = true, optional = true }
 gmsol-programs = { workspace = true, optional = true }
 
 tracing = { workspace = true }

@@ -16,7 +16,7 @@ pub mod value;
 pub mod error;
 
 /// Implement [`Decode`] for GMSOL types.
-#[cfg(any(feature = "gmsol", feature = "gmsol-programs"))]
+#[cfg(feature = "gmsol-programs")]
 pub mod gmsol;
 
 pub use self::{

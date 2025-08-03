@@ -2357,7 +2357,6 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "gmsol-programs",
- "gmsol-store",
  "paste",
  "solana-sdk",
  "solana-transaction-status",
