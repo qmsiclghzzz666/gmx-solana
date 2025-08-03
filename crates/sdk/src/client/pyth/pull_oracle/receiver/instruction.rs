@@ -1,10 +1,7 @@
-use gmsol_programs::anchor_lang::{
-    prelude::{borsh, AnchorSerialize},
-    Discriminator, InstructionData,
-};
+use gmsol_programs::anchor_lang::{prelude::borsh::BorshSerialize, Discriminator, InstructionData};
 use pythnet_sdk::wire::v1::MerklePriceUpdate;
 
-#[derive(AnchorSerialize)]
+#[derive(BorshSerialize)]
 pub(super) struct PostUpdate {
     pub(super) merkle_price_update: MerklePriceUpdate,
     pub(super) treasury_id: u8,
@@ -16,7 +13,7 @@ impl Discriminator for PostUpdate {
 
 impl InstructionData for PostUpdate {}
 
-#[derive(AnchorSerialize)]
+#[derive(BorshSerialize)]
 pub(super) struct ReclaimRent {}
 
 impl Discriminator for ReclaimRent {
