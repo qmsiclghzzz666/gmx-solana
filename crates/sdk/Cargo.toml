@@ -82,11 +82,13 @@ squads = []
 discover = ["client", "tower/discover", "tokio/time", "pin-project-lite"]
 clap = ["dep:clap", "gmsol-utils/clap"]
 
-anchor-test = ["client", "chainlink", "pyth", "decode"]
-
 [dependencies]
 gmsol-utils = { workspace = true, features = ["enum-iter", "debug"] }
-gmsol-programs = { workspace = true, features = ["model", "utils", "gmsol-utils"] }
+gmsol-programs = { workspace = true, features = [
+    "model",
+    "utils",
+    "gmsol-utils",
+] }
 gmsol-model = { workspace = true, features = ["u128", "strum"] }
 gmsol-solana-utils = { workspace = true }
 gmsol-decode = { workspace = true, optional = true, features = [
@@ -171,20 +173,13 @@ pin-project-lite = { workspace = true, optional = true }
 cfg_aliases = { workspace = true }
 
 [dev-dependencies]
-gmsol-mock-chainlink-verifier = { workspace = true, features = [
-    "no-entrypoint",
-] }
-gmsol-store = { workspace = true }
-gmsol-callback = { workspace = true, features = ["no-entrypoint", "debug"] }
-gmsol-competition = { workspace = true, features = ["no-entrypoint", "debug"] }
-
 rust_decimal_macros = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 wasm-bindgen-test = { workspace = true }
-serde_json = { workspace = true }
-event-listener = { workspace = true }
-shellexpand = { workspace = true }
+# serde_json = { workspace = true }
+# event-listener = { workspace = true }
+# shellexpand = { workspace = true }
 eyre = { workspace = true }
 
 [package.metadata.docs.rs]

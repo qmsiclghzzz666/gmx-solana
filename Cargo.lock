@@ -2438,19 +2438,14 @@ dependencies = [
  "cfg_aliases",
  "clap",
  "either",
- "event-listener 5.4.0",
  "eventsource-stream",
  "eyre",
  "futures-util",
- "gmsol-callback",
  "gmsol-chainlink-datastreams",
- "gmsol-competition",
  "gmsol-decode",
- "gmsol-mock-chainlink-verifier",
  "gmsol-model",
  "gmsol-programs",
  "gmsol-solana-utils",
- "gmsol-store",
  "gmsol-utils",
  "hex",
  "hmac 0.12.1",
@@ -2470,7 +2465,6 @@ dependencies = [
  "serde_json",
  "serde_with",
  "sha2 0.10.9",
- "shellexpand",
  "solana-account-decoder",
  "solana-client",
  "solana-sdk",
@@ -2544,6 +2538,35 @@ dependencies = [
  "strum",
  "switchboard-on-demand",
  "typed-builder",
+]
+
+[[package]]
+name = "gmsol-tests"
+version = "0.7.0"
+dependencies = [
+ "anchor-spl",
+ "event-listener 5.4.0",
+ "eyre",
+ "futures-util",
+ "gmsol-callback",
+ "gmsol-chainlink-datastreams",
+ "gmsol-competition",
+ "gmsol-mock-chainlink-verifier",
+ "gmsol-programs",
+ "gmsol-sdk",
+ "gmsol-solana-utils",
+ "gmsol-store",
+ "gmsol-utils",
+ "rand 0.7.3",
+ "rust_decimal_macros",
+ "serde_json",
+ "shellexpand",
+ "solana-client",
+ "solana-sdk",
+ "time",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
