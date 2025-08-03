@@ -326,8 +326,7 @@ impl super::Command for Gt {
                         let balance = Amount::from_u64(balance.amount, token_decimals);
 
                         println!(
-                            "{token}: balance = {}, receiver_vault_out = {}",
-                            balance, recevier_vault_out
+                            "{token}: balance = {balance}, receiver_vault_out = {recevier_vault_out}"
                         );
                     }
                 }

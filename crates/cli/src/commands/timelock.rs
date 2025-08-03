@@ -270,7 +270,7 @@ impl super::Command for Timelock {
                                 )
                                 .await?
                                 .swap_output(());
-                            println!("Adding a vault transaction {idx}: id = {}", transaction);
+                            println!("Adding a vault transaction {idx}: id = {transaction}");
                             println!(
                                 "Inspector URL for transaction {idx}: {}",
                                 inspect_transaction(&message, Some(client.cluster()), false),

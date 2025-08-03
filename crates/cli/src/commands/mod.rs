@@ -357,7 +357,7 @@ impl CommandClient {
                             .swap_output(());
 
                         let txn_count = txn_idx + 1;
-                        println!("Adding a vault transaction {txn_idx}: id = {}", transaction);
+                        println!("Adding a vault transaction {txn_idx}: id = {transaction}");
                         println!(
                             "Inspector URL for transaction {txn_idx}: {}",
                             inspect_transaction(&message, Some(client.cluster()), false),

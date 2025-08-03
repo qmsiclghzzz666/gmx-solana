@@ -344,7 +344,7 @@ impl super::Command for Inspect {
                 use time::OffsetDateTime;
 
                 fn display_report(report: &Report) -> gmsol_sdk::Result<String> {
-                    Ok(format!("{:#?}", report))
+                    Ok(format!("{report:#?}"))
                 }
 
                 let client = if *testnet {

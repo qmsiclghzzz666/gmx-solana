@@ -127,7 +127,7 @@ impl Hermes {
                 let config = token_configs[idx];
                 let price = prices
                     .get(feed)
-                    .ok_or(crate::Error::custom(format!("missing price for {}", feed)))?;
+                    .ok_or(crate::Error::custom(format!("missing price for {feed}")))?;
                 let price = pyth_price_with_confidence_to_price(
                     price.price,
                     price.conf,

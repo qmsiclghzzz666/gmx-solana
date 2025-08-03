@@ -236,7 +236,7 @@ fn json_value_to_cell(value: &Value) -> Cell {
 fn flatten_json(map: &Map<String, Value>, prefix: Option<String>, out: &mut Map<String, Value>) {
     for (key, value) in map {
         let full_key = match &prefix {
-            Some(p) => format!("{}.{}", p, key),
+            Some(p) => format!("{p}.{key}"),
             None => key.to_string(),
         };
 

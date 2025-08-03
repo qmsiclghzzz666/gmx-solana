@@ -556,8 +556,7 @@ impl super::Command for Treasury {
                                     .unwrap_or(false)
                                 {
                                     println!(
-                                        "Skipping deposit for token {} as it is not allowed",
-                                        token_mint
+                                        "Skipping deposit for token {token_mint} as it is not allowed"
                                     );
                                     continue;
                                 }
@@ -620,7 +619,7 @@ impl super::Command for Treasury {
                             );
                         }
 
-                        println!("Total value claimed: ${}", total_value);
+                        println!("Total value claimed: ${total_value}");
 
                         bundle
                     }
