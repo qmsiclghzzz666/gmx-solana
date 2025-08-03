@@ -420,7 +420,7 @@ impl DecodedTransaction<'_> {
     }
 }
 
-impl<'a> crate::TransactionAccess for DecodedTransaction<'a> {
+impl crate::TransactionAccess for DecodedTransaction<'_> {
     fn slot(&self) -> Result<u64, DecodeError> {
         Ok(self.slot_index.0)
     }
