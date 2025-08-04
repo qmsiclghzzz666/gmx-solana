@@ -370,15 +370,15 @@ impl Deployment {
 
         let random_store =
             env::var(ENV_GMSOL_RANDOM_STORE).is_ok() || endpoint == Cluster::Devnet.url();
-        let store_key = random_store
-            .then(|| {
-                let mut rng = thread_rng();
-                (&mut rng)
-                    .sample_iter(Alphanumeric)
-                    .take(16)
-                    .collect::<String>()
-            })
-            .unwrap_or_default();
+        let store_key = if random_store {
+            let mut rng = thread_rng();
+            (&mut rng)
+                .sample_iter(Alphanumeric)
+                .take(16)
+                .collect::<String>()
+        } else {
+            Default::default()
+        };
 
         let client = Client::new_with_options(
             endpoint.parse().map_err(eyre::Error::msg)?,
