@@ -3,8 +3,12 @@
 [![Crates.io](https://img.shields.io/crates/v/gmsol-sdk.svg)](https://crates.io/crates/gmsol-sdk)
 [![Docs.rs](https://docs.rs/gmsol-sdk/badge.svg)](https://docs.rs/gmsol-sdk)
 [![npm](https://img.shields.io/npm/v/@gmsol-labs/gmsol-sdk.svg)](https://www.npmjs.com/package/@gmsol-labs/gmsol-sdk)
+[![Build Status][actions-badge]][actions-url]
 
 [Examples](https://github.com/gmsol-labs/gmx-solana/tree/main/examples)
+
+[actions-badge]: https://img.shields.io/github/actions/workflow/status/gmsol-labs/gmx-solana/ci-sdk.yml?label=CI
+[actions-url]: https://github.com/gmsol-labs/gmx-solana/actions?query=branch%3Amain
 
 ## Audits
 
