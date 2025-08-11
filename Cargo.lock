@@ -2378,6 +2378,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gmsol-liquidity-provider"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
 name = "gmsol-mock-chainlink-verifier"
 version = "0.8.0"
 dependencies = [
