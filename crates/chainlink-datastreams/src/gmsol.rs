@@ -72,7 +72,7 @@ impl super::FromChainlinkReport for PriceFeedPrice {
                     // If `last_update_diff_secs` exceeds the range representable by a `u32`,
                     // we consider the data too old. According to Chainlink Data Streams'
                     // specification for `last_update_timestamp`, such a cause should be
-                    // treasted as the market being closed.
+                    // treated as the market being closed.
                     is_open = false;
                     u32::MAX
                 }
@@ -92,11 +92,11 @@ impl super::FromChainlinkReport for PriceFeedPrice {
         );
 
         price.set_flag(PriceFlag::Open, is_open);
-        price.set_flag(
-            PriceFlag::LastUpdateDiffEnabled,
-            last_update_diff_secs.is_some(),
-        );
-        price.set_flag(PriceFlag::LastUpdateDiffSecs, true);
+
+        if last_update_diff_secs.is_some() {
+            price.set_flag(PriceFlag::LastUpdateDiffEnabled, true);
+            price.set_flag(PriceFlag::LastUpdateDiffSecs, true);
+        }
 
         Ok(price)
     }

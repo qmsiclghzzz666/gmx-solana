@@ -427,3 +427,93 @@ impl<'info> internal::Authentication<'info> for CloseGtExchange<'info> {
         &self.store
     }
 }
+
+/// The accounts definition for
+/// [`update_gt_cumulative_inv_cost_factor`](crate::update_gt_cumulative_inv_cost_factor) instruction.
+#[derive(Accounts)]
+pub struct UpdateGtCumulativeInvCostFactor<'info> {
+    /// The authority for this instruction.
+    pub authority: Signer<'info>,
+    /// The store account to update.
+    #[account(
+        mut,
+        constraint = store.load()?.gt().is_initialized() @ CoreError::PreconditionsAreNotMet,
+    )]
+    pub store: AccountLoader<'info, Store>,
+}
+
+impl UpdateGtCumulativeInvCostFactor<'_> {
+    /// Update the cumulative inverse cost factor.
+    ///
+    /// # CHECK
+    /// - Only GT_CONTROLLER is allowed to invoke.
+    pub(crate) fn invoke_unchecked(ctx: Context<Self>) -> Result<u128> {
+        let mut store = ctx.accounts.store.load_mut()?;
+        let gt = store.gt_mut();
+
+        gt.update_cumulative_inv_cost_factor()?;
+
+        Ok(gt.cumulative_inv_cost_factor())
+    }
+}
+
+impl<'info> internal::Authentication<'info> for UpdateGtCumulativeInvCostFactor<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// The accounts definition for
+/// [`mint_gt_reward`](crate::mint_gt_reward) instruction.
+#[event_cpi]
+#[derive(Accounts)]
+pub struct MintGtReward<'info> {
+    /// The authority for this instruction.
+    pub authority: Signer<'info>,
+    /// The store account to update.
+    #[account(
+        mut,
+        constraint = store.load()?.gt().is_initialized() @ CoreError::PreconditionsAreNotMet,
+    )]
+    pub store: AccountLoader<'info, Store>,
+    /// User Account.
+    #[account(
+        mut,
+        constraint = user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
+        has_one = store,
+        seeds = [UserHeader::SEED, store.key().as_ref(), user.load()?.owner.as_ref()],
+        bump = user.load()?.bump,
+    )]
+    pub user: AccountLoader<'info, UserHeader>,
+}
+
+impl MintGtReward<'_> {
+    /// Mint GT reward to the given account.
+    ///
+    /// # CHECK
+    /// - Only GT_CONTROLLER is allowed to invoke.
+    pub(crate) fn invoke_unchecked(ctx: Context<Self>, amount: u64) -> Result<()> {
+        let mut store = ctx.accounts.store.load_mut()?;
+        let mut user = ctx.accounts.user.load_mut()?;
+        let event_emitter =
+            EventEmitter::new(&ctx.accounts.event_authority, ctx.bumps.event_authority);
+        let gt = store.gt_mut();
+        gt.mint_to(&mut user, amount)?;
+        event_emitter.emit_cpi(&GtUpdated::rewarded(amount, gt, Some(&user)))?;
+        Ok(())
+    }
+}
+
+impl<'info> internal::Authentication<'info> for MintGtReward<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}

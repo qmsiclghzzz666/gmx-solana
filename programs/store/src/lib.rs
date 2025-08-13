@@ -3056,6 +3056,35 @@ pub mod gmsol_store {
         instructions::unchecked_close_gt_exchange(ctx)
     }
 
+    /// Update the GT cumulative inverse cost factor.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](UpdateGtCumulativeInvCostFactor)*
+    ///
+    /// # Errors
+    /// - The [`authority`](UpdateGtCumulativeInvCostFactor::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
+    /// - The [`store`](UpdateGtCumulativeInvCostFactor::store) must be properly initialized with an initialized GT state.
+    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
+    pub fn update_gt_cumulative_inv_cost_factor(
+        ctx: Context<UpdateGtCumulativeInvCostFactor>,
+    ) -> Result<u128> {
+        UpdateGtCumulativeInvCostFactor::invoke_unchecked(ctx)
+    }
+
+    /// Mint GT directly to the given user account.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](MintGtReward)*
+    ///
+    /// # Errors
+    /// - The [`authority`](MintGtReward::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
+    /// - The [`store`](MintGtReward::store) must be properly initialized with an initialized GT state.
+    /// - The [`user`](MintGtReward::user) must be properly initialized and belong to the store.
+    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
+    pub fn mint_gt_reward(ctx: Context<MintGtReward>, amount: u64) -> Result<()> {
+        MintGtReward::invoke_unchecked(ctx, amount)
+    }
+
     // ===========================================
     //              User & Referral
     // ===========================================
