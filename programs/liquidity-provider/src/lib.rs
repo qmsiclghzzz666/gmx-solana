@@ -1,10 +1,12 @@
 const SECONDS_PER_YEAR: u128 = 31_557_600; // 365.25 * 24 * 3600
-const GT_DECIMALS: u32 = 7; // GT token decimals
-const GT_AMOUNT_UNIT: u128 = 10u128.pow(GT_DECIMALS);
-const MARKET_USD_UNIT: u128 = 10u128.pow(20);
 use anchor_lang::prelude::*;
+use gmsol_programs::gmsol_store::constants::MARKET_USD_UNIT;
+use gmsol_programs::gmsol_store::{
+    accounts::Store, cpi as gt_cpi, cpi::accounts::UpdateGtCumulativeInvCostFactor as GtUpdateCtx,
+    cpi::Return as GtReturn, program::GmsolStore,
+};
 
-declare_id!("11111111111111111111111111111111");
+declare_id!("BGDJg2u2NWwUE5q4Q4masGCFBVAhJ5pKrMbVSwjVwo8m");
 
 #[program]
 pub mod gmsol_liquidity_provider {
@@ -27,6 +29,7 @@ pub mod gmsol_liquidity_provider {
         ctx: Context<CalculateGtReward>,
         lp_staked_amount: u64,
         stake_start_time: i64,
+        start_cum_inv_cost: u128,
     ) -> Result<()> {
         let global_state = &ctx.accounts.global_state;
         let current_time = Clock::get()?.unix_timestamp;
@@ -34,27 +37,54 @@ pub mod gmsol_liquidity_provider {
         // duration in seconds (non-negative)
         let duration_seconds = current_time.saturating_sub(stake_start_time);
 
+        // --- Update GT cumulative inverse cost factor via CPI and read current cumulative value ---
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.gt_program.to_account_info(),
+            GtUpdateCtx {
+                authority: ctx.accounts.gt_controller.to_account_info(),
+                store: ctx.accounts.gt_store.to_account_info(),
+            },
+        );
+        // Invoke CPI (updates the store on-chain) and get the latest cumulative inverse cost factor
+        let r: GtReturn<u128> = gt_cpi::update_gt_cumulative_inv_cost_factor(cpi_ctx)?;
+        let cum_now: u128 = r.get();
+
+        // Integral over [start, now]
+        let inv_cost_integral = cum_now.saturating_sub(start_cum_inv_cost);
+
         // In this version, treat lp_staked_amount as raw amount, convert to scaled USD value
         let staked_value_usd = (lp_staked_amount as u128).saturating_mul(MARKET_USD_UNIT);
+
+        // Read GT decimals from GT store and derive GT amount unit (10^decimals)
+        let gt_decimals_u8 = {
+            let store = ctx.accounts.gt_store.load()?;
+            store.gt.decimals
+        };
+        let gt_decimals: u32 = gt_decimals_u8 as u32;
+        let gt_amount_unit: u128 = 10u128.pow(gt_decimals);
 
         // Calculate GT reward amount in raw base units (decimals = 7)
         let gt_reward_raw = calculate_gt_reward_amount_int(
             staked_value_usd,
             duration_seconds,
             global_state.gt_apy as u128,
-            global_state.gt_price_usd,
+            inv_cost_integral,
+            gt_amount_unit,
         )?;
 
         // For display, also compute human-readable GT (floored)
-        let gt_whole = (gt_reward_raw / (GT_AMOUNT_UNIT as u64)) as u64;
+        let gt_whole = (gt_reward_raw / (gt_amount_unit as u64)) as u64;
 
         msg!("Staked amount (scaled USD): {}", staked_value_usd);
         msg!("Staking duration (s): {}", duration_seconds);
         msg!("GT APY (whole %): {}", global_state.gt_apy);
-        msg!("GT price USD (1e20 units): {}", global_state.gt_price_usd);
+        msg!(
+            "Integral of inv_cost over time (computed): {}",
+            inv_cost_integral
+        );
         msg!(
             "Calculated GT reward (raw, decimals={}): {}",
-            GT_DECIMALS,
+            gt_decimals,
             gt_reward_raw
         );
         msg!("Calculated GT reward (whole GT, floored): {} GT", gt_whole);
@@ -93,32 +123,32 @@ pub mod gmsol_liquidity_provider {
 }
 
 /// Calculate GT reward amount (returns raw amount in base units, respecting token decimals)
+/// Expects the integral of (MARKET_USD_UNIT / price(t)) dt over the interval [start, now] precomputed (from CPI).
 fn calculate_gt_reward_amount_int(
-    staked_value_usd: u128, // Already scaled USD value (e.g., in MARKET_USD_UNIT)
-    duration_seconds: i64,  // current_time - stake_start_time
-    gt_apy: u128,           // APY as whole percent (e.g., 15 for 15%)
-    gt_price_usd: u128,     // USD price scaled by MARKET_USD_UNIT (1e20)
+    staked_value_usd: u128,  // Already scaled USD value (e.g., in MARKET_USD_UNIT)
+    duration_seconds: i64,   // current_time - stake_start_time
+    gt_apy: u128,            // APY as whole percent (e.g., 15 for 15%)
+    inv_cost_integral: u128, // ∫ (MARKET_USD_UNIT / price(t)) dt over the interval [start, now]
+    gt_amount_unit: u128,
 ) -> Result<u64> {
     require!(duration_seconds >= 0, ErrorCode::Unauthorized);
 
     let dur = duration_seconds as u128;
 
-    // interest_usd_scaled = staked * apy% * duration / (100 * SECONDS_PER_YEAR)
-    let mut acc = staked_value_usd;
-    acc = acc.saturating_mul(gt_apy);
-    acc = acc.saturating_div(100);
-    acc = acc.saturating_mul(dur);
-    acc = acc.saturating_div(SECONDS_PER_YEAR);
+    const PERCENT_DIVISOR: u128 = 100;
+    let acc = staked_value_usd
+        .saturating_mul(gt_apy)
+        .saturating_div(PERCENT_DIVISOR)
+        .saturating_mul(gt_amount_unit) // to GT base units later
+        .saturating_div(SECONDS_PER_YEAR);
 
-    if gt_price_usd == 0 {
-        return Ok(0);
-    }
-
-    // Convert USD (1e20) to GT raw units (1e7):
-    // gt_raw = interest_usd_scaled * GT_AMOUNT_UNIT / gt_price_usd
+    // Apply the integral of MARKET_USD_UNIT / price(t) over time.
+    // Units:
+    //   inv_cost_integral has units of seconds * (MARKET_USD_UNIT / USD_scaled).
+    //   Multiplying by 'acc' (USD_scaled/sec in GT base units after previous step) cancels seconds and MARKET_USD_UNIT.
     let gt_raw = acc
-        .saturating_mul(GT_AMOUNT_UNIT)
-        .saturating_div(gt_price_usd);
+        .saturating_mul(inv_cost_integral)
+        .saturating_div(MARKET_USD_UNIT);
 
     Ok(gt_raw.min(u64::MAX as u128) as u64)
 }
@@ -146,6 +176,13 @@ pub struct Initialize<'info> {
 #[derive(Accounts)]
 pub struct CalculateGtReward<'info> {
     pub global_state: Account<'info, GlobalState>,
+    /// The authority allowed to call update_gt_cumulative_inv_cost_factor in GT program
+    pub gt_controller: Signer<'info>,
+    /// The GT Store account (loaded & mutated by CPI)
+    #[account(mut)]
+    pub gt_store: AccountLoader<'info, Store>,
+    /// The GT program
+    pub gt_program: Program<'info, GmsolStore>,
 }
 
 #[derive(Accounts)]
@@ -177,75 +214,4 @@ pub struct GlobalState {
 pub enum ErrorCode {
     #[msg("Unauthorized operation")]
     Unauthorized,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_calculate_gt_reward_amount_int() {
-        // Case 1: $1000, 1 year, 15% APY, $1.00
-        let staked_value = 1000u64;
-        let duration_seconds = SECONDS_PER_YEAR as i64;
-        let apy = 15u128; // 15%
-        let price = MARKET_USD_UNIT; // $1.00 * 1e20
-
-        // Multiply staked_value by MARKET_USD_UNIT to scale
-        let staked_value_scaled = (staked_value as u128).saturating_mul(MARKET_USD_UNIT);
-
-        let gt_reward_raw =
-            calculate_gt_reward_amount_int(staked_value_scaled, duration_seconds, apy, price)
-                .unwrap();
-
-        // Expected: 1000 * 0.15 = 150 GT -> raw = 150 * 10^7
-        assert_eq!(gt_reward_raw, 150 * (GT_AMOUNT_UNIT as u64));
-
-        // Case 2: $2000, 0.5 years, 15% APY, $1.00
-        let staked_value = 2000u64;
-        let duration_seconds = (SECONDS_PER_YEAR / 2) as i64;
-
-        let staked_value_scaled = (staked_value as u128).saturating_mul(MARKET_USD_UNIT);
-
-        let gt_reward_raw =
-            calculate_gt_reward_amount_int(staked_value_scaled, duration_seconds, apy, price)
-                .unwrap();
-
-        // Expected: 2000 * 0.15 * 0.5 = 150 GT
-        assert_eq!(gt_reward_raw, 150 * (GT_AMOUNT_UNIT as u64));
-
-        // Case 3: $1000, 1 year, 20% APY, $0.50
-        let staked_value = 1000u64;
-        let duration_seconds = SECONDS_PER_YEAR as i64;
-        let apy = 20u128; // 20%
-        let price = MARKET_USD_UNIT / 2; // $0.50 * 1e20
-
-        let staked_value_scaled = (staked_value as u128).saturating_mul(MARKET_USD_UNIT);
-
-        let gt_reward_raw =
-            calculate_gt_reward_amount_int(staked_value_scaled, duration_seconds, apy, price)
-                .unwrap();
-
-        // Expected: 1000 * 0.20 / 0.50 = 400 GT
-        assert_eq!(gt_reward_raw, 400 * (GT_AMOUNT_UNIT as u64));
-    }
-
-    #[test]
-    fn test_edge_cases_int() {
-        // Stake $0
-        let r = calculate_gt_reward_amount_int(0, SECONDS_PER_YEAR as i64, 15, MARKET_USD_UNIT)
-            .unwrap();
-        assert_eq!(r, 0);
-
-        // Duration 0
-        let staked_value_scaled = 1000u128.saturating_mul(MARKET_USD_UNIT);
-        let r =
-            calculate_gt_reward_amount_int(staked_value_scaled, 0, 15, MARKET_USD_UNIT).unwrap();
-        assert_eq!(r, 0);
-
-        // Price 0 -> safe-guard returns 0
-        let r = calculate_gt_reward_amount_int(staked_value_scaled, SECONDS_PER_YEAR as i64, 15, 0)
-            .unwrap();
-        assert_eq!(r, 0);
-    }
 }

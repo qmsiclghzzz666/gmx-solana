@@ -25,4 +25,4 @@ migration = []
 
 [dependencies]
 anchor-lang = "0.31.1"
-
+gmsol-programs = { workspace = true }
