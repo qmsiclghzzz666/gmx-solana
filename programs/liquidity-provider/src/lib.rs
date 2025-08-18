@@ -1,6 +1,3 @@
-const SECONDS_PER_YEAR: u128 = 31_557_600; // 365.25 * 24 * 3600
-const PERCENT_DIVISOR: u128 = 100;
-const APY_PER_SEC_DENOM: u128 = PERCENT_DIVISOR * SECONDS_PER_YEAR;
 use anchor_lang::prelude::*;
 use gmsol_model::utils::apply_factor;
 use gmsol_programs::gmsol_store::constants::MARKET_USD_UNIT;
@@ -8,6 +5,11 @@ use gmsol_programs::gmsol_store::{
     accounts::Store, cpi as gt_cpi, cpi::accounts::UpdateGtCumulativeInvCostFactor as GtUpdateCtx,
     cpi::Return as GtReturn, program::GmsolStore,
 };
+
+const SECONDS_PER_YEAR: u128 = 31_557_600; // 365.25 * 24 * 3600
+const PERCENT_DIVISOR: u64 = 100;
+const GT_APY_PER_SEC: u128 =
+    15u128 * MARKET_USD_UNIT as u128 / PERCENT_DIVISOR as u128 / SECONDS_PER_YEAR as u128;
 
 declare_id!("BGDJg2u2NWwUE5q4Q4masGCFBVAhJ5pKrMbVSwjVwo8m");
 
@@ -20,8 +22,8 @@ pub mod gmsol_liquidity_provider {
         let global_state = &mut ctx.accounts.global_state;
         global_state.authority = ctx.accounts.authority.key();
         global_state.gt_mint = ctx.accounts.gt_mint.key();
-        // APY as whole percent, price as 1e20
-        global_state.gt_apy = 15; // 15% APY (unscaled percentage)
+        // APY per-second (scaled by 1e20): 15% APR -> (15 * 1e20) / (100 * SECONDS_PER_YEAR)
+        global_state.gt_apy_per_sec = GT_APY_PER_SEC;
         global_state.gt_price_usd = MARKET_USD_UNIT; // $1.00 in 1e20 units
         msg!("LP staking program initialized, GT APY: 15%, GT price: $1.00");
         Ok(())
@@ -84,9 +86,8 @@ pub mod gmsol_liquidity_provider {
         let gt_reward_raw = calculate_gt_reward_amount(
             staked_value_usd,
             duration_seconds,
-            global_state.gt_apy as u128,
+            global_state.gt_apy_per_sec,
             inv_cost_integral,
-            gt_amount_unit,
         )?;
 
         // For display, also compute human-readable GT (floored)
@@ -94,7 +95,7 @@ pub mod gmsol_liquidity_provider {
 
         msg!("Staked amount (scaled USD): {}", staked_value_usd);
         msg!("Staking duration (s): {}", duration_seconds);
-        msg!("GT APY (whole %): {}", global_state.gt_apy);
+        msg!("GT APY per-second (1e20): {}", global_state.gt_apy_per_sec);
         msg!(
             "Calculated GT reward (raw, decimals={}): {}",
             gt_decimals,
@@ -105,17 +106,17 @@ pub mod gmsol_liquidity_provider {
     }
 
     /// Update GT APY parameter
-    pub fn update_gt_apy(
+    pub fn update_gt_apy_per_sec(
         ctx: Context<UpdateGtApy>,
-        new_apy: u64, // APY as whole percent, e.g., 15 for 15%
+        new_apy_per_sec: u128, // scaled by 1e20
     ) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
         require!(
             ctx.accounts.authority.key() == global_state.authority,
             ErrorCode::Unauthorized
         );
-        global_state.gt_apy = new_apy;
-        msg!("GT APY (whole %) updated to: {}", new_apy);
+        global_state.gt_apy_per_sec = new_apy_per_sec;
+        msg!("GT APY per-second (1e20) updated to: {}", new_apy_per_sec);
         Ok(())
     }
 }
@@ -127,23 +128,20 @@ pub mod gmsol_liquidity_provider {
 fn calculate_gt_reward_amount(
     staked_value_usd: u128,  // Already scaled USD value (e.g., in MARKET_USD_UNIT)
     duration_seconds: i64,   // current_time - stake_start_time
-    gt_apy: u128,            // APY as whole percent (e.g., 15 for 15%)
+    gt_apy_per_sec: u128,    // per-second factor scaled by 1e20
     inv_cost_integral: u128, // ∫ (MARKET_USD_UNIT / price(t)) dt over the interval [start, now]
-    gt_amount_unit: u128,
 ) -> Result<u64> {
     require!(duration_seconds >= 0, ErrorCode::Unauthorized);
 
-    let dur = duration_seconds as u128;
-
-    let per_sec_factor = staked_value_usd
-        .saturating_mul(gt_apy)
-        .saturating_mul(gt_amount_unit) // to GT base units later
-        .saturating_div(APY_PER_SEC_DENOM);
+    // The inverse-cost integral returned by GT already includes unit conversion to GT base units.
+    // So per_sec_factor only converts APY to per-second on the USD notionals.
+    let per_sec_factor = apply_factor::<u128, 20>(&staked_value_usd, &gt_apy_per_sec)
+        .ok_or(ErrorCode::MathOverflow)?;
 
     // Apply the integral of MARKET_USD_UNIT / price(t) over time.
     // Units:
     // inv_cost_integral has units of seconds * (MARKET_USD_UNIT / USD_scaled).
-    // Multiplying by 'per_sec_factor' (USD_scaled/sec in GT base units after previous step) cancels seconds and MARKET_USD_UNIT.
+    // Multiplying by 'per_sec_factor' (USD_scaled/sec) cancels seconds and MARKET_USD_UNIT.
     // apply_factor::<T, DECIMALS>(&value, &factor) where DECIMALS is the decimals of `factor`.
     // Here, `factor` = inv_cost_integral has MARKET_USD_UNIT (1e20) decimals.
     let gt_raw = apply_factor::<u128, 20>(&per_sec_factor, &inv_cost_integral)
@@ -206,8 +204,9 @@ pub struct GlobalState {
     pub authority: Pubkey,
     /// GT token mint address
     pub gt_mint: Pubkey,
-    /// APY as whole percent (e.g., 15 for 15%)
-    pub gt_apy: u64,
+    /// Per-second APY factor scaled by 1e20 (MARKET_USD_UNIT).
+    /// Example: for 15% APR, set to (15 * 1e20) / (100 * SECONDS_PER_YEAR).
+    pub gt_apy_per_sec: u128,
     /// USD price scaled by 1e20
     pub gt_price_usd: u128,
 }
