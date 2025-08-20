@@ -21,6 +21,7 @@ pub mod gmsol_liquidity_provider {
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
         global_state.authority = ctx.accounts.authority.key();
+        global_state.pending_authority = Pubkey::default();
         global_state.gt_mint = ctx.accounts.gt_mint.key();
         // APY per-second (scaled by 1e20): 15% APR -> (15 * 1e20) / (100 * SECONDS_PER_YEAR)
         global_state.gt_apy_per_sec = GT_APY_PER_SEC;
@@ -32,6 +33,7 @@ pub mod gmsol_liquidity_provider {
     /// Create a new LP position and snapshot stake-time values
     pub fn stake_lp(
         ctx: Context<StakeLp>,
+        position_id: u64,
         lp_staked_amount: u64,
         lp_staked_value: u128, // scaled USD at stake time
     ) -> Result<()> {
@@ -58,19 +60,21 @@ pub mod gmsol_liquidity_provider {
         let position = &mut ctx.accounts.position;
         position.owner = ctx.accounts.owner.key();
         position.global_state = ctx.accounts.global_state.key();
+        position.position_id = position_id;
         position.staked_amount = lp_staked_amount;
         position.staked_value_usd = lp_staked_value;
         position.stake_start_time = now;
-        position.start_cum_inv_cost = c_start;
+        position.cum_inv_cost = c_start;
         position.bump = ctx.bumps.position;
 
         msg!(
-            "Stake created: owner={}, amount={}, value(1e20)={}, start_ts={}, C_start={}",
+            "Stake created: owner={}, amount={}, value(1e20)={}, start_ts={}, C_start={}, pos_id={}",
             position.owner,
             lp_staked_amount,
             lp_staked_value,
             now,
-            c_start
+            c_start,
+            position_id
         );
         Ok(())
     }
@@ -103,15 +107,12 @@ pub mod gmsol_liquidity_provider {
         let cum_now: u128 = r.get();
 
         // Integral over [start, now] (C(now) - C(start)); require monotonicity to avoid masking bugs
-        require!(
-            cum_now >= position.start_cum_inv_cost,
-            ErrorCode::InvalidArgument
-        );
-        let inv_cost_integral = cum_now - position.start_cum_inv_cost;
+        require!(cum_now >= position.cum_inv_cost, ErrorCode::InvalidArgument);
+        let inv_cost_integral = cum_now - position.cum_inv_cost;
 
         msg!(
             "GT inverse-cost cumulative: start={}, now={}, integral={}",
-            position.start_cum_inv_cost,
+            position.cum_inv_cost,
             cum_now,
             inv_cost_integral
         );
@@ -163,6 +164,46 @@ pub mod gmsol_liquidity_provider {
         );
         global_state.gt_apy_per_sec = new_apy_per_sec;
         msg!("GT APY per-second (1e20) updated to: {}", new_apy_per_sec);
+        Ok(())
+    }
+
+    /// Propose transferring program authority to `new_authority` (two-step handover).
+    pub fn transfer_authority(
+        ctx: Context<TransferAuthority>,
+        new_authority: Pubkey,
+    ) -> Result<()> {
+        let gs = &mut ctx.accounts.global_state;
+        require_keys_eq!(
+            ctx.accounts.authority.key(),
+            gs.authority,
+            ErrorCode::Unauthorized
+        );
+        require!(
+            new_authority != Pubkey::default(),
+            ErrorCode::InvalidArgument
+        );
+        gs.pending_authority = new_authority;
+        msg!(
+            "Authority transfer proposed: pending_authority = {}",
+            new_authority
+        );
+        Ok(())
+    }
+
+    /// Accept authority if you are the pending_authority; finalizes the handover.
+    pub fn accept_authority(ctx: Context<AcceptAuthority>) -> Result<()> {
+        let gs = &mut ctx.accounts.global_state;
+        require_keys_eq!(
+            ctx.accounts.new_authority.key(),
+            gs.pending_authority,
+            ErrorCode::Unauthorized
+        );
+        gs.authority = ctx.accounts.new_authority.key();
+        gs.pending_authority = Pubkey::default();
+        msg!(
+            "Authority transfer accepted: new authority = {}",
+            gs.authority
+        );
         Ok(())
     }
 }
@@ -218,16 +259,22 @@ pub struct Initialize<'info> {
 
 /// Accounts context for staking LP tokens and creating a Position
 #[derive(Accounts)]
+#[instruction(position_id: u64)]
 pub struct StakeLp<'info> {
     /// Global config (PDA)
     #[account(seeds = [b"global_state"], bump)]
     pub global_state: Account<'info, GlobalState>,
-    /// Position PDA to initialize for (global_state, owner)
+    /// Position PDA to initialize for (global_state, owner, position_id)
     #[account(
         init,
         payer = owner,
         space = 8 + Position::INIT_SPACE,
-        seeds = [b"position", global_state.key().as_ref(), owner.key().as_ref()],
+        seeds = [
+            b"position",
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+        ],
         bump
     )]
     pub position: Account<'info, Position>,
@@ -244,6 +291,7 @@ pub struct StakeLp<'info> {
 
 /// Accounts context for calculating GT reward from a Position
 #[derive(Accounts)]
+#[instruction(position_id: u64)]
 pub struct CalculateGtReward<'info> {
     /// Global config (PDA)
     #[account(seeds = [b"global_state"], bump)]
@@ -253,10 +301,14 @@ pub struct CalculateGtReward<'info> {
     pub gt_store: AccountLoader<'info, Store>,
     /// The GT program
     pub gt_program: Program<'info, GmsolStore>,
-    /// Position tied to (global_state, owner)
+    /// Position tied to (global_state, owner, position_id)
     #[account(
-        mut,
-        seeds = [b"position", global_state.key().as_ref(), owner.key().as_ref()],
+        seeds = [
+            b"position",
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+        ],
         bump = position.bump,
         has_one = owner,
         has_one = global_state
@@ -276,18 +328,28 @@ pub struct UpdateGtApy<'info> {
 }
 
 #[derive(Accounts)]
-pub struct UpdateGtPrice<'info> {
-    #[account(mut)]
+pub struct TransferAuthority<'info> {
+    #[account(mut, seeds = [b"global_state"], bump)]
     pub global_state: Account<'info, GlobalState>,
-
+    /// Current authority proposing a transfer
     pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptAuthority<'info> {
+    #[account(mut, seeds = [b"global_state"], bump)]
+    pub global_state: Account<'info, GlobalState>,
+    /// New authority accepting control
+    pub new_authority: Signer<'info>,
 }
 
 #[account]
 #[derive(InitSpace)]
 pub struct GlobalState {
-    /// Program administrator
+    /// Program administrator with governance privileges
     pub authority: Pubkey,
+    /// Pending authority awaiting acceptance (Pubkey::default() if none)
+    pub pending_authority: Pubkey,
     /// GT token mint address
     pub gt_mint: Pubkey,
     /// Per-second APY factor scaled by 1e20 (MARKET_USD_UNIT).
@@ -305,14 +367,16 @@ pub struct Position {
     pub owner: Pubkey,
     /// Ties position to a specific GlobalState
     pub global_state: Pubkey,
+    /// Position id to allow multiple positions per owner
+    pub position_id: u64,
     /// Staked LP amount at stake time (raw amount as provided by caller; optional semantics)
     pub staked_amount: u64,
     /// Staked value in USD (scaled by 1e20) captured at stake time
     pub staked_value_usd: u128,
     /// Stake start unix timestamp (seconds)
     pub stake_start_time: i64,
-    /// Cumulative inverse-cost factor at stake time (C(start))
-    pub start_cum_inv_cost: u128,
+    /// Cumulative inverse-cost factor)
+    pub cum_inv_cost: u128,
     /// PDA bump
     pub bump: u8,
 }
