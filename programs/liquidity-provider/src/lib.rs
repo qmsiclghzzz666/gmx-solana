@@ -26,6 +26,7 @@ pub mod gmsol_liquidity_provider {
         // APY per-second (scaled by 1e20): 15% APR -> (15 * 1e20) / (100 * SECONDS_PER_YEAR)
         global_state.gt_apy_per_sec = GT_APY_PER_SEC;
         global_state.lp_token_price = MARKET_USD_UNIT; // $1.00 in 1e20 units
+        global_state.bump = ctx.bumps.global_state;
         msg!("LP staking program initialized, GT APY: 15%, GT price: $1.00");
         Ok(())
     }
@@ -40,8 +41,7 @@ pub mod gmsol_liquidity_provider {
         let now = Clock::get()?.unix_timestamp;
 
         // Use GlobalState PDA as controller for GT CPI
-        let gs_bump: u8 = ctx.bumps.global_state;
-        let gs_seeds: &[&[u8]] = &[b"global_state", &[gs_bump]];
+        let gs_seeds: &[&[u8]] = &[b"global_state", &[ctx.accounts.global_state.bump]];
         let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
 
         let cpi_ctx = CpiContext::new_with_signer(
@@ -90,8 +90,7 @@ pub mod gmsol_liquidity_provider {
 
         // --- Update GT cumulative inverse cost factor via CPI and read current cumulative value ---
         // Use the GlobalState PDA as GT_CONTROLLER authority
-        let gs_bump: u8 = ctx.bumps.global_state;
-        let gs_seeds: &[&[u8]] = &[b"global_state", &[gs_bump]];
+        let gs_seeds: &[&[u8]] = &[b"global_state", &[ctx.accounts.global_state.bump]];
         let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
 
         let cpi_ctx = CpiContext::new_with_signer(
@@ -158,10 +157,6 @@ pub mod gmsol_liquidity_provider {
         new_apy_per_sec: u128, // scaled by 1e20
     ) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
-        require!(
-            ctx.accounts.authority.key() == global_state.authority,
-            ErrorCode::Unauthorized
-        );
         global_state.gt_apy_per_sec = new_apy_per_sec;
         msg!("GT APY per-second (1e20) updated to: {}", new_apy_per_sec);
         Ok(())
@@ -173,11 +168,6 @@ pub mod gmsol_liquidity_provider {
         new_authority: Pubkey,
     ) -> Result<()> {
         let gs = &mut ctx.accounts.global_state;
-        require_keys_eq!(
-            ctx.accounts.authority.key(),
-            gs.authority,
-            ErrorCode::Unauthorized
-        );
         require!(
             new_authority != Pubkey::default(),
             ErrorCode::InvalidArgument
@@ -193,12 +183,7 @@ pub mod gmsol_liquidity_provider {
     /// Accept authority if you are the pending_authority; finalizes the handover.
     pub fn accept_authority(ctx: Context<AcceptAuthority>) -> Result<()> {
         let gs = &mut ctx.accounts.global_state;
-        require_keys_eq!(
-            ctx.accounts.new_authority.key(),
-            gs.pending_authority,
-            ErrorCode::Unauthorized
-        );
-        gs.authority = ctx.accounts.new_authority.key();
+        gs.authority = ctx.accounts.pending_authority.key();
         gs.pending_authority = Pubkey::default();
         msg!(
             "Authority transfer accepted: new authority = {}",
@@ -321,15 +306,17 @@ pub struct CalculateGtReward<'info> {
 
 #[derive(Accounts)]
 pub struct UpdateGtApy<'info> {
-    #[account(mut)]
+    /// Global config (PDA). The `authority` signer must match `global_state.authority`.
+    #[account(mut, seeds = [b"global_state"], bump, has_one = authority)]
     pub global_state: Account<'info, GlobalState>,
-
+    /// Current authority
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct TransferAuthority<'info> {
-    #[account(mut, seeds = [b"global_state"], bump)]
+    /// Global config (PDA). The `authority` signer must match `global_state.authority`.
+    #[account(mut, seeds = [b"global_state"], bump, has_one = authority)]
     pub global_state: Account<'info, GlobalState>,
     /// Current authority proposing a transfer
     pub authority: Signer<'info>,
@@ -337,10 +324,11 @@ pub struct TransferAuthority<'info> {
 
 #[derive(Accounts)]
 pub struct AcceptAuthority<'info> {
-    #[account(mut, seeds = [b"global_state"], bump)]
+    /// Global config (PDA). The signer must equal `global_state.pending_authority`.
+    #[account(mut, seeds = [b"global_state"], bump, has_one = pending_authority)]
     pub global_state: Account<'info, GlobalState>,
-    /// New authority accepting control
-    pub new_authority: Signer<'info>,
+    /// Pending authority accepting control (must match `global_state.pending_authority`)
+    pub pending_authority: Signer<'info>,
 }
 
 #[account]
@@ -357,6 +345,8 @@ pub struct GlobalState {
     pub gt_apy_per_sec: u128,
     /// LP token price in USD scaled by 1e20
     pub lp_token_price: u128,
+    /// PDA bump for this GlobalState (derived from seed ["global_state"])
+    pub bump: u8,
 }
 
 /// Position account to persist LP stake data and snapshot stake-time values
