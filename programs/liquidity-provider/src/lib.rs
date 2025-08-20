@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use gmsol_model::utils::apply_factor;
-use gmsol_programs::gmsol_store::constants::MARKET_USD_UNIT;
+use gmsol_programs::gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
 use gmsol_programs::gmsol_store::{
     accounts::Store, cpi as gt_cpi, cpi::accounts::UpdateGtCumulativeInvCostFactor as GtUpdateCtx,
     cpi::Return as GtReturn, program::GmsolStore,
@@ -207,7 +207,7 @@ fn calculate_gt_reward_amount(
 
     // The inverse-cost integral returned by GT already includes unit conversion to GT base units.
     // So per_sec_factor only converts APY to per-second on the USD notionals.
-    let per_sec_factor = apply_factor::<u128, 20>(&staked_value_usd, &gt_apy_per_sec)
+    let per_sec_factor = apply_factor::<u128, MARKET_DECIMALS>(&staked_value_usd, &gt_apy_per_sec)
         .ok_or(ErrorCode::MathOverflow)?;
 
     // Apply the integral of MARKET_USD_UNIT / price(t) over time.
@@ -216,7 +216,7 @@ fn calculate_gt_reward_amount(
     // Multiplying by 'per_sec_factor' (USD_scaled/sec) cancels seconds and MARKET_USD_UNIT.
     // apply_factor::<T, DECIMALS>(&value, &factor) where DECIMALS is the decimals of `factor`.
     // Here, `factor` = inv_cost_integral has MARKET_USD_UNIT (1e20) decimals.
-    let gt_raw = apply_factor::<u128, 20>(&per_sec_factor, &inv_cost_integral)
+    let gt_raw = apply_factor::<u128, MARKET_DECIMALS>(&per_sec_factor, &inv_cost_integral)
         .ok_or(ErrorCode::MathOverflow)?;
 
     Ok(gt_raw.min(u64::MAX as u128) as u64)
@@ -247,7 +247,7 @@ pub struct Initialize<'info> {
 #[instruction(position_id: u64)]
 pub struct StakeLp<'info> {
     /// Global config (PDA)
-    #[account(seeds = [b"global_state"], bump)]
+    #[account(seeds = [b"global_state"], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
     /// Position PDA to initialize for (global_state, owner, position_id)
     #[account(
@@ -279,7 +279,7 @@ pub struct StakeLp<'info> {
 #[instruction(position_id: u64)]
 pub struct CalculateGtReward<'info> {
     /// Global config (PDA)
-    #[account(seeds = [b"global_state"], bump)]
+    #[account(seeds = [b"global_state"], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
     /// The GT Store account (loaded & mutated by CPI)
     #[account(mut)]
@@ -307,7 +307,7 @@ pub struct CalculateGtReward<'info> {
 #[derive(Accounts)]
 pub struct UpdateGtApy<'info> {
     /// Global config (PDA). The `authority` signer must match `global_state.authority`.
-    #[account(mut, seeds = [b"global_state"], bump, has_one = authority)]
+    #[account(mut, seeds = [b"global_state"], bump = global_state.bump, has_one = authority)]
     pub global_state: Account<'info, GlobalState>,
     /// Current authority
     pub authority: Signer<'info>,
@@ -316,7 +316,7 @@ pub struct UpdateGtApy<'info> {
 #[derive(Accounts)]
 pub struct TransferAuthority<'info> {
     /// Global config (PDA). The `authority` signer must match `global_state.authority`.
-    #[account(mut, seeds = [b"global_state"], bump, has_one = authority)]
+    #[account(mut, seeds = [b"global_state"], bump = global_state.bump, has_one = authority)]
     pub global_state: Account<'info, GlobalState>,
     /// Current authority proposing a transfer
     pub authority: Signer<'info>,
@@ -325,7 +325,7 @@ pub struct TransferAuthority<'info> {
 #[derive(Accounts)]
 pub struct AcceptAuthority<'info> {
     /// Global config (PDA). The signer must equal `global_state.pending_authority`.
-    #[account(mut, seeds = [b"global_state"], bump, has_one = pending_authority)]
+    #[account(mut, seeds = [b"global_state"], bump = global_state.bump, has_one = pending_authority)]
     pub global_state: Account<'info, GlobalState>,
     /// Pending authority accepting control (must match `global_state.pending_authority`)
     pub pending_authority: Signer<'info>,
