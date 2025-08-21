@@ -1,3 +1,4 @@
+use anchor_lang::prelude::AccountsClose;
 use anchor_lang::prelude::*;
 use gmsol_model::utils::apply_factor;
 use gmsol_programs::gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
@@ -188,6 +189,98 @@ pub mod gmsol_liquidity_provider {
             cum_now,
             inv_cost_integral
         );
+
+        Ok(())
+    }
+
+    /// Unstake LP: first claim rewards, then either close the position (full) or update proportionally (partial)
+    pub fn unstake_lp(
+        ctx: Context<UnstakeLp>,
+        _position_id: u64,
+        unstake_amount: u64,
+    ) -> Result<()> {
+        require!(unstake_amount > 0, ErrorCode::InvalidArgument);
+
+        let global_state = &ctx.accounts.global_state;
+
+        // 1) Claim-like flow: refresh C(t), compute reward, mint, and snapshot
+        let out = compute_reward_with_cpi(
+            &ctx.accounts.global_state,
+            &ctx.accounts.store,
+            &ctx.accounts.gt_program,
+            &ctx.accounts.position,
+        )?;
+        let gt_reward_raw = out.gt_reward_raw;
+        let cum_now = out.cum_now;
+        let prev_cum = out.prev_cum;
+        let inv_cost_integral = out.inv_cost_integral;
+
+        if gt_reward_raw > 0 {
+            let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
+            let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
+
+            let mint_ctx = CpiContext::new_with_signer(
+                ctx.accounts.gt_program.to_account_info(),
+                GtMintCtx {
+                    authority: global_state.to_account_info(),
+                    store: ctx.accounts.store.to_account_info(),
+                    user: ctx.accounts.gt_user.to_account_info(),
+                    event_authority: ctx.accounts.event_authority.to_account_info(),
+                    program: ctx.accounts.gt_program.to_account_info(),
+                },
+                signer_seeds,
+            );
+            gt_cpi::mint_gt_reward(mint_ctx, gt_reward_raw)?;
+        }
+
+        // Snapshot to now
+        {
+            let position = &mut ctx.accounts.position;
+            position.cum_inv_cost = cum_now;
+        }
+
+        // 2) Apply unstake amount
+        let (old_amount, old_value) = {
+            let p = &ctx.accounts.position;
+            (p.staked_amount, p.staked_value_usd)
+        };
+        require!(unstake_amount <= old_amount, ErrorCode::InvalidArgument);
+
+        let remaining_amount = old_amount.saturating_sub(unstake_amount);
+
+        if remaining_amount == 0 {
+            // Full unstake: close position account, zero fields before close (optional)
+            {
+                let position = &mut ctx.accounts.position;
+                position.staked_amount = 0;
+                position.staked_value_usd = 0;
+            }
+            // Manually close to owner
+            ctx.accounts
+                .position
+                .close(ctx.accounts.owner.to_account_info())?;
+        } else {
+            // Partial unstake: scale staked_value_usd by remaining_amount / old_amount
+            let new_value = (old_value)
+                .saturating_mul(remaining_amount as u128)
+                .saturating_div(old_amount as u128);
+
+            let position = &mut ctx.accounts.position;
+            position.staked_amount = remaining_amount;
+            position.staked_value_usd = new_value;
+
+            msg!(
+                "Unstaked partial: old_amount={}, unstake={}, remain={}, value_scaled={} (C_prev->C_now: {}->{}, integral={}, reward_raw={})",
+                old_amount,
+                unstake_amount,
+                remaining_amount,
+                new_value,
+                prev_cum,
+                cum_now,
+                inv_cost_integral,
+                gt_reward_raw
+            );
+        }
 
         Ok(())
     }
@@ -402,6 +495,51 @@ pub struct CalculateGtReward<'info> {
 #[derive(Accounts)]
 #[instruction(position_id: u64)]
 pub struct ClaimGt<'info> {
+    /// Global config (PDA)
+    #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
+    pub global_state: Account<'info, GlobalState>,
+
+    /// The GT Store account (mutated by CPI)
+    #[account(mut)]
+    pub store: AccountLoader<'info, Store>,
+
+    /// The GT program
+    pub gt_program: Program<'info, GmsolStore>,
+
+    /// Position tied to (global_state, owner, position_id)
+    #[account(
+        mut,
+        seeds = [
+            POSITION_SEED,
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+        ],
+        bump = position.bump,
+        has_one = owner,
+        has_one = global_state
+    )]
+    pub position: Account<'info, Position>,
+
+    /// Owner of the position
+    pub owner: Signer<'info>,
+
+    /// GT User account (mut) managed by the GT program; must correspond to (store, owner)
+    #[account(
+        mut,
+        has_one = owner,
+        has_one = store,
+    )]
+    pub gt_user: AccountLoader<'info, UserHeader>,
+
+    /// CHECK: GT program's event authority PDA required by #[event_cpi] calls
+    pub event_authority: UncheckedAccount<'info>,
+}
+
+/// Accounts context for unstaking LP; combines claim + partial/full exit
+#[derive(Accounts)]
+#[instruction(position_id: u64)]
+pub struct UnstakeLp<'info> {
     /// Global config (PDA)
     #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
