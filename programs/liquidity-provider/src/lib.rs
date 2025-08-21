@@ -2,10 +2,12 @@ use anchor_lang::prelude::AccountsClose;
 use anchor_lang::prelude::*;
 use gmsol_model::utils::apply_factor;
 use gmsol_programs::gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
+
 #[constant]
 pub const POSITION_SEED: &'static [u8] = b"position";
 #[constant]
 pub const GLOBAL_STATE_SEED: &'static [u8] = b"global_state";
+
 use gmsol_programs::gmsol_store::{
     accounts::{Store, UserHeader},
     cpi as gt_cpi,
@@ -26,7 +28,7 @@ pub mod gmsol_liquidity_provider {
     use super::*;
 
     /// Initialize LP staking program
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, min_stake_value: u128) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
         global_state.authority = ctx.accounts.authority.key();
         global_state.pending_authority = Pubkey::default();
@@ -34,8 +36,12 @@ pub mod gmsol_liquidity_provider {
         // APY per-second (scaled by 1e20): 15% APR -> (15 * 1e20) / (100 * SECONDS_PER_YEAR)
         global_state.gt_apy_per_sec = GT_APY_PER_SEC;
         global_state.lp_token_price = MARKET_USD_UNIT; // $1.00 in 1e20 units
+        global_state.min_stake_value = min_stake_value;
         global_state.bump = ctx.bumps.global_state;
-        msg!("LP staking program initialized, GT APY: 15%, GT price: $1.00");
+        msg!(
+            "LP staking program initialized, GT APY: 15%%, GT price: $1.00, min_stake_value(1e20)={}",
+            min_stake_value
+        );
         Ok(())
     }
 
@@ -47,6 +53,12 @@ pub mod gmsol_liquidity_provider {
         lp_staked_value: u128, // scaled USD at stake time
     ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
+
+        // Enforce minimum stake value (scaled 1e20)
+        require!(
+            lp_staked_value >= ctx.accounts.global_state.min_stake_value,
+            ErrorCode::InvalidArgument
+        );
 
         // Use GlobalState PDA as controller for GT CPI
         let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[ctx.accounts.global_state.bump]];
@@ -249,13 +261,12 @@ pub mod gmsol_liquidity_provider {
         let remaining_amount = old_amount.saturating_sub(unstake_amount);
 
         if remaining_amount == 0 {
-            // Full unstake: close position account, zero fields before close (optional)
+            // Full unstake: close position account
             {
                 let position = &mut ctx.accounts.position;
                 position.staked_amount = 0;
                 position.staked_value_usd = 0;
             }
-            // Manually close to owner
             ctx.accounts
                 .position
                 .close(ctx.accounts.owner.to_account_info())?;
@@ -265,21 +276,33 @@ pub mod gmsol_liquidity_provider {
                 .saturating_mul(remaining_amount as u128)
                 .saturating_div(old_amount as u128);
 
-            let position = &mut ctx.accounts.position;
-            position.staked_amount = remaining_amount;
-            position.staked_value_usd = new_value;
+            // If new_value drops below the minimum, treat as full unstake
+            if new_value < ctx.accounts.global_state.min_stake_value {
+                {
+                    let position = &mut ctx.accounts.position;
+                    position.staked_amount = 0;
+                    position.staked_value_usd = 0;
+                }
+                ctx.accounts
+                    .position
+                    .close(ctx.accounts.owner.to_account_info())?;
+            } else {
+                let position = &mut ctx.accounts.position;
+                position.staked_amount = remaining_amount;
+                position.staked_value_usd = new_value;
 
-            msg!(
-                "Unstaked partial: old_amount={}, unstake={}, remain={}, value_scaled={} (C_prev->C_now: {}->{}, integral={}, reward_raw={})",
-                old_amount,
-                unstake_amount,
-                remaining_amount,
-                new_value,
-                prev_cum,
-                cum_now,
-                inv_cost_integral,
-                gt_reward_raw
-            );
+                msg!(
+                    "Unstaked partial: old_amount={}, unstake={}, remain={}, value_scaled={} (C_prev->C_now: {}->{}, integral={}, reward_raw={})",
+                    old_amount,
+                    unstake_amount,
+                    remaining_amount,
+                    new_value,
+                    prev_cum,
+                    cum_now,
+                    inv_cost_integral,
+                    gt_reward_raw
+                );
+            }
         }
 
         Ok(())
@@ -293,6 +316,17 @@ pub mod gmsol_liquidity_provider {
         let global_state = &mut ctx.accounts.global_state;
         global_state.gt_apy_per_sec = new_apy_per_sec;
         msg!("GT APY per-second (1e20) updated to: {}", new_apy_per_sec);
+        Ok(())
+    }
+
+    /// Update the minimum stake value (1e20 scaled)
+    pub fn update_min_stake_value(
+        ctx: Context<UpdateMinStakeValue>,
+        new_min_stake_value: u128,
+    ) -> Result<()> {
+        let gs = &mut ctx.accounts.global_state;
+        gs.min_stake_value = new_min_stake_value;
+        msg!("min_stake_value updated to (1e20): {}", new_min_stake_value);
         Ok(())
     }
 
@@ -591,6 +625,15 @@ pub struct UpdateGtApy<'info> {
 }
 
 #[derive(Accounts)]
+pub struct UpdateMinStakeValue<'info> {
+    /// Global config (PDA). The `authority` signer must match `global_state.authority`.
+    #[account(mut, seeds = [GLOBAL_STATE_SEED], bump = global_state.bump, has_one = authority)]
+    pub global_state: Account<'info, GlobalState>,
+    /// Current authority
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct TransferAuthority<'info> {
     /// Global config (PDA). The `authority` signer must match `global_state.authority`.
     #[account(mut, seeds = [GLOBAL_STATE_SEED], bump = global_state.bump, has_one = authority)]
@@ -622,6 +665,8 @@ pub struct GlobalState {
     pub gt_apy_per_sec: u128,
     /// LP token price in USD scaled by 1e20
     pub lp_token_price: u128,
+    /// Minimum stake value in USD scaled by 1e20
+    pub min_stake_value: u128,
     /// PDA bump for this GlobalState (derived from seed [GLOBAL_STATE_SEED])
     pub bump: u8,
 }
