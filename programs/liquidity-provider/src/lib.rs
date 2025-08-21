@@ -1,5 +1,6 @@
 use anchor_lang::prelude::AccountsClose;
 use anchor_lang::prelude::*;
+use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
 use gmsol_model::utils::apply_factor;
 use gmsol_programs::gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
 
@@ -76,10 +77,24 @@ pub mod gmsol_liquidity_provider {
         let r: GtReturn<u128> = gt_cpi::update_gt_cumulative_inv_cost_factor(cpi_ctx)?;
         let c_start: u128 = r.get();
 
+        // Transfer LP tokens from user to the position vault
+        if lp_staked_amount > 0 {
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.user_lp_token.to_account_info(),
+                to: ctx.accounts.position_vault.to_account_info(),
+                authority: ctx.accounts.owner.to_account_info(),
+            };
+            let cpi_ctx =
+                CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+            token::transfer(cpi_ctx, lp_staked_amount)?;
+        }
+
         // Init position fields
         let position = &mut ctx.accounts.position;
         position.owner = ctx.accounts.owner.key();
         position.global_state = ctx.accounts.global_state.key();
+        position.lp_mint = ctx.accounts.lp_mint.key();
+        position.vault = ctx.accounts.position_vault.key();
         position.position_id = position_id;
         position.staked_amount = lp_staked_amount;
         position.staked_value_usd = lp_staked_value;
@@ -258,51 +273,89 @@ pub mod gmsol_liquidity_provider {
         };
         require!(unstake_amount <= old_amount, ErrorCode::InvalidArgument);
 
+        // Sanity: ensure the passed lp_mint matches the position
+        require_keys_eq!(
+            ctx.accounts.lp_mint.key(),
+            ctx.accounts.position.lp_mint,
+            ErrorCode::InvalidArgument
+        );
+
         let remaining_amount = old_amount.saturating_sub(unstake_amount);
 
-        if remaining_amount == 0 {
-            // Full unstake: close position account
+        // Compute new_value for partial case and determine if we should fully exit
+        let new_value = if remaining_amount == 0 {
+            0
+        } else {
+            (old_value)
+                .saturating_mul(remaining_amount as u128)
+                .saturating_div(old_amount as u128)
+        };
+        let full_exit =
+            remaining_amount == 0 || new_value < ctx.accounts.global_state.min_stake_value;
+
+        // Decide transfer amount based on full_exit
+        let amount_to_transfer = if full_exit {
+            old_amount
+        } else {
+            unstake_amount
+        };
+        if amount_to_transfer > 0 {
+            let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
+            let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.position_vault.to_account_info(),
+                to: ctx.accounts.user_lp_token.to_account_info(),
+                authority: ctx.accounts.global_state.to_account_info(),
+            };
+            let cpi_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                cpi_accounts,
+                signer_seeds,
+            );
+            token::transfer(cpi_ctx, amount_to_transfer)?;
+        }
+
+        if full_exit {
+            // Full unstake: zero fields, close vault, close position account
             {
                 let position = &mut ctx.accounts.position;
                 position.staked_amount = 0;
                 position.staked_value_usd = 0;
             }
+            // Close the vault token account to return rent to owner
+            let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
+            let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
+            let close_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                CloseAccount {
+                    account: ctx.accounts.position_vault.to_account_info(),
+                    destination: ctx.accounts.owner.to_account_info(),
+                    authority: ctx.accounts.global_state.to_account_info(),
+                },
+                signer_seeds,
+            );
+            token::close_account(close_ctx)?;
+
             ctx.accounts
                 .position
                 .close(ctx.accounts.owner.to_account_info())?;
         } else {
-            // Partial unstake: scale staked_value_usd by remaining_amount / old_amount
-            let new_value = (old_value)
-                .saturating_mul(remaining_amount as u128)
-                .saturating_div(old_amount as u128);
+            // Partial update
+            let position = &mut ctx.accounts.position;
+            position.staked_amount = remaining_amount;
+            position.staked_value_usd = new_value;
 
-            // If new_value drops below the minimum, treat as full unstake
-            if new_value < ctx.accounts.global_state.min_stake_value {
-                {
-                    let position = &mut ctx.accounts.position;
-                    position.staked_amount = 0;
-                    position.staked_value_usd = 0;
-                }
-                ctx.accounts
-                    .position
-                    .close(ctx.accounts.owner.to_account_info())?;
-            } else {
-                let position = &mut ctx.accounts.position;
-                position.staked_amount = remaining_amount;
-                position.staked_value_usd = new_value;
-
-                msg!(
-                    "Unstaked partial: old_amount={}, unstake={}, remain={}, value_scaled={} (C_prev->C_now: {}->{}, integral={}, reward_raw={})",
-                    old_amount,
-                    unstake_amount,
-                    remaining_amount,
-                    new_value,
-                    prev_cum,
-                    cum_now,
-                    inv_cost_integral,
-                    gt_reward_raw
-                );
-            }
+            msg!(
+                "Unstaked partial: old_amount={}, unstake={}, remain={}, value_scaled={} (C_prev->C_now: {}->{}, integral={}, reward_raw={})",
+                old_amount,
+                unstake_amount,
+                remaining_amount,
+                new_value,
+                prev_cum,
+                cum_now,
+                inv_cost_integral,
+                gt_reward_raw
+            );
         }
 
         Ok(())
@@ -470,6 +523,10 @@ pub struct StakeLp<'info> {
     /// Global config (PDA)
     #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
+
+    /// LP token mint to be staked
+    pub lp_mint: Account<'info, Mint>,
+
     /// Position PDA to initialize for (global_state, owner, position_id)
     #[account(
         init,
@@ -484,15 +541,45 @@ pub struct StakeLp<'info> {
         bump
     )]
     pub position: Account<'info, Position>,
+
+    /// Vault token account (PDA) to hold staked LP tokens for this position
+    #[account(
+        init,
+        payer = owner,
+        seeds = [
+            POSITION_SEED,
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+            b"vault",
+        ],
+        bump,
+        token::mint = lp_mint,
+        token::authority = global_state,
+    )]
+    pub position_vault: Account<'info, TokenAccount>,
+
     /// The GT Store account (mutated by CPI)
     #[account(mut)]
     pub gt_store: AccountLoader<'info, Store>,
+
     /// GT program
     pub gt_program: Program<'info, GmsolStore>,
+
     /// Owner paying rent and recorded as position owner
     #[account(mut)]
     pub owner: Signer<'info>,
+
+    /// User's LP token account (must match lp_mint and owner)
+    #[account(
+        mut,
+        constraint = user_lp_token.mint == lp_mint.key(),
+        constraint = user_lp_token.owner == owner.key(),
+    )]
+    pub user_lp_token: Account<'info, TokenAccount>,
+
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 /// Accounts context for calculating GT reward from a Position
@@ -578,6 +665,9 @@ pub struct UnstakeLp<'info> {
     #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
 
+    /// LP token mint for this position (must match position.lp_mint)
+    pub lp_mint: Account<'info, Mint>,
+
     /// The GT Store account (mutated by CPI)
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
@@ -600,6 +690,22 @@ pub struct UnstakeLp<'info> {
     )]
     pub position: Account<'info, Position>,
 
+    /// Vault holding staked LP tokens (PDA)
+    #[account(
+        mut,
+        seeds = [
+            POSITION_SEED,
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+            b"vault",
+        ],
+        bump,
+        token::mint = lp_mint,
+        token::authority = global_state,
+    )]
+    pub position_vault: Account<'info, TokenAccount>,
+
     /// Owner of the position
     pub owner: Signer<'info>,
 
@@ -611,8 +717,18 @@ pub struct UnstakeLp<'info> {
     )]
     pub gt_user: AccountLoader<'info, UserHeader>,
 
+    /// Destination LP token account to receive unstaked tokens
+    #[account(
+        mut,
+        constraint = user_lp_token.mint == lp_mint.key(),
+        constraint = user_lp_token.owner == owner.key(),
+    )]
+    pub user_lp_token: Account<'info, TokenAccount>,
+
     /// CHECK: GT program's event authority PDA required by #[event_cpi] calls
     pub event_authority: UncheckedAccount<'info>,
+
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -679,6 +795,10 @@ pub struct Position {
     pub owner: Pubkey,
     /// Ties position to a specific GlobalState
     pub global_state: Pubkey,
+    /// LP token mint for this position
+    pub lp_mint: Pubkey,
+    /// PDA token account that escrows staked LP tokens
+    pub vault: Pubkey,
     /// Position id to allow multiple positions per owner
     pub position_id: u64,
     /// Staked LP amount at stake time (raw amount as provided by caller; optional semantics)
