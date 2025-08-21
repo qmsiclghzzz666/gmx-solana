@@ -82,69 +82,46 @@ pub mod gmsol_liquidity_provider {
         Ok(())
     }
 
-    /// Calculate GT rewards for LP based on stored Position data
+    /// Calculate GT rewards for LP based on stored Position data (no mint)
     pub fn calculate_gt_reward(ctx: Context<CalculateGtReward>) -> Result<()> {
-        let global_state = &ctx.accounts.global_state;
-        let position = &ctx.accounts.position;
-        let current_time = Clock::get()?.unix_timestamp;
+        // Refresh C(t) via CPI and compute reward using shared helper
+        let out = compute_reward_with_cpi(
+            &ctx.accounts.global_state,
+            &ctx.accounts.gt_store,
+            &ctx.accounts.gt_program,
+            &ctx.accounts.position,
+        )?;
+        let cum_now = out.cum_now;
+        let inv_cost_integral = out.inv_cost_integral;
+        let gt_reward_raw = out.gt_reward_raw;
 
-        // duration in seconds (non-negative)
-        let duration_seconds = current_time.saturating_sub(position.stake_start_time);
-
-        // --- Update GT cumulative inverse cost factor via CPI and read current cumulative value ---
-        // Use the GlobalState PDA as GT_CONTROLLER authority
-        let gs_seeds: &[&[u8]] = &[b"global_state", &[ctx.accounts.global_state.bump]];
-        let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
-
-        let cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.gt_program.to_account_info(),
-            GtUpdateCtx {
-                authority: ctx.accounts.global_state.to_account_info(),
-                store: ctx.accounts.gt_store.to_account_info(),
-            },
-            signer_seeds,
-        );
-
-        let r: GtReturn<u128> = gt_cpi::update_gt_cumulative_inv_cost_factor(cpi_ctx)?;
-        let cum_now: u128 = r.get();
-
-        // Integral over [start, now] (C(now) - C(start)); require monotonicity to avoid masking bugs
-        require!(cum_now >= position.cum_inv_cost, ErrorCode::InvalidArgument);
-        let inv_cost_integral = cum_now - position.cum_inv_cost;
-
-        msg!(
-            "GT inverse-cost cumulative: start={}, now={}, integral={}",
-            position.cum_inv_cost,
-            cum_now,
-            inv_cost_integral
-        );
-
-        // Use the staked USD value captured at stake time (already 1e20 scaled)
-        let staked_value_usd = position.staked_value_usd;
-
-        // Read GT decimals from GT store and derive GT amount unit (10^decimals)
+        // For display, also compute human-readable GT (floored)
         let gt_decimals_u8 = {
             let store = ctx.accounts.gt_store.load()?;
             store.gt.decimals
         };
         let gt_decimals: u32 = gt_decimals_u8 as u32;
         let gt_amount_unit: u128 = 10u128.pow(gt_decimals);
-
-        // Calculate GT reward amount in raw base units
-        let gt_reward_raw = calculate_gt_reward_amount(
-            staked_value_usd,
-            duration_seconds,
-            global_state.gt_apy_per_sec,
-            inv_cost_integral,
-        )?;
-
-        // For display, also compute human-readable GT (floored)
         let gt_whole = (gt_reward_raw / (gt_amount_unit as u64)) as u64;
 
-        msg!("Staked amount (raw): {}", position.staked_amount);
-        msg!("Staked value (USD, 1e20): {}", staked_value_usd);
-        msg!("Staking duration (s): {}", duration_seconds);
-        msg!("GT APY per-second (1e20): {}", global_state.gt_apy_per_sec);
+        msg!(
+            "GT inverse-cost cumulative: start={}, now={}, integral={}",
+            ctx.accounts.position.cum_inv_cost,
+            cum_now,
+            inv_cost_integral
+        );
+        msg!(
+            "Staked amount (raw): {}",
+            ctx.accounts.position.staked_amount
+        );
+        msg!(
+            "Staked value (USD, 1e20): {}",
+            ctx.accounts.position.staked_value_usd
+        );
+        msg!(
+            "GT APY per-second (1e20): {}",
+            ctx.accounts.global_state.gt_apy_per_sec
+        );
         msg!(
             "Calculated GT reward (raw, decimals={}): {}",
             gt_decimals,
@@ -156,43 +133,28 @@ pub mod gmsol_liquidity_provider {
 
     /// Claim GT rewards for a position, minting tokens and updating snapshot
     pub fn claim_gt(ctx: Context<ClaimGt>, _position_id: u64) -> Result<()> {
-        let position = &mut ctx.accounts.position;
         let global_state = &ctx.accounts.global_state;
 
-        // Use GlobalState PDA as controller for GT CPI
-        let gs_seeds: &[&[u8]] = &[b"global_state", &[global_state.bump]];
-        let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
-
-        let update_ctx = CpiContext::new_with_signer(
-            ctx.accounts.gt_program.to_account_info(),
-            GtUpdateCtx {
-                authority: global_state.to_account_info(),
-                store: ctx.accounts.store.to_account_info(),
-            },
-            signer_seeds,
-        );
-
-        // 1) Update GT cumulative inverse cost factor and get current cumulative value
-        let r: GtReturn<u128> = gt_cpi::update_gt_cumulative_inv_cost_factor(update_ctx)?;
-        let cum_now: u128 = r.get();
-        let prev_cum: u128 = position.cum_inv_cost;
-
-        // 2) Compute integral over [last_snapshot, now]
-        require!(cum_now >= prev_cum, ErrorCode::InvalidArgument);
-        let inv_cost_integral = cum_now - prev_cum;
-
-        // 3) Calculate GT reward amount
-        let current_time = Clock::get()?.unix_timestamp;
-        let duration_seconds = current_time.saturating_sub(position.stake_start_time);
-        let gt_reward_raw = calculate_gt_reward_amount(
-            position.staked_value_usd,
-            duration_seconds,
-            global_state.gt_apy_per_sec,
-            inv_cost_integral,
+        // Refresh C(t) via CPI and compute reward using shared helper
+        let out = compute_reward_with_cpi(
+            &ctx.accounts.global_state,
+            &ctx.accounts.store,
+            &ctx.accounts.gt_program,
+            &ctx.accounts.position,
         )?;
+        let gt_reward_raw = out.gt_reward_raw;
+        let cum_now = out.cum_now;
+        let prev_cum = out.prev_cum;
+        let inv_cost_integral = out.inv_cost_integral;
+        let duration_seconds = out.duration_seconds;
+        // Capture position id immutably for later log use
+        let pos_id = ctx.accounts.position.position_id;
 
-        // 4) Mint GT tokens to the user's GT account (authority = GlobalState PDA)
+        // Mint GT tokens to the user's GT account (authority = GlobalState PDA)
         if gt_reward_raw > 0 {
+            let gs_seeds: &[&[u8]] = &[b"global_state", &[global_state.bump]];
+            let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
+
             let mint_ctx = CpiContext::new_with_signer(
                 ctx.accounts.gt_program.to_account_info(),
                 GtMintCtx {
@@ -207,13 +169,16 @@ pub mod gmsol_liquidity_provider {
             gt_cpi::mint_gt_reward(mint_ctx, gt_reward_raw)?;
         }
 
-        // 5) Update snapshot to now for future claims (do NOT change stake_start_time)
-        position.cum_inv_cost = cum_now;
+        // Update snapshot to now for future claims (do NOT change stake_start_time)
+        {
+            let position = &mut ctx.accounts.position;
+            position.cum_inv_cost = cum_now;
+        }
 
         msg!(
             "Claimed GT: amount_raw={} | pos_id={} | duration={}s | C_prev->C_now: {}->{}, integral={}",
             gt_reward_raw,
-            position.position_id,
+            pos_id,
             duration_seconds,
             prev_cum,
             cum_now,
@@ -223,7 +188,7 @@ pub mod gmsol_liquidity_provider {
         Ok(())
     }
 
-    /// Update GT APY parameter
+    /// Update GT APY parameter (per-second 1e20-scaled)
     pub fn update_gt_apy_per_sec(
         ctx: Context<UpdateGtApy>,
         new_apy_per_sec: u128, // scaled by 1e20
@@ -288,6 +253,65 @@ fn calculate_gt_reward_amount(
     Ok(gt_raw.min(u64::MAX as u128) as u64)
 }
 
+/// Output of reward computation with CPI-updated cumulative inverse cost
+struct ComputeRewardOut {
+    gt_reward_raw: u64,
+    cum_now: u128,
+    prev_cum: u128,
+    inv_cost_integral: u128,
+    duration_seconds: i64,
+}
+
+/// Compute reward by (a) refreshing C(t) via GT CPI and (b) applying APY-per-sec and integral.
+fn compute_reward_with_cpi<'info>(
+    global_state: &Account<'info, GlobalState>,
+    store: &AccountLoader<'info, Store>,
+    gt_program: &Program<'info, GmsolStore>,
+    position: &Account<'info, Position>,
+) -> Result<ComputeRewardOut> {
+    // Use GlobalState PDA as controller for GT CPI
+    let gs_seeds: &[&[u8]] = &[b"global_state", &[global_state.bump]];
+    let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
+
+    let update_ctx = CpiContext::new_with_signer(
+        gt_program.to_account_info(),
+        GtUpdateCtx {
+            authority: global_state.to_account_info(),
+            store: store.to_account_info(),
+        },
+        signer_seeds,
+    );
+
+    // 1) Refresh cumulative inverse cost and read C(now)
+    let r: GtReturn<u128> = gt_cpi::update_gt_cumulative_inv_cost_factor(update_ctx)?;
+    let cum_now: u128 = r.get();
+    let prev_cum: u128 = position.cum_inv_cost;
+
+    // 2) Compute integral over [last_snapshot, now]
+    require!(cum_now >= prev_cum, ErrorCode::InvalidArgument);
+    let inv_cost_integral = cum_now - prev_cum;
+
+    // 3) Duration for logging / APY-per-sec pipeline
+    let current_time = Clock::get()?.unix_timestamp;
+    let duration_seconds = current_time.saturating_sub(position.stake_start_time);
+
+    // 4) Reward in GT base units
+    let gt_reward_raw = calculate_gt_reward_amount(
+        position.staked_value_usd,
+        duration_seconds,
+        global_state.gt_apy_per_sec,
+        inv_cost_integral,
+    )?;
+
+    Ok(ComputeRewardOut {
+        gt_reward_raw,
+        cum_now,
+        prev_cum,
+        inv_cost_integral,
+        duration_seconds,
+    })
+}
+
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(
@@ -321,7 +345,7 @@ pub struct StakeLp<'info> {
         payer = owner,
         space = 8 + Position::INIT_SPACE,
         seeds = [
-            b"position",
+            Position::SEED,
             global_state.key().as_ref(),
             owner.key().as_ref(),
             &position_id.to_le_bytes(),
@@ -355,7 +379,7 @@ pub struct CalculateGtReward<'info> {
     /// Position tied to (global_state, owner, position_id)
     #[account(
         seeds = [
-            b"position",
+            Position::SEED,
             global_state.key().as_ref(),
             owner.key().as_ref(),
             &position_id.to_le_bytes(),
@@ -389,7 +413,7 @@ pub struct ClaimGt<'info> {
     #[account(
         mut,
         seeds = [
-            b"position",
+            Position::SEED,
             global_state.key().as_ref(),
             owner.key().as_ref(),
             &position_id.to_le_bytes(),
@@ -480,6 +504,11 @@ pub struct Position {
     pub cum_inv_cost: u128,
     /// PDA bump
     pub bump: u8,
+}
+
+impl Position {
+    /// PDA seed prefix for Position accounts
+    pub const SEED: &'static [u8] = b"position";
 }
 
 #[error_code]
