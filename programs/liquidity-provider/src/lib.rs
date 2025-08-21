@@ -1,6 +1,10 @@
 use anchor_lang::prelude::*;
 use gmsol_model::utils::apply_factor;
 use gmsol_programs::gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
+#[constant]
+pub const POSITION_SEED: &'static [u8] = b"position";
+#[constant]
+pub const GLOBAL_STATE_SEED: &'static [u8] = b"global_state";
 use gmsol_programs::gmsol_store::{
     accounts::{Store, UserHeader},
     cpi as gt_cpi,
@@ -44,7 +48,7 @@ pub mod gmsol_liquidity_provider {
         let now = Clock::get()?.unix_timestamp;
 
         // Use GlobalState PDA as controller for GT CPI
-        let gs_seeds: &[&[u8]] = &[b"global_state", &[ctx.accounts.global_state.bump]];
+        let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[ctx.accounts.global_state.bump]];
         let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
 
         let cpi_ctx = CpiContext::new_with_signer(
@@ -152,7 +156,7 @@ pub mod gmsol_liquidity_provider {
 
         // Mint GT tokens to the user's GT account (authority = GlobalState PDA)
         if gt_reward_raw > 0 {
-            let gs_seeds: &[&[u8]] = &[b"global_state", &[global_state.bump]];
+            let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
             let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
 
             let mint_ctx = CpiContext::new_with_signer(
@@ -270,7 +274,7 @@ fn compute_reward_with_cpi<'info>(
     position: &Account<'info, Position>,
 ) -> Result<ComputeRewardOut> {
     // Use GlobalState PDA as controller for GT CPI
-    let gs_seeds: &[&[u8]] = &[b"global_state", &[global_state.bump]];
+    let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
     let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
 
     let update_ctx = CpiContext::new_with_signer(
@@ -318,7 +322,7 @@ pub struct Initialize<'info> {
         init,
         payer = authority,
         space = 8 + GlobalState::INIT_SPACE,
-        seeds = [b"global_state"],
+        seeds = [GLOBAL_STATE_SEED],
         bump
     )]
     pub global_state: Account<'info, GlobalState>,
@@ -337,7 +341,7 @@ pub struct Initialize<'info> {
 #[instruction(position_id: u64)]
 pub struct StakeLp<'info> {
     /// Global config (PDA)
-    #[account(seeds = [b"global_state"], bump = global_state.bump)]
+    #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
     /// Position PDA to initialize for (global_state, owner, position_id)
     #[account(
@@ -345,7 +349,7 @@ pub struct StakeLp<'info> {
         payer = owner,
         space = 8 + Position::INIT_SPACE,
         seeds = [
-            Position::SEED,
+            POSITION_SEED,
             global_state.key().as_ref(),
             owner.key().as_ref(),
             &position_id.to_le_bytes(),
@@ -369,7 +373,7 @@ pub struct StakeLp<'info> {
 #[instruction(position_id: u64)]
 pub struct CalculateGtReward<'info> {
     /// Global config (PDA)
-    #[account(seeds = [b"global_state"], bump = global_state.bump)]
+    #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
     /// The GT Store account (loaded & mutated by CPI)
     #[account(mut)]
@@ -379,7 +383,7 @@ pub struct CalculateGtReward<'info> {
     /// Position tied to (global_state, owner, position_id)
     #[account(
         seeds = [
-            Position::SEED,
+            POSITION_SEED,
             global_state.key().as_ref(),
             owner.key().as_ref(),
             &position_id.to_le_bytes(),
@@ -399,7 +403,7 @@ pub struct CalculateGtReward<'info> {
 #[instruction(position_id: u64)]
 pub struct ClaimGt<'info> {
     /// Global config (PDA)
-    #[account(seeds = [b"global_state"], bump = global_state.bump)]
+    #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
 
     /// The GT Store account (mutated by CPI)
@@ -413,7 +417,7 @@ pub struct ClaimGt<'info> {
     #[account(
         mut,
         seeds = [
-            Position::SEED,
+            POSITION_SEED,
             global_state.key().as_ref(),
             owner.key().as_ref(),
             &position_id.to_le_bytes(),
@@ -442,7 +446,7 @@ pub struct ClaimGt<'info> {
 #[derive(Accounts)]
 pub struct UpdateGtApy<'info> {
     /// Global config (PDA). The `authority` signer must match `global_state.authority`.
-    #[account(mut, seeds = [b"global_state"], bump = global_state.bump, has_one = authority)]
+    #[account(mut, seeds = [GLOBAL_STATE_SEED], bump = global_state.bump, has_one = authority)]
     pub global_state: Account<'info, GlobalState>,
     /// Current authority
     pub authority: Signer<'info>,
@@ -451,7 +455,7 @@ pub struct UpdateGtApy<'info> {
 #[derive(Accounts)]
 pub struct TransferAuthority<'info> {
     /// Global config (PDA). The `authority` signer must match `global_state.authority`.
-    #[account(mut, seeds = [b"global_state"], bump = global_state.bump, has_one = authority)]
+    #[account(mut, seeds = [GLOBAL_STATE_SEED], bump = global_state.bump, has_one = authority)]
     pub global_state: Account<'info, GlobalState>,
     /// Current authority proposing a transfer
     pub authority: Signer<'info>,
@@ -460,7 +464,7 @@ pub struct TransferAuthority<'info> {
 #[derive(Accounts)]
 pub struct AcceptAuthority<'info> {
     /// Global config (PDA). The signer must equal `global_state.pending_authority`.
-    #[account(mut, seeds = [b"global_state"], bump = global_state.bump, has_one = pending_authority)]
+    #[account(mut, seeds = [GLOBAL_STATE_SEED], bump = global_state.bump, has_one = pending_authority)]
     pub global_state: Account<'info, GlobalState>,
     /// Pending authority accepting control (must match `global_state.pending_authority`)
     pub pending_authority: Signer<'info>,
@@ -480,7 +484,7 @@ pub struct GlobalState {
     pub gt_apy_per_sec: u128,
     /// LP token price in USD scaled by 1e20
     pub lp_token_price: u128,
-    /// PDA bump for this GlobalState (derived from seed ["global_state"])
+    /// PDA bump for this GlobalState (derived from seed [GLOBAL_STATE_SEED])
     pub bump: u8,
 }
 
@@ -504,11 +508,6 @@ pub struct Position {
     pub cum_inv_cost: u128,
     /// PDA bump
     pub bump: u8,
-}
-
-impl Position {
-    /// PDA seed prefix for Position accounts
-    pub const SEED: &'static [u8] = b"position";
 }
 
 #[error_code]
