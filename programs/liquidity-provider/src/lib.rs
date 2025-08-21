@@ -1,6 +1,7 @@
 use anchor_lang::prelude::AccountsClose;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
+use gmsol_model::num::MulDiv;
 use gmsol_model::utils::apply_factor;
 use gmsol_programs::gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
 
@@ -286,9 +287,12 @@ pub mod gmsol_liquidity_provider {
         let new_value = if remaining_amount == 0 {
             0
         } else {
-            (old_value)
-                .saturating_mul(remaining_amount as u128)
-                .saturating_div(old_amount as u128)
+            MulDiv::checked_mul_div(
+                &old_value,
+                &(remaining_amount as u128),
+                &(old_amount as u128),
+            )
+            .ok_or(ErrorCode::MathOverflow)?
         };
         let full_exit =
             remaining_amount == 0 || new_value < ctx.accounts.global_state.min_stake_value;
