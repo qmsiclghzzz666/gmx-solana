@@ -1,6 +1,9 @@
 use anchor_lang::prelude::AccountsClose;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token_interface as token_if;
+use anchor_spl::token_interface::{
+    CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked,
+};
 use gmsol_model::num::MulDiv;
 use gmsol_model::utils::apply_factor;
 use gmsol_programs::gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
@@ -9,6 +12,8 @@ use gmsol_programs::gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
 pub const POSITION_SEED: &'static [u8] = b"position";
 #[constant]
 pub const GLOBAL_STATE_SEED: &'static [u8] = b"global_state";
+#[constant]
+pub const VAULT_SEED: &'static [u8] = b"vault";
 
 use gmsol_programs::gmsol_store::{
     accounts::{Store, UserHeader},
@@ -80,14 +85,15 @@ pub mod gmsol_liquidity_provider {
 
         // Transfer LP tokens from user to the position vault
         if lp_staked_amount > 0 {
-            let cpi_accounts = Transfer {
+            let cpi_accounts = TransferChecked {
                 from: ctx.accounts.user_lp_token.to_account_info(),
+                mint: ctx.accounts.lp_mint.to_account_info(),
                 to: ctx.accounts.position_vault.to_account_info(),
                 authority: ctx.accounts.owner.to_account_info(),
             };
             let cpi_ctx =
                 CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
-            token::transfer(cpi_ctx, lp_staked_amount)?;
+            token_if::transfer_checked(cpi_ctx, lp_staked_amount, ctx.accounts.lp_mint.decimals)?;
         }
 
         // Init position fields
@@ -306,8 +312,9 @@ pub mod gmsol_liquidity_provider {
         if amount_to_transfer > 0 {
             let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
             let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
-            let cpi_accounts = Transfer {
+            let cpi_accounts = TransferChecked {
                 from: ctx.accounts.position_vault.to_account_info(),
+                mint: ctx.accounts.lp_mint.to_account_info(),
                 to: ctx.accounts.user_lp_token.to_account_info(),
                 authority: ctx.accounts.global_state.to_account_info(),
             };
@@ -316,7 +323,7 @@ pub mod gmsol_liquidity_provider {
                 cpi_accounts,
                 signer_seeds,
             );
-            token::transfer(cpi_ctx, amount_to_transfer)?;
+            token_if::transfer_checked(cpi_ctx, amount_to_transfer, ctx.accounts.lp_mint.decimals)?;
         }
 
         if full_exit {
@@ -338,7 +345,7 @@ pub mod gmsol_liquidity_provider {
                 },
                 signer_seeds,
             );
-            token::close_account(close_ctx)?;
+            token_if::close_account(close_ctx)?;
 
             ctx.accounts
                 .position
@@ -529,7 +536,7 @@ pub struct StakeLp<'info> {
     pub global_state: Account<'info, GlobalState>,
 
     /// LP token mint to be staked
-    pub lp_mint: Account<'info, Mint>,
+    pub lp_mint: InterfaceAccount<'info, Mint>,
 
     /// Position PDA to initialize for (global_state, owner, position_id)
     #[account(
@@ -555,13 +562,13 @@ pub struct StakeLp<'info> {
             global_state.key().as_ref(),
             owner.key().as_ref(),
             &position_id.to_le_bytes(),
-            b"vault",
+            VAULT_SEED,
         ],
         bump,
         token::mint = lp_mint,
         token::authority = global_state,
     )]
-    pub position_vault: Account<'info, TokenAccount>,
+    pub position_vault: InterfaceAccount<'info, TokenAccount>,
 
     /// The GT Store account (mutated by CPI)
     #[account(mut)]
@@ -580,10 +587,10 @@ pub struct StakeLp<'info> {
         constraint = user_lp_token.mint == lp_mint.key(),
         constraint = user_lp_token.owner == owner.key(),
     )]
-    pub user_lp_token: Account<'info, TokenAccount>,
+    pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
 
     pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
+    pub token_program: Interface<'info, TokenInterface>,
 }
 
 /// Accounts context for calculating GT reward from a Position
@@ -670,7 +677,7 @@ pub struct UnstakeLp<'info> {
     pub global_state: Account<'info, GlobalState>,
 
     /// LP token mint for this position (must match position.lp_mint)
-    pub lp_mint: Account<'info, Mint>,
+    pub lp_mint: InterfaceAccount<'info, Mint>,
 
     /// The GT Store account (mutated by CPI)
     #[account(mut)]
@@ -702,13 +709,13 @@ pub struct UnstakeLp<'info> {
             global_state.key().as_ref(),
             owner.key().as_ref(),
             &position_id.to_le_bytes(),
-            b"vault",
+            VAULT_SEED,
         ],
         bump,
         token::mint = lp_mint,
         token::authority = global_state,
     )]
-    pub position_vault: Account<'info, TokenAccount>,
+    pub position_vault: InterfaceAccount<'info, TokenAccount>,
 
     /// Owner of the position
     pub owner: Signer<'info>,
@@ -727,12 +734,12 @@ pub struct UnstakeLp<'info> {
         constraint = user_lp_token.mint == lp_mint.key(),
         constraint = user_lp_token.owner == owner.key(),
     )]
-    pub user_lp_token: Account<'info, TokenAccount>,
+    pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
 
     /// CHECK: GT program's event authority PDA required by #[event_cpi] calls
     pub event_authority: UncheckedAccount<'info>,
 
-    pub token_program: Program<'info, Token>,
+    pub token_program: Interface<'info, TokenInterface>,
 }
 
 #[derive(Accounts)]
