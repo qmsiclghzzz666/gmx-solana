@@ -1,10 +1,20 @@
+use anchor_lang::prelude::AccountsClose;
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface as token_if;
+use anchor_spl::token_interface::{
+    CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked,
+};
+use gmsol_model::num::MulDiv;
 use gmsol_model::utils::apply_factor;
 use gmsol_programs::gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
+
 #[constant]
 pub const POSITION_SEED: &'static [u8] = b"position";
 #[constant]
 pub const GLOBAL_STATE_SEED: &'static [u8] = b"global_state";
+#[constant]
+pub const VAULT_SEED: &'static [u8] = b"vault";
+
 use gmsol_programs::gmsol_store::{
     accounts::{Store, UserHeader},
     cpi as gt_cpi,
@@ -25,7 +35,7 @@ pub mod gmsol_liquidity_provider {
     use super::*;
 
     /// Initialize LP staking program
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, min_stake_value: u128) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
         global_state.authority = ctx.accounts.authority.key();
         global_state.pending_authority = Pubkey::default();
@@ -33,8 +43,12 @@ pub mod gmsol_liquidity_provider {
         // APY per-second (scaled by 1e20): 15% APR -> (15 * 1e20) / (100 * SECONDS_PER_YEAR)
         global_state.gt_apy_per_sec = GT_APY_PER_SEC;
         global_state.lp_token_price = MARKET_USD_UNIT; // $1.00 in 1e20 units
+        global_state.min_stake_value = min_stake_value;
         global_state.bump = ctx.bumps.global_state;
-        msg!("LP staking program initialized, GT APY: 15%, GT price: $1.00");
+        msg!(
+            "LP staking program initialized, GT APY: 15%%, GT price: $1.00, min_stake_value(1e20)={}",
+            min_stake_value
+        );
         Ok(())
     }
 
@@ -46,6 +60,12 @@ pub mod gmsol_liquidity_provider {
         lp_staked_value: u128, // scaled USD at stake time
     ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
+
+        // Enforce minimum stake value (scaled 1e20)
+        require!(
+            lp_staked_value >= ctx.accounts.global_state.min_stake_value,
+            ErrorCode::InvalidArgument
+        );
 
         // Use GlobalState PDA as controller for GT CPI
         let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[ctx.accounts.global_state.bump]];
@@ -63,10 +83,25 @@ pub mod gmsol_liquidity_provider {
         let r: GtReturn<u128> = gt_cpi::update_gt_cumulative_inv_cost_factor(cpi_ctx)?;
         let c_start: u128 = r.get();
 
+        // Transfer LP tokens from user to the position vault
+        if lp_staked_amount > 0 {
+            let cpi_accounts = TransferChecked {
+                from: ctx.accounts.user_lp_token.to_account_info(),
+                mint: ctx.accounts.lp_mint.to_account_info(),
+                to: ctx.accounts.position_vault.to_account_info(),
+                authority: ctx.accounts.owner.to_account_info(),
+            };
+            let cpi_ctx =
+                CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+            token_if::transfer_checked(cpi_ctx, lp_staked_amount, ctx.accounts.lp_mint.decimals)?;
+        }
+
         // Init position fields
         let position = &mut ctx.accounts.position;
         position.owner = ctx.accounts.owner.key();
         position.global_state = ctx.accounts.global_state.key();
+        position.lp_mint = ctx.accounts.lp_mint.key();
+        position.vault = ctx.accounts.position_vault.key();
         position.position_id = position_id;
         position.staked_amount = lp_staked_amount;
         position.staked_value_usd = lp_staked_value;
@@ -192,6 +227,151 @@ pub mod gmsol_liquidity_provider {
         Ok(())
     }
 
+    /// Unstake LP: first claim rewards, then either close the position (full) or update proportionally (partial)
+    pub fn unstake_lp(
+        ctx: Context<UnstakeLp>,
+        _position_id: u64,
+        unstake_amount: u64,
+    ) -> Result<()> {
+        require!(unstake_amount > 0, ErrorCode::InvalidArgument);
+
+        let global_state = &ctx.accounts.global_state;
+
+        // 1) Claim-like flow: refresh C(t), compute reward, mint, and snapshot
+        let out = compute_reward_with_cpi(
+            &ctx.accounts.global_state,
+            &ctx.accounts.store,
+            &ctx.accounts.gt_program,
+            &ctx.accounts.position,
+        )?;
+        let gt_reward_raw = out.gt_reward_raw;
+        let cum_now = out.cum_now;
+        let prev_cum = out.prev_cum;
+        let inv_cost_integral = out.inv_cost_integral;
+
+        if gt_reward_raw > 0 {
+            let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
+            let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
+
+            let mint_ctx = CpiContext::new_with_signer(
+                ctx.accounts.gt_program.to_account_info(),
+                GtMintCtx {
+                    authority: global_state.to_account_info(),
+                    store: ctx.accounts.store.to_account_info(),
+                    user: ctx.accounts.gt_user.to_account_info(),
+                    event_authority: ctx.accounts.event_authority.to_account_info(),
+                    program: ctx.accounts.gt_program.to_account_info(),
+                },
+                signer_seeds,
+            );
+            gt_cpi::mint_gt_reward(mint_ctx, gt_reward_raw)?;
+        }
+
+        // Snapshot to now
+        {
+            let position = &mut ctx.accounts.position;
+            position.cum_inv_cost = cum_now;
+        }
+
+        // 2) Apply unstake amount
+        let (old_amount, old_value) = {
+            let p = &ctx.accounts.position;
+            (p.staked_amount, p.staked_value_usd)
+        };
+        require!(unstake_amount <= old_amount, ErrorCode::InvalidArgument);
+
+        // Sanity: ensure the passed lp_mint matches the position
+        require_keys_eq!(
+            ctx.accounts.lp_mint.key(),
+            ctx.accounts.position.lp_mint,
+            ErrorCode::InvalidArgument
+        );
+
+        let remaining_amount = old_amount.saturating_sub(unstake_amount);
+
+        // Compute new_value for partial case and determine if we should fully exit
+        let new_value = if remaining_amount == 0 {
+            0
+        } else {
+            MulDiv::checked_mul_div(
+                &old_value,
+                &(remaining_amount as u128),
+                &(old_amount as u128),
+            )
+            .ok_or(ErrorCode::MathOverflow)?
+        };
+        let full_exit =
+            remaining_amount == 0 || new_value < ctx.accounts.global_state.min_stake_value;
+
+        // Decide transfer amount based on full_exit
+        let amount_to_transfer = if full_exit {
+            old_amount
+        } else {
+            unstake_amount
+        };
+        if amount_to_transfer > 0 {
+            let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
+            let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
+            let cpi_accounts = TransferChecked {
+                from: ctx.accounts.position_vault.to_account_info(),
+                mint: ctx.accounts.lp_mint.to_account_info(),
+                to: ctx.accounts.user_lp_token.to_account_info(),
+                authority: ctx.accounts.global_state.to_account_info(),
+            };
+            let cpi_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                cpi_accounts,
+                signer_seeds,
+            );
+            token_if::transfer_checked(cpi_ctx, amount_to_transfer, ctx.accounts.lp_mint.decimals)?;
+        }
+
+        if full_exit {
+            // Full unstake: zero fields, close vault, close position account
+            {
+                let position = &mut ctx.accounts.position;
+                position.staked_amount = 0;
+                position.staked_value_usd = 0;
+            }
+            // Close the vault token account to return rent to owner
+            let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
+            let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
+            let close_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                CloseAccount {
+                    account: ctx.accounts.position_vault.to_account_info(),
+                    destination: ctx.accounts.owner.to_account_info(),
+                    authority: ctx.accounts.global_state.to_account_info(),
+                },
+                signer_seeds,
+            );
+            token_if::close_account(close_ctx)?;
+
+            ctx.accounts
+                .position
+                .close(ctx.accounts.owner.to_account_info())?;
+        } else {
+            // Partial update
+            let position = &mut ctx.accounts.position;
+            position.staked_amount = remaining_amount;
+            position.staked_value_usd = new_value;
+
+            msg!(
+                "Unstaked partial: old_amount={}, unstake={}, remain={}, value_scaled={} (C_prev->C_now: {}->{}, integral={}, reward_raw={})",
+                old_amount,
+                unstake_amount,
+                remaining_amount,
+                new_value,
+                prev_cum,
+                cum_now,
+                inv_cost_integral,
+                gt_reward_raw
+            );
+        }
+
+        Ok(())
+    }
+
     /// Update GT APY parameter (per-second 1e20-scaled)
     pub fn update_gt_apy_per_sec(
         ctx: Context<UpdateGtApy>,
@@ -200,6 +380,17 @@ pub mod gmsol_liquidity_provider {
         let global_state = &mut ctx.accounts.global_state;
         global_state.gt_apy_per_sec = new_apy_per_sec;
         msg!("GT APY per-second (1e20) updated to: {}", new_apy_per_sec);
+        Ok(())
+    }
+
+    /// Update the minimum stake value (1e20 scaled)
+    pub fn update_min_stake_value(
+        ctx: Context<UpdateMinStakeValue>,
+        new_min_stake_value: u128,
+    ) -> Result<()> {
+        let gs = &mut ctx.accounts.global_state;
+        gs.min_stake_value = new_min_stake_value;
+        msg!("min_stake_value updated to (1e20): {}", new_min_stake_value);
         Ok(())
     }
 
@@ -343,6 +534,10 @@ pub struct StakeLp<'info> {
     /// Global config (PDA)
     #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
+
+    /// LP token mint to be staked
+    pub lp_mint: InterfaceAccount<'info, Mint>,
+
     /// Position PDA to initialize for (global_state, owner, position_id)
     #[account(
         init,
@@ -357,15 +552,45 @@ pub struct StakeLp<'info> {
         bump
     )]
     pub position: Account<'info, Position>,
+
+    /// Vault token account (PDA) to hold staked LP tokens for this position
+    #[account(
+        init,
+        payer = owner,
+        seeds = [
+            POSITION_SEED,
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+            VAULT_SEED,
+        ],
+        bump,
+        token::mint = lp_mint,
+        token::authority = global_state,
+    )]
+    pub position_vault: InterfaceAccount<'info, TokenAccount>,
+
     /// The GT Store account (mutated by CPI)
     #[account(mut)]
     pub gt_store: AccountLoader<'info, Store>,
+
     /// GT program
     pub gt_program: Program<'info, GmsolStore>,
+
     /// Owner paying rent and recorded as position owner
     #[account(mut)]
     pub owner: Signer<'info>,
+
+    /// User's LP token account (must match lp_mint and owner)
+    #[account(
+        mut,
+        constraint = user_lp_token.mint == lp_mint.key(),
+        constraint = user_lp_token.owner == owner.key(),
+    )]
+    pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
+
     pub system_program: Program<'info, System>,
+    pub token_program: Interface<'info, TokenInterface>,
 }
 
 /// Accounts context for calculating GT reward from a Position
@@ -443,8 +668,91 @@ pub struct ClaimGt<'info> {
     pub event_authority: UncheckedAccount<'info>,
 }
 
+/// Accounts context for unstaking LP; combines claim + partial/full exit
+#[derive(Accounts)]
+#[instruction(position_id: u64)]
+pub struct UnstakeLp<'info> {
+    /// Global config (PDA)
+    #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
+    pub global_state: Account<'info, GlobalState>,
+
+    /// LP token mint for this position (must match position.lp_mint)
+    pub lp_mint: InterfaceAccount<'info, Mint>,
+
+    /// The GT Store account (mutated by CPI)
+    #[account(mut)]
+    pub store: AccountLoader<'info, Store>,
+
+    /// The GT program
+    pub gt_program: Program<'info, GmsolStore>,
+
+    /// Position tied to (global_state, owner, position_id)
+    #[account(
+        mut,
+        seeds = [
+            POSITION_SEED,
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+        ],
+        bump = position.bump,
+        has_one = owner,
+        has_one = global_state
+    )]
+    pub position: Account<'info, Position>,
+
+    /// Vault holding staked LP tokens (PDA)
+    #[account(
+        mut,
+        seeds = [
+            POSITION_SEED,
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+            VAULT_SEED,
+        ],
+        bump,
+        token::mint = lp_mint,
+        token::authority = global_state,
+    )]
+    pub position_vault: InterfaceAccount<'info, TokenAccount>,
+
+    /// Owner of the position
+    pub owner: Signer<'info>,
+
+    /// GT User account (mut) managed by the GT program; must correspond to (store, owner)
+    #[account(
+        mut,
+        has_one = owner,
+        has_one = store,
+    )]
+    pub gt_user: AccountLoader<'info, UserHeader>,
+
+    /// Destination LP token account to receive unstaked tokens
+    #[account(
+        mut,
+        constraint = user_lp_token.mint == lp_mint.key(),
+        constraint = user_lp_token.owner == owner.key(),
+    )]
+    pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
+
+    /// CHECK: GT program's event authority PDA required by #[event_cpi] calls
+    pub event_authority: UncheckedAccount<'info>,
+
+    pub token_program: Interface<'info, TokenInterface>,
+}
+
 #[derive(Accounts)]
 pub struct UpdateGtApy<'info> {
+    /// Global config (PDA). The `authority` signer must match `global_state.authority`.
+    #[account(mut, seeds = [GLOBAL_STATE_SEED], bump = global_state.bump, has_one = authority)]
+    pub global_state: Account<'info, GlobalState>,
+    /// Current authority
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateMinStakeValue<'info> {
     /// Global config (PDA). The `authority` signer must match `global_state.authority`.
     #[account(mut, seeds = [GLOBAL_STATE_SEED], bump = global_state.bump, has_one = authority)]
     pub global_state: Account<'info, GlobalState>,
@@ -484,6 +792,8 @@ pub struct GlobalState {
     pub gt_apy_per_sec: u128,
     /// LP token price in USD scaled by 1e20
     pub lp_token_price: u128,
+    /// Minimum stake value in USD scaled by 1e20
+    pub min_stake_value: u128,
     /// PDA bump for this GlobalState (derived from seed [GLOBAL_STATE_SEED])
     pub bump: u8,
 }
@@ -496,6 +806,10 @@ pub struct Position {
     pub owner: Pubkey,
     /// Ties position to a specific GlobalState
     pub global_state: Pubkey,
+    /// LP token mint for this position
+    pub lp_mint: Pubkey,
+    /// PDA token account that escrows staked LP tokens
+    pub vault: Pubkey,
     /// Position id to allow multiple positions per owner
     pub position_id: u64,
     /// Staked LP amount at stake time (raw amount as provided by caller; optional semantics)
