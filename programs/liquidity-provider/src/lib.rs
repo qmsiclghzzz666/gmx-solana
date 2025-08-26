@@ -36,19 +36,86 @@ pub mod gmsol_liquidity_provider {
     pub fn initialize(
         ctx: Context<Initialize>,
         min_stake_value: u128,
-        apy_gradient: [u128; 53], // each item is 1e20-scaled APR for week buckets [0-1), [1-2), ..., [52, +inf)
+        initial_apy: u128, // Initial APY for all buckets (1e20-scaled)
     ) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
         global_state.authority = ctx.accounts.authority.key();
         global_state.pending_authority = Pubkey::default();
         global_state.gt_mint = ctx.accounts.gt_mint.key();
-        global_state.apy_gradient = apy_gradient;
+
+        // Initialize all buckets with the same initial APY
+        global_state.apy_gradient = [initial_apy; 53];
+
         global_state.lp_token_price = MARKET_USD_UNIT; // $1.00 in 1e20 units
         global_state.min_stake_value = min_stake_value;
         global_state.bump = ctx.bumps.global_state;
         msg!(
-            "LP staking program initialized, min_stake_value(1e20)={}",
-            min_stake_value
+            "LP staking program initialized, min_stake_value(1e20)={}, initial_apy(1e20)={}",
+            min_stake_value,
+            initial_apy
+        );
+        Ok(())
+    }
+
+    /// Update APY gradient with a sparse table (only non-zero buckets)
+    pub fn update_apy_gradient_sparse(
+        ctx: Context<UpdateApyGradient>,
+        bucket_indices: Vec<u8>, // indices of buckets to update
+        apy_values: Vec<u128>,   // corresponding APY values (1e20-scaled)
+    ) -> Result<()> {
+        let gs = &mut ctx.accounts.global_state;
+
+        // Lengths must match
+        require!(
+            bucket_indices.len() == apy_values.len(),
+            ErrorCode::InvalidArgument
+        );
+
+        // Apply sparse updates
+        for (idx, val) in bucket_indices.into_iter().zip(apy_values.into_iter()) {
+            require!(idx < 53, ErrorCode::InvalidArgument);
+            gs.apy_gradient[idx as usize] = val;
+        }
+
+        msg!(
+            "APY gradient updated via sparse entries (total buckets = {})",
+            gs.apy_gradient.len()
+        );
+        Ok(())
+    }
+
+    /// Update APY gradient for a contiguous range of buckets
+    pub fn update_apy_gradient_range(
+        ctx: Context<UpdateApyGradient>,
+        start_bucket: u8,
+        end_bucket: u8,
+        apy_values: Vec<u128>, // Must match the range size
+    ) -> Result<()> {
+        let gs = &mut ctx.accounts.global_state;
+
+        require!(
+            start_bucket < 53 && end_bucket < 53,
+            ErrorCode::InvalidArgument
+        );
+        require!(start_bucket <= end_bucket, ErrorCode::InvalidArgument);
+
+        let expected_size = (end_bucket - start_bucket + 1) as usize;
+        require!(
+            apy_values.len() == expected_size,
+            ErrorCode::InvalidArgument
+        );
+
+        // Apply range updates
+        for (i, apy_value) in apy_values.into_iter().enumerate() {
+            let bucket_idx = start_bucket as usize + i;
+            gs.apy_gradient[bucket_idx] = apy_value;
+        }
+
+        msg!(
+            "APY gradient updated for buckets {}..={} ({} values)",
+            start_bucket,
+            end_bucket,
+            expected_size
         );
         Ok(())
     }
@@ -367,17 +434,6 @@ pub mod gmsol_liquidity_provider {
         Ok(())
     }
 
-    /// Update APY gradient array (53 buckets)
-    pub fn update_apy_gradient(
-        ctx: Context<UpdateApyGradient>,
-        new_apy_gradient: [u128; 53],
-    ) -> Result<()> {
-        let gs = &mut ctx.accounts.global_state;
-        gs.apy_gradient = new_apy_gradient;
-        msg!("apy_gradient updated (53 buckets)");
-        Ok(())
-    }
-
     /// Propose transferring program authority to `new_authority` (two-step handover).
     pub fn transfer_authority(
         ctx: Context<TransferAuthority>,
@@ -506,36 +562,34 @@ fn compute_time_weighted_apy(stake_start_time: i64, now: i64, apy_gradient: &[u1
     if now <= stake_start_time {
         return apy_gradient[0];
     }
-    let mut remaining: u128 = (now - stake_start_time) as u128;
-    let mut current_start: i64 = stake_start_time;
-    let mut acc: u128 = 0;
-    let mut week_index: usize = 0;
-
-    while remaining > 0 {
-        let week_end = current_start.saturating_add(SECONDS_PER_WEEK as i64);
-        let segment_seconds: u128 = if (now as i128) < (week_end as i128) {
-            remaining
-        } else {
-            SECONDS_PER_WEEK.min(remaining)
-        };
-        let apy = if week_index < 52 {
-            apy_gradient[week_index]
-        } else {
-            apy_gradient[52]
-        };
-        // accumulate apy * seconds
-        acc = acc.saturating_add(apy.saturating_mul(segment_seconds));
-        remaining = remaining.saturating_sub(segment_seconds);
-        current_start = week_end;
-        week_index = week_index.saturating_add(1);
-    }
-
     let total_seconds: u128 = (now - stake_start_time) as u128;
     if total_seconds == 0 {
-        apy_gradient[0]
-    } else {
-        acc / total_seconds
+        return apy_gradient[0];
     }
+
+    let full_weeks: u128 = total_seconds / SECONDS_PER_WEEK;
+    let rem_seconds: u128 = total_seconds % SECONDS_PER_WEEK;
+
+    // Sum full-week contributions
+    let mut acc: u128 = 0;
+    let capped_full: u128 = full_weeks.min(52);
+    for i in 0..(capped_full as usize) {
+        acc = acc.saturating_add(apy_gradient[i].saturating_mul(SECONDS_PER_WEEK));
+    }
+    if full_weeks > 52 {
+        let extra = full_weeks - 52; // weeks 52+ use bucket 52
+        acc = acc.saturating_add(
+            apy_gradient[52].saturating_mul(SECONDS_PER_WEEK.saturating_mul(extra)),
+        );
+    }
+
+    // Add partial-week remainder
+    if rem_seconds > 0 {
+        let idx = usize::try_from(full_weeks.min(52)).unwrap_or(52);
+        acc = acc.saturating_add(apy_gradient[idx].saturating_mul(rem_seconds));
+    }
+
+    acc / total_seconds
 }
 
 #[derive(Accounts)]
@@ -782,6 +836,7 @@ pub struct UpdateMinStakeValue<'info> {
     pub authority: Signer<'info>,
 }
 
+/// Accounts for APY gradient updates (used by sparse and range initializers)
 #[derive(Accounts)]
 pub struct UpdateApyGradient<'info> {
     /// Global config (PDA). The `authority` signer must match `global_state.authority`.
