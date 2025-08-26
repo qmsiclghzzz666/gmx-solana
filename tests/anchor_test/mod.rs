@@ -26,3 +26,5 @@ mod token;
 mod callback;
 
 mod competition;
+
+mod liquidity_provider;

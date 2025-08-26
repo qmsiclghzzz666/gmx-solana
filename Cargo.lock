@@ -2379,7 +2379,7 @@ dependencies = [
 
 [[package]]
 name = "gmsol-liquidity-provider"
-version = "0.1.0"
+version = "0.8.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2561,6 +2561,7 @@ dependencies = [
  "gmsol-callback",
  "gmsol-chainlink-datastreams",
  "gmsol-competition",
+ "gmsol-liquidity-provider",
  "gmsol-mock-chainlink-verifier",
  "gmsol-programs",
  "gmsol-sdk",
