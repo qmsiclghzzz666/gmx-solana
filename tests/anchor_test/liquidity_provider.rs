@@ -1,4 +1,5 @@
 use crate::anchor_test::setup::{current_deployment, Deployment};
+use anchor_spl::token::spl_token;
 use gmsol_liquidity_provider as lp;
 use solana_sdk::{pubkey::Pubkey, signer::keypair::Keypair, signer::Signer, system_program};
 
@@ -277,5 +278,135 @@ async fn liquidity_provider_tests() -> eyre::Result<()> {
     tracing::info!("✓ Reject default address test passed");
 
     tracing::info!("All liquidity provider tests passed!");
+    Ok(())
+}
+
+use std::time::Duration;
+
+/// End-to-end stake → claim (with sleep) → partial & full unstake flow.
+/// Ignored by default until token accounts and GT store fixtures are wired in the test harness.
+#[tokio::test]
+#[ignore]
+async fn stake_claim_unstake_flow() -> eyre::Result<()> {
+    let deployment = current_deployment().await?;
+    let _guard = deployment.use_accounts().await?;
+    let client = deployment.user_client(Deployment::DEFAULT_USER)?;
+
+    // Derive global state PDA and create a unique position id for this test run
+    let (global_state, _bump) = derive_global_state();
+    let position_id: u64 = 42; // any deterministic id for this test
+
+    // --- Test fixtures (TODO):
+    // You must provide these accounts in your test harness before enabling the test:
+    // - lp_mint: InterfaceAccount<Mint>
+    // - user_lp_token: InterfaceAccount<TokenAccount> for the payer
+    // - position PDA and its vault PDA are derived on-chain by the instruction
+    // - gt_store and gt_program: the GT program and its Store account for CPI
+
+    // Placeholder pubkeys; replace with real accounts from your fixtures
+    let lp_mint = Pubkey::new_unique();
+    let user_lp_token = Pubkey::new_unique();
+    let gt_store = Pubkey::new_unique();
+    let gt_program = gmsol_programs::gmsol_store::ID;
+
+    // Choose stake amounts
+    let lp_staked_amount: u64 = 1_000_000_000; // raw LP amount (depends on mint decimals)
+    let lp_staked_value: u128 = 200_000_000_000_000_000_000u128; // 2.0 in 1e20 units
+
+    // --- Stake
+    let stake_ix = client
+        .store_transaction()
+        .program(lp::id())
+        .anchor_args(lp::instruction::StakeLp {
+            position_id,
+            lp_staked_amount,
+            lp_staked_value,
+        })
+        .anchor_accounts(lp::accounts::StakeLp {
+            global_state,
+            lp_mint,
+            position: Pubkey::new_unique(), // created by the instruction; placeholder
+            position_vault: Pubkey::new_unique(), // created by the instruction; placeholder
+            gt_store,
+            gt_program,
+            owner: client.payer(),
+            user_lp_token,
+            system_program: system_program::ID,
+            token_program: spl_token::ID,
+        });
+
+    let _sig = stake_ix.send().await?;
+
+    // --- Sleep before claim to ensure reward accrual across time
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    // --- Claim
+    let claim_ix = client
+        .store_transaction()
+        .program(lp::id())
+        .anchor_args(lp::instruction::ClaimGt {
+            _position_id: position_id,
+        })
+        .anchor_accounts(lp::accounts::ClaimGt {
+            global_state,
+            store: gt_store,
+            gt_program,
+            position: Pubkey::new_unique(), // derived PDA in real fixture
+            owner: client.payer(),          // Signer for the position owner
+            gt_user: Pubkey::new_unique(),  // GT user account loader in real fixture
+            event_authority: Pubkey::new_unique(),
+        });
+
+    let _sig = claim_ix.send().await?;
+
+    // --- Partial unstake
+    let partial_unstake: u64 = lp_staked_amount / 2;
+    let unstake_ix = client
+        .store_transaction()
+        .program(lp::id())
+        .anchor_args(lp::instruction::UnstakeLp {
+            _position_id: position_id,
+            unstake_amount: partial_unstake,
+        })
+        .anchor_accounts(lp::accounts::UnstakeLp {
+            global_state,
+            lp_mint,
+            store: gt_store,
+            gt_program,
+            position: Pubkey::new_unique(),
+            position_vault: Pubkey::new_unique(),
+            owner: client.payer(),
+            gt_user: Pubkey::new_unique(),
+            user_lp_token,
+            event_authority: Pubkey::new_unique(),
+            token_program: spl_token::ID,
+        });
+
+    let _sig = unstake_ix.send().await?;
+
+    // --- Full unstake (remaining)
+    let full_unstake_ix = client
+        .store_transaction()
+        .program(lp::id())
+        .anchor_args(lp::instruction::UnstakeLp {
+            _position_id: position_id,
+            unstake_amount: lp_staked_amount - partial_unstake,
+        })
+        .anchor_accounts(lp::accounts::UnstakeLp {
+            global_state,
+            lp_mint,
+            store: gt_store,
+            gt_program,
+            position: Pubkey::new_unique(),
+            position_vault: Pubkey::new_unique(),
+            owner: client.payer(),
+            gt_user: Pubkey::new_unique(),
+            user_lp_token,
+            event_authority: Pubkey::new_unique(),
+            token_program: spl_token::ID,
+        });
+
+    let _sig = full_unstake_ix.send().await?;
+
     Ok(())
 }
