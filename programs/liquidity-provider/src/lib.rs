@@ -14,6 +14,17 @@ pub const POSITION_SEED: &'static [u8] = b"position";
 pub const GLOBAL_STATE_SEED: &'static [u8] = b"global_state";
 #[constant]
 pub const VAULT_SEED: &'static [u8] = b"vault";
+// IDL-safe constants (u8) exposed via #[constant]
+#[constant]
+pub const APY_BUCKETS_U8: u8 = 53;
+#[constant]
+pub const APY_LAST_INDEX_U8: u8 = APY_BUCKETS_U8 - 1; // 52
+
+// Internal mirrors as usize for array lengths and indexing
+pub const APY_BUCKETS: usize = APY_BUCKETS_U8 as usize;
+pub const APY_LAST_INDEX: usize = APY_LAST_INDEX_U8 as usize;
+#[constant]
+pub const APY_MAX: u128 = 200_000_000_000_000_000_000u128; // 200% at 1e20 scale
 
 use gmsol_programs::gmsol_store::{
     accounts::{Store, UserHeader},
@@ -43,8 +54,9 @@ pub mod gmsol_liquidity_provider {
         global_state.pending_authority = Pubkey::default();
         global_state.gt_mint = ctx.accounts.gt_mint.key();
 
-        // Initialize all buckets with the same initial APY
-        global_state.apy_gradient = [initial_apy; 53];
+        // Cap-check and initialize all buckets with the same initial APY
+        require!(initial_apy <= APY_MAX, ErrorCode::ApyTooLarge);
+        global_state.apy_gradient = [initial_apy; APY_BUCKETS];
 
         global_state.lp_token_price = MARKET_USD_UNIT; // $1.00 in 1e20 units
         global_state.min_stake_value = min_stake_value;
@@ -73,7 +85,8 @@ pub mod gmsol_liquidity_provider {
 
         // Apply sparse updates
         for (idx, val) in bucket_indices.into_iter().zip(apy_values.into_iter()) {
-            require!(idx < 53, ErrorCode::InvalidArgument);
+            require!((idx as usize) < APY_BUCKETS, ErrorCode::InvalidArgument);
+            require!(val <= APY_MAX, ErrorCode::ApyTooLarge);
             gs.apy_gradient[idx as usize] = val;
         }
 
@@ -94,7 +107,7 @@ pub mod gmsol_liquidity_provider {
         let gs = &mut ctx.accounts.global_state;
 
         require!(
-            start_bucket < 53 && end_bucket < 53,
+            (start_bucket as usize) < APY_BUCKETS && (end_bucket as usize) < APY_BUCKETS,
             ErrorCode::InvalidArgument
         );
         require!(start_bucket <= end_bucket, ErrorCode::InvalidArgument);
@@ -107,6 +120,7 @@ pub mod gmsol_liquidity_provider {
 
         // Apply range updates
         for (i, apy_value) in apy_values.into_iter().enumerate() {
+            require!(apy_value <= APY_MAX, ErrorCode::ApyTooLarge);
             let bucket_idx = start_bucket as usize + i;
             gs.apy_gradient[bucket_idx] = apy_value;
         }
@@ -557,8 +571,12 @@ fn compute_reward_with_cpi<'info>(
     })
 }
 
-/// Compute time-weighted average APR over [start, now] using 53-bucket weekly gradient (1e20-scaled).
-fn compute_time_weighted_apy(stake_start_time: i64, now: i64, apy_gradient: &[u128; 53]) -> u128 {
+/// Compute time-weighted average APR over [start, now] using APY_BUCKETS-bucket weekly gradient (1e20-scaled).
+fn compute_time_weighted_apy(
+    stake_start_time: i64,
+    now: i64,
+    apy_gradient: &[u128; APY_BUCKETS],
+) -> u128 {
     if now <= stake_start_time {
         return apy_gradient[0];
     }
@@ -572,20 +590,20 @@ fn compute_time_weighted_apy(stake_start_time: i64, now: i64, apy_gradient: &[u1
 
     // Sum full-week contributions
     let mut acc: u128 = 0;
-    let capped_full: u128 = full_weeks.min(52);
+    let capped_full: u128 = full_weeks.min(APY_LAST_INDEX as u128);
     for i in 0..(capped_full as usize) {
         acc = acc.saturating_add(apy_gradient[i].saturating_mul(SECONDS_PER_WEEK));
     }
-    if full_weeks > 52 {
-        let extra = full_weeks - 52; // weeks 52+ use bucket 52
+    if full_weeks > (APY_LAST_INDEX as u128) {
+        let extra = full_weeks - (APY_LAST_INDEX as u128); // weeks APY_LAST_INDEX+ use bucket APY_LAST_INDEX
         acc = acc.saturating_add(
-            apy_gradient[52].saturating_mul(SECONDS_PER_WEEK.saturating_mul(extra)),
+            apy_gradient[APY_LAST_INDEX].saturating_mul(SECONDS_PER_WEEK.saturating_mul(extra)),
         );
     }
 
     // Add partial-week remainder
     if rem_seconds > 0 {
-        let idx = usize::try_from(full_weeks.min(52)).unwrap_or(52);
+        let idx = usize::try_from(full_weeks.min(APY_LAST_INDEX as u128)).unwrap_or(APY_LAST_INDEX);
         acc = acc.saturating_add(apy_gradient[idx].saturating_mul(rem_seconds));
     }
 
@@ -873,8 +891,8 @@ pub struct GlobalState {
     pub pending_authority: Pubkey,
     /// GT token mint address
     pub gt_mint: Pubkey,
-    /// APY gradient buckets (53), each is 1e20-scaled APR for week buckets [0-1), [1-2), ..., [52, +inf)
-    pub apy_gradient: [u128; 53],
+    /// APY gradient buckets (APY_BUCKETS), each is 1e20-scaled APR for week buckets [0-1), [1-2), ..., [APY_BUCKETS, +inf)
+    pub apy_gradient: [u128; APY_BUCKETS],
     /// LP token price in USD scaled by 1e20
     pub lp_token_price: u128,
     /// Minimum stake value in USD scaled by 1e20
@@ -917,4 +935,6 @@ pub enum ErrorCode {
     InvalidArgument,
     #[msg("Math overflow")]
     MathOverflow,
+    #[msg("APY value exceeds the configured maximum")]
+    ApyTooLarge,
 }
