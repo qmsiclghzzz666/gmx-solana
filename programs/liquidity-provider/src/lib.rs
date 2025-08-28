@@ -60,12 +60,21 @@ pub mod gmsol_liquidity_provider {
 
         global_state.lp_token_price = MARKET_USD_UNIT; // $1.00 in 1e20 units
         global_state.min_stake_value = min_stake_value;
+        global_state.claim_enabled = false;
         global_state.bump = ctx.bumps.global_state;
         msg!(
             "LP staking program initialized, min_stake_value(1e20)={}, initial_apy(1e20)={}",
             min_stake_value,
             initial_apy
         );
+        Ok(())
+    }
+
+    /// Toggle whether LPs can claim GT without unstaking.
+    pub fn set_claim_enabled(ctx: Context<SetClaimEnabled>, enabled: bool) -> Result<()> {
+        let gs = &mut ctx.accounts.global_state;
+        gs.claim_enabled = enabled;
+        msg!("claim_enabled set to {}", enabled);
         Ok(())
     }
 
@@ -238,6 +247,8 @@ pub mod gmsol_liquidity_provider {
     /// Claim GT rewards for a position, minting tokens and updating snapshot
     pub fn claim_gt(ctx: Context<ClaimGt>, _position_id: u64) -> Result<()> {
         let global_state = &ctx.accounts.global_state;
+        // Disallow free claims unless explicitly enabled by authority
+        require!(global_state.claim_enabled, ErrorCode::ClaimDisabled);
 
         // Refresh C(t) via CPI and compute reward using shared helper
         let out = compute_reward_with_cpi(
@@ -846,6 +857,15 @@ pub struct UnstakeLp<'info> {
 }
 
 #[derive(Accounts)]
+pub struct SetClaimEnabled<'info> {
+    /// Global config (PDA). The `authority` signer must match `global_state.authority`.
+    #[account(mut, seeds = [GLOBAL_STATE_SEED], bump = global_state.bump, has_one = authority)]
+    pub global_state: Account<'info, GlobalState>,
+    /// Current authority
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct UpdateMinStakeValue<'info> {
     /// Global config (PDA). The `authority` signer must match `global_state.authority`.
     #[account(mut, seeds = [GLOBAL_STATE_SEED], bump = global_state.bump, has_one = authority)]
@@ -897,6 +917,8 @@ pub struct GlobalState {
     pub lp_token_price: u128,
     /// Minimum stake value in USD scaled by 1e20
     pub min_stake_value: u128,
+    /// If true, LPs may call `claim_gt` at any time without unstaking
+    pub claim_enabled: bool,
     /// PDA bump for this GlobalState (derived from seed [GLOBAL_STATE_SEED])
     pub bump: u8,
 }
@@ -937,4 +959,6 @@ pub enum ErrorCode {
     MathOverflow,
     #[msg("APY value exceeds the configured maximum")]
     ApyTooLarge,
+    #[msg("Claim is disabled by protocol policy")]
+    ClaimDisabled,
 }
