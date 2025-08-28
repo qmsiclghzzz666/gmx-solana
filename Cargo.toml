@@ -144,6 +144,10 @@ path = "programs/callback"
 version = "0.8.0"
 path = "programs/competition"
 
+[workspace.dependencies.gmsol-liquidity-provider]
+version = "0.8.0"
+path = "programs/liquidity-provider"
+
 [workspace.dependencies.gmsol-decode]
 version = "0.8.0"
 path = "crates/decode"
