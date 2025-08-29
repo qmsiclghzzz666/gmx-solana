@@ -378,24 +378,27 @@ impl Deployment {
     }
 
     async fn initialize_liquidity_provider(&mut self) -> eyre::Result<()> {
-        use gmsol_liquidity_provider as lp;
         use anchor_spl::token::{spl_token::instruction, Mint, ID};
+        use gmsol_liquidity_provider as lp;
 
         self.liquidity_provider_program = lp::ID;
-        
+
         let client = self.user_client(Self::DEFAULT_KEEPER)?;
-        
+
         // Use the stored GT mint keypair
         let gt_mint = &self.liquidity_provider_gt_mint;
-        
-        tracing::info!("Creating GT mint account with keypair: {}", gt_mint.pubkey());
+
+        tracing::info!(
+            "Creating GT mint account with keypair: {}",
+            gt_mint.pubkey()
+        );
 
         // First, create the GT mint account
         let client_rpc = client.store_program().rpc();
         let rent = client_rpc
             .get_minimum_balance_for_rent_exemption(Mint::LEN)
             .await?;
-        
+
         let create_mint_ix = client
             .store_transaction()
             .signer(gt_mint)
@@ -425,7 +428,7 @@ impl Deployment {
 
         // Now initialize the liquidity provider
         let initial_apy: u128 = 1_000_000_000_000_000_000u128; // 1% (1e20-scaled)
-        
+
         let init_ix = client
             .store_transaction()
             .program(lp::id())

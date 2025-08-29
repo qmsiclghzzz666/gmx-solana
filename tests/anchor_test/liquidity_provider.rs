@@ -17,7 +17,7 @@ async fn liquidity_provider_tests() -> eyre::Result<()> {
     let client = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
     let global_state = deployment.liquidity_provider_global_state;
     let gt_mint = deployment.liquidity_provider_gt_mint.pubkey();
-    
+
     tracing::info!("Global state: {}", global_state);
     tracing::info!("GT mint: {}", gt_mint);
 
