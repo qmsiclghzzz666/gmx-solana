@@ -5,10 +5,6 @@ use solana_sdk::{pubkey::Pubkey, signer::keypair::Keypair, signer::Signer, syste
 
 // Test helpers ----------------------------------------------------------------
 
-fn derive_global_state() -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[lp::GLOBAL_STATE_SEED], &lp::id())
-}
-
 // Tests -----------------------------------------------------------------------
 
 #[tokio::test]
@@ -18,29 +14,12 @@ async fn liquidity_provider_tests() -> eyre::Result<()> {
     let span = tracing::info_span!("liquidity_provider_tests");
     let _enter = span.enter();
 
-    let client = deployment.user_client(Deployment::DEFAULT_USER)?;
-    let (global_state, _bump) = derive_global_state();
-    let gt_mint = Keypair::new();
+    let client = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
+    let global_state = deployment.liquidity_provider_global_state;
+    let gt_mint = deployment.liquidity_provider_gt_mint.pubkey();
 
-    // Initialize the GlobalState once for all tests
-    let initial_apy: u128 = 1_000_000_000_000_000_000u128; // 1% (1e20-scaled)
-
-    let init_ix = client
-        .store_transaction()
-        .program(lp::id())
-        .anchor_args(lp::instruction::Initialize {
-            min_stake_value: 1_000_000_000_000_000_000_000u128, // 1e21
-            initial_apy,
-        })
-        .anchor_accounts(lp::accounts::Initialize {
-            global_state,
-            authority: client.payer(),
-            gt_mint: gt_mint.pubkey(),
-            system_program: system_program::ID,
-        });
-
-    let signature = init_ix.send().await?;
-    tracing::info!(%signature, "initialized liquidity provider program for all tests");
+    tracing::info!("Global state: {}", global_state);
+    tracing::info!("GT mint: {}", gt_mint);
 
     // Test 1: Verify initialization
     let gs = client
@@ -49,7 +28,7 @@ async fn liquidity_provider_tests() -> eyre::Result<()> {
         .expect("global_state must exist");
 
     assert_eq!(gs.authority, client.payer());
-    assert_eq!(gs.gt_mint, gt_mint.pubkey());
+    assert_eq!(gs.gt_mint, gt_mint);
     assert_eq!(gs.min_stake_value, 1_000_000_000_000_000_000_000u128);
 
     // Verify all buckets have the same initial APY
@@ -290,10 +269,10 @@ use std::time::Duration;
 async fn stake_claim_unstake_flow() -> eyre::Result<()> {
     let deployment = current_deployment().await?;
     let _guard = deployment.use_accounts().await?;
-    let client = deployment.user_client(Deployment::DEFAULT_USER)?;
+    let client = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
 
-    // Derive global state PDA and create a unique position id for this test run
-    let (global_state, _bump) = derive_global_state();
+    // Use global state from deployment
+    let global_state = deployment.liquidity_provider_global_state;
     let position_id: u64 = 42; // any deterministic id for this test
 
     // --- Test fixtures (TODO):

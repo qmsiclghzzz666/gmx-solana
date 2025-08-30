@@ -117,6 +117,12 @@ pub struct Deployment {
     pub callback_program: Pubkey,
     /// Callback config.
     pub callback_shared_data: Pubkey,
+    /// Liquidity provider program.
+    pub liquidity_provider_program: Pubkey,
+    /// Liquidity provider global state.
+    pub liquidity_provider_global_state: Pubkey,
+    /// Liquidity provider GT mint.
+    pub liquidity_provider_gt_mint: Keypair,
 }
 
 impl fmt::Debug for Deployment {
@@ -199,6 +205,14 @@ impl Deployment {
         let signature = rpc.send_without_preflight().await?;
         tracing::info!(%market_alt, %signature, "created an ALT for market addresses");
 
+        // Initialize liquidity provider program
+        let liquidity_provider_program = gmsol_liquidity_provider::ID;
+        let (liquidity_provider_global_state, _) = Pubkey::find_program_address(
+            &[gmsol_liquidity_provider::GLOBAL_STATE_SEED],
+            &liquidity_provider_program,
+        );
+        let liquidity_provider_gt_mint = Keypair::generate(&mut rng);
+
         Ok(Self {
             users: Users::new(&mut rng),
             extra_user_count: 0,
@@ -228,6 +242,9 @@ impl Deployment {
             chainlink_feed_index: 42,
             callback_program: Default::default(),
             callback_shared_data: Default::default(),
+            liquidity_provider_program,
+            liquidity_provider_global_state,
+            liquidity_provider_gt_mint,
         })
     }
 
@@ -331,6 +348,8 @@ impl Deployment {
 
         self.initialize_gt(7).await?;
 
+        self.initialize_liquidity_provider().await?;
+
         self.initialize_claim_fees_sleep().await?;
 
         self.initialize_callback().await?;
@@ -354,6 +373,78 @@ impl Deployment {
             ],
         )
         .await?;
+
+        Ok(())
+    }
+
+    async fn initialize_liquidity_provider(&mut self) -> eyre::Result<()> {
+        use anchor_spl::token::{spl_token::instruction, Mint, ID};
+        use gmsol_liquidity_provider as lp;
+
+        self.liquidity_provider_program = lp::ID;
+
+        let client = self.user_client(Self::DEFAULT_KEEPER)?;
+
+        // Use the stored GT mint keypair
+        let gt_mint = &self.liquidity_provider_gt_mint;
+
+        tracing::info!(
+            "Creating GT mint account with keypair: {}",
+            gt_mint.pubkey()
+        );
+
+        // First, create the GT mint account
+        let client_rpc = client.store_program().rpc();
+        let rent = client_rpc
+            .get_minimum_balance_for_rent_exemption(Mint::LEN)
+            .await?;
+
+        let create_mint_ix = client
+            .store_transaction()
+            .signer(gt_mint)
+            .pre_instruction(
+                system_instruction::create_account(
+                    &client.payer(),
+                    &gt_mint.pubkey(),
+                    rent,
+                    Mint::LEN as u64,
+                    &ID,
+                ),
+                true,
+            )
+            .pre_instruction(
+                instruction::initialize_mint2(
+                    &ID,
+                    &gt_mint.pubkey(),
+                    &client.payer(),
+                    None,
+                    9, // GT decimals
+                )?,
+                true,
+            );
+
+        let signature = create_mint_ix.send().await?;
+        tracing::info!(%signature, "created GT mint account with pubkey: {}", gt_mint.pubkey());
+
+        // Now initialize the liquidity provider
+        let initial_apy: u128 = 1_000_000_000_000_000_000u128; // 1% (1e20-scaled)
+
+        let init_ix = client
+            .store_transaction()
+            .program(lp::id())
+            .anchor_args(lp::instruction::Initialize {
+                min_stake_value: 1_000_000_000_000_000_000_000u128, // 1e21
+                initial_apy,
+            })
+            .anchor_accounts(lp::accounts::Initialize {
+                global_state: self.liquidity_provider_global_state,
+                authority: client.payer(),
+                gt_mint: gt_mint.pubkey(),
+                system_program: system_program::ID,
+            });
+
+        let signature = init_ix.send().await?;
+        tracing::info!(%signature, "initialized liquidity provider program");
 
         Ok(())
     }
@@ -405,14 +496,13 @@ impl Deployment {
     }
 
     fn init_tracing() -> eyre::Result<()> {
-        tracing_subscriber::fmt()
+        let _ = tracing_subscriber::fmt()
             .with_env_filter(
                 EnvFilter::builder()
                     .with_default_directive(LevelFilter::ERROR.into())
                     .from_env_lossy(),
             )
-            .try_init()
-            .map_err(eyre::Error::msg)?;
+            .try_init();
         Ok(())
     }
 
