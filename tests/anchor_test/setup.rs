@@ -446,6 +446,18 @@ impl Deployment {
         let signature = init_ix.send().await?;
         tracing::info!(%signature, "initialized liquidity provider program");
 
+        // Grant GT_CONTROLLER role to the liquidity provider's GlobalState PDA
+        // This is required for the liquidity provider to call GT program CPIs
+        // Note: We need to use the admin client (self.client) to grant roles, not the keeper client
+        let grant_role_ix = self.client.grant_role(
+            &self.store,
+            &self.liquidity_provider_global_state,
+            "GT_CONTROLLER",
+        );
+
+        let signature = grant_role_ix.send().await?;
+        tracing::info!(%signature, "granted GT_CONTROLLER role to liquidity provider GlobalState");
+
         Ok(())
     }
 
