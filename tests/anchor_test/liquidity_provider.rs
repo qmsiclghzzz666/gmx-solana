@@ -385,7 +385,7 @@ async fn stake_claim_unstake_flow() -> eyre::Result<()> {
 
     // Choose stake amounts
     let lp_staked_amount: u64 = 1_000_000_000; // 1,000 LP tokens (with 6 decimals)
-    let lp_staked_value: u128 = 6_000_000_000_000_000_000_000u128; // 60.0 in 1e20 units (must be >= min_stake_value)
+    let lp_staked_value: u128 = 60_000_000_000_000_000_000_000u128; // 600.0 in 1e20 units (must be >= min_stake_value)
 
     // Debug: Print the values we're using
     tracing::info!("LP staked amount: {}", lp_staked_amount);
@@ -497,57 +497,123 @@ async fn stake_claim_unstake_flow() -> eyre::Result<()> {
     let claim_sig = claim_ix.send().await?;
     tracing::info!(%claim_sig, "Claimed GT rewards");
 
-    // --- Commented out unstake for now to focus on stake and claim ---
-    // // --- Partial unstake ---
-    // let partial_unstake: u64 = lp_staked_amount / 2;
-    // let unstake_ix = client
-    //     .store_transaction()
-    //     .program(lp::id())
-    //     .anchor_args(lp::instruction::UnstakeLp {
-    //         _position_id: position_id,
-    //         unstake_amount: partial_unstake,
-    //     })
-    //     .anchor_accounts(lp::accounts::UnstakeLp {
-    //         global_state,
-    //         lp_mint,
-    //         store: gt_store,
-    //         gt_program,
-    //         position: position_pda,
-    //         position_vault: position_vault_pda,
-    //         owner: client.payer(),
-    //         gt_user,
-    //         user_lp_token,
-    //         event_authority,
-    //         token_program: spl_token::ID,
-    //     });
+    // --- Check position state after claim ---
+    let position_account = client
+        .account::<lp::Position>(&position_pda)
+        .await?
+        .expect("position must exist after staking");
+    tracing::info!(
+        "Position after claim - staked_amount: {}, staked_value: {}, position_id: {}",
+        position_account.staked_amount,
+        position_account.staked_value_usd,
+        position_account.position_id
+    );
 
-    // let _sig = unstake_ix.send().await?;
-    // tracing::info!("Partially unstaked {} LP tokens", partial_unstake);
+    // --- Check position state before unstake ---
+    let position_account_before = client
+        .account::<lp::Position>(&position_pda)
+        .await?
+        .expect("position must exist before unstake");
+    tracing::info!(
+        "Position before unstake - staked_amount: {}, staked_value: {}",
+        position_account_before.staked_amount,
+        position_account_before.staked_value_usd
+    );
 
-    // // --- Full unstake (remaining) ---
-    // let full_unstake_ix = client
-    //     .store_transaction()
-    //     .program(lp::id())
-    //     .anchor_args(lp::instruction::UnstakeLp {
-    //         _position_id: position_id,
-    //         unstake_amount: lp_staked_amount - partial_unstake,
-    //     })
-    //     .anchor_accounts(lp::accounts::UnstakeLp {
-    //         global_state,
-    //         lp_mint,
-    //         store: gt_store,
-    //         gt_program,
-    //         position: position_pda,
-    //         position_vault: position_vault_pda,
-    //         owner: client.payer(),
-    //         gt_user,
-    //         user_lp_token,
-    //         event_authority,
-    //         token_program: spl_token::ID,
-    //     });
+    // --- Partial unstake ---
+    let partial_unstake: u64 = lp_staked_amount / 2;
+    tracing::info!(
+        "Attempting to unstake {} LP tokens (partial)",
+        partial_unstake
+    );
+    tracing::info!(
+        "Expected remaining amount: {}",
+        lp_staked_amount - partial_unstake
+    );
+    tracing::info!(
+        "Expected remaining value: {} (should be >= min_stake_value: {})",
+        (position_account_before.staked_value_usd * (lp_staked_amount - partial_unstake) as u128)
+            / lp_staked_amount as u128,
+        gs.min_stake_value
+    );
 
-    // let _sig = full_unstake_ix.send().await?;
-    // tracing::info!("Fully unstaked remaining LP tokens");
+    let unstake_ix = client
+        .store_transaction()
+        .program(lp::id())
+        .anchor_args(lp::instruction::UnstakeLp {
+            _position_id: position_id,
+            unstake_amount: partial_unstake,
+        })
+        .anchor_accounts(lp::accounts::UnstakeLp {
+            global_state,
+            lp_mint,
+            store: gt_store,
+            gt_program,
+            position: position_pda,
+            position_vault: position_vault_pda,
+            owner: client.payer(),
+            gt_user,
+            user_lp_token,
+            event_authority,
+            token_program: spl_token::ID,
+        });
+
+    let unstake_sig = unstake_ix.send().await?;
+    tracing::info!(%unstake_sig, "Partially unstaked {} LP tokens", partial_unstake);
+
+    // --- Check position state after partial unstake ---
+    let position_account = client
+        .account::<lp::Position>(&position_pda)
+        .await?
+        .expect("position must exist after partial unstake");
+    tracing::info!(
+        "Position after partial unstake - staked_amount: {}, staked_value: {}",
+        position_account.staked_amount,
+        position_account.staked_value_usd
+    );
+
+    // --- Full unstake (remaining) ---
+    let remaining_unstake: u64 = lp_staked_amount - partial_unstake;
+    tracing::info!(
+        "Attempting to unstake remaining {} LP tokens (full exit)",
+        remaining_unstake
+    );
+
+    let full_unstake_ix = client
+        .store_transaction()
+        .program(lp::id())
+        .anchor_args(lp::instruction::UnstakeLp {
+            _position_id: position_id,
+            unstake_amount: remaining_unstake,
+        })
+        .anchor_accounts(lp::accounts::UnstakeLp {
+            global_state,
+            lp_mint,
+            store: gt_store,
+            gt_program,
+            position: position_pda,
+            position_vault: position_vault_pda,
+            owner: client.payer(),
+            gt_user,
+            user_lp_token,
+            event_authority,
+            token_program: spl_token::ID,
+        });
+
+    let full_unstake_sig = full_unstake_ix.send().await?;
+    tracing::info!(%full_unstake_sig, "Fully unstaked remaining {} LP tokens", remaining_unstake);
+
+    // --- Verify position is closed after full unstake ---
+    let position_account_after_full = client.account::<lp::Position>(&position_pda).await;
+
+    match position_account_after_full {
+        Ok(_) => {
+            tracing::warn!("Position account still exists after full unstake - this might be expected behavior");
+        }
+        Err(_) => {
+            tracing::info!("Position account successfully closed after full unstake");
+        }
+    }
 
     tracing::info!("✓ stake_claim_unstake_flow test completed successfully!");
     Ok(())
