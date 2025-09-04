@@ -455,7 +455,7 @@ async fn stake_claim_unstake_flow() -> eyre::Result<()> {
         .anchor_args(lp::instruction::StakeLp {
             position_id,
             lp_staked_amount,
-            lp_staked_value: Some(lp_staked_value),
+            lp_staked_value,
         })
         .anchor_accounts(lp::accounts::StakeLp {
             global_state,
@@ -466,13 +466,6 @@ async fn stake_claim_unstake_flow() -> eyre::Result<()> {
             gt_program,
             owner: client.payer(),
             user_lp_token,
-            pricing_store: None,
-            token_map: None,
-            oracle: None,
-            market: None,
-            market_token: None,
-            glv: None,
-            glv_token: None,
             system_program: system_program::ID,
             token_program: spl_token::ID,
         });

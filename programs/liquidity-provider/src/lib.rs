@@ -161,43 +161,17 @@ pub mod gmsol_liquidity_provider {
         Ok(())
     }
 
-    /// Create a new LP position and snapshot stake-time values
+    /// Create a new LP position with manual pricing (for generic LP tokens)
     pub fn stake_lp<'info>(
         ctx: Context<'_, '_, 'info, 'info, StakeLp<'info>>,
         position_id: u64,
         lp_staked_amount: u64,
-        lp_staked_value: Option<u128>, // Optional scaled USD at stake time, if None, will use pricing
+        lp_staked_value: u128, // Manual scaled USD value (no longer optional)
     ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
 
-        // Get the actual staked value - either provided or calculated via pricing
-        let actual_staked_value = if let Some(value) = lp_staked_value {
-            value
-        } else {
-            // Use pricing to calculate the value
-            // Check if we have the required pricing accounts
-            if let (Some(pricing_store), Some(token_map), Some(oracle)) = (
-                &ctx.accounts.pricing_store,
-                &ctx.accounts.token_map,
-                &ctx.accounts.oracle,
-            ) {
-                get_lp_token_value_via_pricing(
-                    &ctx.accounts.global_state,
-                    &ctx.accounts.gt_program,
-                    pricing_store,
-                    token_map,
-                    oracle,
-                    ctx.accounts.market.as_ref(),
-                    ctx.accounts.market_token.as_ref(),
-                    ctx.accounts.glv.as_ref(),
-                    ctx.accounts.glv_token.as_ref(),
-                    ctx.remaining_accounts,
-                    lp_staked_amount,
-                )?
-            } else {
-                return Err(ErrorCode::InvalidArgument.into());
-            }
-        };
+        // Use the provided manual staked value
+        let actual_staked_value = lp_staked_value;
 
         // Enforce minimum stake value (scaled 1e20)
         require!(
@@ -257,6 +231,86 @@ pub mod gmsol_liquidity_provider {
             c_start,
             position_id
         );
+        Ok(())
+    }
+
+    /// Stake GM tokens with automatic pricing via CPI
+    pub fn stake_gm<'info>(
+        ctx: Context<'_, '_, 'info, 'info, StakeGm<'info>>,
+        position_id: u64,
+        gm_staked_amount: u64,
+    ) -> Result<()> {
+        // Get GM token value using pricing CPI
+        let gm_value = get_gm_token_value_via_cpi(
+            &ctx.accounts.global_state,
+            &ctx.accounts.pricing_store,
+            &ctx.accounts.token_map,
+            &ctx.accounts.oracle,
+            &ctx.accounts.market,
+            &ctx.accounts.market_token,
+            &ctx.accounts.gt_program,
+            ctx.remaining_accounts,
+            gm_staked_amount,
+        )?;
+
+        // Call shared stake logic
+        execute_stake(
+            &ctx.accounts.global_state,
+            &ctx.accounts.lp_mint,
+            &mut ctx.accounts.position,
+            &ctx.accounts.position_vault,
+            &ctx.accounts.gt_store,
+            &ctx.accounts.gt_program,
+            &ctx.accounts.owner,
+            &ctx.accounts.user_lp_token,
+            &ctx.accounts.token_program,
+            ctx.bumps.position,
+            position_id,
+            gm_staked_amount,
+            gm_value,
+        )?;
+
+        msg!("GM tokens staked successfully: amount={}, value={}", gm_staked_amount, gm_value);
+        Ok(())
+    }
+
+    /// Stake GLV tokens with automatic pricing via CPI
+    pub fn stake_glv<'info>(
+        ctx: Context<'_, '_, 'info, 'info, StakeGlv<'info>>,
+        position_id: u64,
+        glv_staked_amount: u64,
+    ) -> Result<()> {
+        // Get GLV token value using pricing CPI
+        let glv_value = get_glv_token_value_via_cpi(
+            &ctx.accounts.global_state,
+            &ctx.accounts.pricing_store,
+            &ctx.accounts.token_map,
+            &ctx.accounts.oracle,
+            &ctx.accounts.glv,
+            &ctx.accounts.glv_token,
+            &ctx.accounts.gt_program,
+            ctx.remaining_accounts,
+            glv_staked_amount,
+        )?;
+
+        // Call shared stake logic
+        execute_stake(
+            &ctx.accounts.global_state,
+            &ctx.accounts.lp_mint,
+            &mut ctx.accounts.position,
+            &ctx.accounts.position_vault,
+            &ctx.accounts.gt_store,
+            &ctx.accounts.gt_program,
+            &ctx.accounts.owner,
+            &ctx.accounts.user_lp_token,
+            &ctx.accounts.token_program,
+            ctx.bumps.position,
+            position_id,
+            glv_staked_amount,
+            glv_value,
+        )?;
+
+        msg!("GLV tokens staked successfully: amount={}, value={}", glv_staked_amount, glv_value);
         Ok(())
     }
 
@@ -751,18 +805,153 @@ pub struct StakeLp<'info> {
     )]
     pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
 
-    /// Optional pricing accounts for GM/GLV token valuation
-    /// These are only required when lp_staked_value is None
-    pub pricing_store: Option<AccountLoader<'info, Store>>,
-    pub token_map: Option<AccountLoader<'info, TokenMapHeader>>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Interface<'info, TokenInterface>,
+}
+
+/// Accounts context for staking GM tokens with automatic pricing
+#[derive(Accounts)]
+#[instruction(position_id: u64)]
+pub struct StakeGm<'info> {
+    /// Global config (PDA)
+    #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
+    pub global_state: Box<Account<'info, GlobalState>>,
+
+    /// GM token mint to be staked (market token)
+    pub lp_mint: InterfaceAccount<'info, Mint>,
+
+    /// Position PDA to initialize
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + Position::INIT_SPACE,
+        seeds = [
+            POSITION_SEED,
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+        ],
+        bump
+    )]
+    pub position: Box<Account<'info, Position>>,
+
+    /// Vault token account (PDA) to hold staked GM tokens
+    #[account(
+        init,
+        payer = owner,
+        seeds = [
+            POSITION_SEED,
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+            VAULT_SEED,
+        ],
+        bump,
+        token::mint = lp_mint,
+        token::authority = global_state,
+    )]
+    pub position_vault: InterfaceAccount<'info, TokenAccount>,
+
+    /// The GT Store account (mutated by CPI)
     #[account(mut)]
-    pub oracle: Option<AccountLoader<'info, Oracle>>,
-    /// Market account for GM pricing
-    pub market: Option<AccountLoader<'info, Market>>,
-    pub market_token: Option<InterfaceAccount<'info, Mint>>,
-    /// GLV account for GLV pricing
-    pub glv: Option<AccountLoader<'info, Glv>>,
-    pub glv_token: Option<InterfaceAccount<'info, Mint>>,
+    pub gt_store: AccountLoader<'info, Store>,
+
+    /// GT program
+    pub gt_program: Program<'info, GmsolStore>,
+
+    /// Owner paying rent and recorded as position owner
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    /// User's GM token account
+    #[account(
+        mut,
+        constraint = user_lp_token.mint == lp_mint.key(),
+        constraint = user_lp_token.owner == owner.key(),
+    )]
+    pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
+
+    /// Pricing accounts for GM token valuation
+    pub pricing_store: AccountLoader<'info, Store>,
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
+    #[account(mut)]
+    pub oracle: AccountLoader<'info, Oracle>,
+    pub market: AccountLoader<'info, Market>,
+    pub market_token: InterfaceAccount<'info, Mint>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Interface<'info, TokenInterface>,
+}
+
+/// Accounts context for staking GLV tokens with automatic pricing
+#[derive(Accounts)]
+#[instruction(position_id: u64)]
+pub struct StakeGlv<'info> {
+    /// Global config (PDA)
+    #[account(seeds = [GLOBAL_STATE_SEED], bump = global_state.bump)]
+    pub global_state: Box<Account<'info, GlobalState>>,
+
+    /// GLV token mint to be staked
+    pub lp_mint: InterfaceAccount<'info, Mint>,
+
+    /// Position PDA to initialize
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + Position::INIT_SPACE,
+        seeds = [
+            POSITION_SEED,
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+        ],
+        bump
+    )]
+    pub position: Box<Account<'info, Position>>,
+
+    /// Vault token account (PDA) to hold staked GLV tokens
+    #[account(
+        init,
+        payer = owner,
+        seeds = [
+            POSITION_SEED,
+            global_state.key().as_ref(),
+            owner.key().as_ref(),
+            &position_id.to_le_bytes(),
+            VAULT_SEED,
+        ],
+        bump,
+        token::mint = lp_mint,
+        token::authority = global_state,
+    )]
+    pub position_vault: InterfaceAccount<'info, TokenAccount>,
+
+    /// The GT Store account (mutated by CPI)
+    #[account(mut)]
+    pub gt_store: AccountLoader<'info, Store>,
+
+    /// GT program
+    pub gt_program: Program<'info, GmsolStore>,
+
+    /// Owner paying rent and recorded as position owner
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    /// User's GLV token account
+    #[account(
+        mut,
+        constraint = user_lp_token.mint == lp_mint.key(),
+        constraint = user_lp_token.owner == owner.key(),
+    )]
+    pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
+
+    /// Pricing accounts for GLV token valuation
+    pub pricing_store: AccountLoader<'info, Store>,
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
+    #[account(mut)]
+    pub oracle: AccountLoader<'info, Oracle>,
+    pub glv: AccountLoader<'info, Glv>,
+    pub glv_token: InterfaceAccount<'info, Mint>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Interface<'info, TokenInterface>,
@@ -1035,75 +1224,161 @@ pub enum ErrorCode {
     ClaimDisabled,
 }
 
-/// Helper function to get LP token value using pricing instruction
-/// This function determines whether to use GM or GLV pricing based on the token type
-fn get_lp_token_value_via_pricing<'info>(
+/// Shared core stake logic for all stake types
+fn execute_stake<'info>(
     global_state: &Account<'info, GlobalState>,
+    lp_mint: &InterfaceAccount<'info, Mint>,
+    position: &mut Account<'info, Position>,
+    position_vault: &InterfaceAccount<'info, TokenAccount>,
+    gt_store: &AccountLoader<'info, Store>,
     gt_program: &Program<'info, GmsolStore>,
+    owner: &Signer<'info>,
+    user_lp_token: &InterfaceAccount<'info, TokenAccount>,
+    token_program: &Interface<'info, TokenInterface>,
+    position_bump: u8,
+    position_id: u64,
+    staked_amount: u64,
+    staked_value: u128,
+) -> Result<()> {
+    let now = Clock::get()?.unix_timestamp;
+
+    // Enforce minimum stake value
+    require!(
+        staked_value >= global_state.min_stake_value,
+        ErrorCode::InvalidArgument
+    );
+
+    // Get C(start) snapshot via CPI
+    let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
+    let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
+
+    let cpi_ctx = CpiContext::new_with_signer(
+        gt_program.to_account_info(),
+        GtUpdateCtx {
+            authority: global_state.to_account_info(),
+            store: gt_store.to_account_info(),
+        },
+        signer_seeds,
+    );
+    let r: GtReturn<u128> = gt_cpi::update_gt_cumulative_inv_cost_factor(cpi_ctx)?;
+    let c_start: u128 = r.get();
+
+    // Transfer LP tokens from user to vault
+    if staked_amount > 0 {
+        let cpi_accounts = TransferChecked {
+            from: user_lp_token.to_account_info(),
+            mint: lp_mint.to_account_info(),
+            to: position_vault.to_account_info(),
+            authority: owner.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(token_program.to_account_info(), cpi_accounts);
+        token_if::transfer_checked(cpi_ctx, staked_amount, lp_mint.decimals)?;
+    }
+
+    // Initialize position
+    position.owner = owner.key();
+    position.global_state = global_state.key();
+    position.lp_mint = lp_mint.key();
+    position.vault = position_vault.key();
+    position.position_id = position_id;
+    position.staked_amount = staked_amount;
+    position.staked_value_usd = staked_value;
+    position.stake_start_time = now;
+    position.cum_inv_cost = c_start;
+    position.bump = position_bump;
+
+    msg!(
+        "Stake executed: owner={}, amount={}, value(1e20)={}, start_ts={}, C_start={}, pos_id={}",
+        position.owner,
+        staked_amount,
+        staked_value,
+        now,
+        c_start,
+        position_id
+    );
+
+    Ok(())
+}
+
+/// Get GM token value via CPI to gmsol_store
+fn get_gm_token_value_via_cpi<'info>(
+    global_state: &Account<'info, GlobalState>,
     pricing_store: &AccountLoader<'info, Store>,
     token_map: &AccountLoader<'info, TokenMapHeader>,
     oracle: &AccountLoader<'info, Oracle>,
-    market: Option<&AccountLoader<'info, Market>>,
-    market_token: Option<&InterfaceAccount<'info, Mint>>,
-    glv: Option<&AccountLoader<'info, Glv>>,
-    glv_token: Option<&InterfaceAccount<'info, Mint>>,
+    market: &AccountLoader<'info, Market>,
+    market_token: &InterfaceAccount<'info, Mint>,
+    gt_program: &Program<'info, GmsolStore>,
     remaining_accounts: &'info [AccountInfo<'info>],
     amount: u64,
 ) -> Result<u128> {
-    // Determine which pricing method to use based on available accounts
-    if let (Some(market), Some(market_token)) = (market, market_token) {
-        // Use GM pricing
-        let cpi_accounts = GetMarketTokenValue {
-            authority: global_state.to_account_info(),
-            store: pricing_store.to_account_info(),
-            token_map: token_map.to_account_info(),
-            oracle: oracle.to_account_info(),
-            market: market.to_account_info(),
-            market_token: market_token.to_account_info(),
-            event_authority: global_state.to_account_info(),
-            program: gt_program.to_account_info(),
-        };
+    let cpi_accounts = GetMarketTokenValue {
+        authority: global_state.to_account_info(),
+        store: pricing_store.to_account_info(),
+        token_map: token_map.to_account_info(),
+        oracle: oracle.to_account_info(),
+        market: market.to_account_info(),
+        market_token: market_token.to_account_info(),
+        event_authority: global_state.to_account_info(),
+        program: gt_program.to_account_info(),
+    };
 
-        let cpi_ctx = CpiContext::new(gt_program.to_account_info(), cpi_accounts)
-            .with_remaining_accounts(remaining_accounts.to_vec());
+    // Use GlobalState PDA as signer for the CPI call
+    let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
+    let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
 
-        let result = get_market_token_value(
-            cpi_ctx,
-            amount,
-            "min".to_string(), // pnl_factor: use "min" for conservative pricing
-            false,             // maximize: false for conservative pricing
-            global_state.pricing_staleness_seconds,
-            false, // emit_event: false to avoid event emission
-        )?;
+    let cpi_ctx = CpiContext::new_with_signer(gt_program.to_account_info(), cpi_accounts, signer_seeds)
+        .with_remaining_accounts(remaining_accounts.to_vec());
 
-        Ok(result.get())
-    } else if let (Some(glv), Some(glv_token)) = (glv, glv_token) {
-        // Use GLV pricing
-        let cpi_accounts = GetGlvTokenValue {
-            authority: global_state.to_account_info(),
-            store: pricing_store.to_account_info(),
-            token_map: token_map.to_account_info(),
-            oracle: oracle.to_account_info(),
-            glv: glv.to_account_info(),
-            glv_token: glv_token.to_account_info(),
-            event_authority: global_state.to_account_info(),
-            program: gt_program.to_account_info(),
-        };
+    let result = get_market_token_value(
+        cpi_ctx,
+        amount,
+        "min".to_string(), // Conservative pricing
+        false,             // maximize: false
+        global_state.pricing_staleness_seconds,
+        false, // emit_event: false
+    )?;
 
-        let cpi_ctx = CpiContext::new(gt_program.to_account_info(), cpi_accounts)
-            .with_remaining_accounts(remaining_accounts.to_vec());
+    Ok(result.get())
+}
 
-        let result = get_glv_token_value(
-            cpi_ctx,
-            amount,
-            false, // maximize: false for conservative pricing
-            global_state.pricing_staleness_seconds,
-            false, // emit_event: false to avoid event emission
-        )?;
+/// Get GLV token value via CPI to gmsol_store
+fn get_glv_token_value_via_cpi<'info>(
+    global_state: &Account<'info, GlobalState>,
+    pricing_store: &AccountLoader<'info, Store>,
+    token_map: &AccountLoader<'info, TokenMapHeader>,
+    oracle: &AccountLoader<'info, Oracle>,
+    glv: &AccountLoader<'info, Glv>,
+    glv_token: &InterfaceAccount<'info, Mint>,
+    gt_program: &Program<'info, GmsolStore>,
+    remaining_accounts: &'info [AccountInfo<'info>],
+    amount: u64,
+) -> Result<u128> {
+    let cpi_accounts = GetGlvTokenValue {
+        authority: global_state.to_account_info(),
+        store: pricing_store.to_account_info(),
+        token_map: token_map.to_account_info(),
+        oracle: oracle.to_account_info(),
+        glv: glv.to_account_info(),
+        glv_token: glv_token.to_account_info(),
+        event_authority: global_state.to_account_info(),
+        program: gt_program.to_account_info(),
+    };
 
-        Ok(result.get())
-    } else {
-        // Neither GM nor GLV pricing accounts are provided
-        Err(ErrorCode::InvalidArgument.into())
-    }
+    // Use GlobalState PDA as signer for the CPI call
+    let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
+    let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
+
+    let cpi_ctx = CpiContext::new_with_signer(gt_program.to_account_info(), cpi_accounts, signer_seeds)
+        .with_remaining_accounts(remaining_accounts.to_vec());
+
+    let result = get_glv_token_value(
+        cpi_ctx,
+        amount,
+        false, // maximize: false for conservative pricing
+        global_state.pricing_staleness_seconds,
+        false, // emit_event: false
+    )?;
+
+    Ok(result.get())
 }
