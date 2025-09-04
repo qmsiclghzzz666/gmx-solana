@@ -206,8 +206,7 @@ pub mod gmsol_liquidity_provider {
             to: ctx.accounts.position_vault.to_account_info(),
             authority: ctx.accounts.owner.to_account_info(),
         };
-        let cpi_ctx =
-            CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
         token_if::transfer_checked(cpi_ctx, lp_staked_amount, ctx.accounts.lp_mint.decimals)?;
 
         // Init position fields
@@ -1345,7 +1344,7 @@ fn get_gm_token_value_via_cpi<'info>(
         cpi_ctx,
         amount,
         "max_after_deposit".to_string(), // Conservative pricing
-        false,             // maximize: false
+        false,                           // maximize: false
         global_state.pricing_staleness_seconds,
         false, // emit_event: false
     )?;
