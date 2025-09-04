@@ -270,7 +270,11 @@ pub mod gmsol_liquidity_provider {
             gm_value,
         )?;
 
-        msg!("GM tokens staked successfully: amount={}, value={}", gm_staked_amount, gm_value);
+        msg!(
+            "GM tokens staked successfully: amount={}, value={}",
+            gm_staked_amount,
+            gm_value
+        );
         Ok(())
     }
 
@@ -310,7 +314,11 @@ pub mod gmsol_liquidity_provider {
             glv_value,
         )?;
 
-        msg!("GLV tokens staked successfully: amount={}, value={}", glv_staked_amount, glv_value);
+        msg!(
+            "GLV tokens staked successfully: amount={}, value={}",
+            glv_staked_amount,
+            glv_value
+        );
         Ok(())
     }
 
@@ -1327,8 +1335,9 @@ fn get_gm_token_value_via_cpi<'info>(
     let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
     let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
 
-    let cpi_ctx = CpiContext::new_with_signer(gt_program.to_account_info(), cpi_accounts, signer_seeds)
-        .with_remaining_accounts(remaining_accounts.to_vec());
+    let cpi_ctx =
+        CpiContext::new_with_signer(gt_program.to_account_info(), cpi_accounts, signer_seeds)
+            .with_remaining_accounts(remaining_accounts.to_vec());
 
     let result = get_market_token_value(
         cpi_ctx,
@@ -1369,8 +1378,9 @@ fn get_glv_token_value_via_cpi<'info>(
     let gs_seeds: &[&[u8]] = &[GLOBAL_STATE_SEED, &[global_state.bump]];
     let signer_seeds: &[&[&[u8]]] = &[gs_seeds];
 
-    let cpi_ctx = CpiContext::new_with_signer(gt_program.to_account_info(), cpi_accounts, signer_seeds)
-        .with_remaining_accounts(remaining_accounts.to_vec());
+    let cpi_ctx =
+        CpiContext::new_with_signer(gt_program.to_account_info(), cpi_accounts, signer_seeds)
+            .with_remaining_accounts(remaining_accounts.to_vec());
 
     let result = get_glv_token_value(
         cpi_ctx,
