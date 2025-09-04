@@ -170,6 +170,9 @@ pub mod gmsol_liquidity_provider {
     ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
 
+        // Enforce non-zero staked amount
+        require!(lp_staked_amount > 0, ErrorCode::InvalidArgument);
+
         // Use the provided manual staked value
         let actual_staked_value = lp_staked_value;
 
@@ -197,17 +200,15 @@ pub mod gmsol_liquidity_provider {
         let c_start: u128 = r.get();
 
         // Transfer LP tokens from user to the position vault
-        if lp_staked_amount > 0 {
-            let cpi_accounts = TransferChecked {
-                from: ctx.accounts.user_lp_token.to_account_info(),
-                mint: ctx.accounts.lp_mint.to_account_info(),
-                to: ctx.accounts.position_vault.to_account_info(),
-                authority: ctx.accounts.owner.to_account_info(),
-            };
-            let cpi_ctx =
-                CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
-            token_if::transfer_checked(cpi_ctx, lp_staked_amount, ctx.accounts.lp_mint.decimals)?;
-        }
+        let cpi_accounts = TransferChecked {
+            from: ctx.accounts.user_lp_token.to_account_info(),
+            mint: ctx.accounts.lp_mint.to_account_info(),
+            to: ctx.accounts.position_vault.to_account_info(),
+            authority: ctx.accounts.owner.to_account_info(),
+        };
+        let cpi_ctx =
+            CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+        token_if::transfer_checked(cpi_ctx, lp_staked_amount, ctx.accounts.lp_mint.decimals)?;
 
         // Init position fields
         let position = &mut ctx.accounts.position;
@@ -1250,6 +1251,9 @@ fn execute_stake<'info>(
 ) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
 
+    // Enforce non-zero staked amount
+    require!(staked_amount > 0, ErrorCode::InvalidArgument);
+
     // Enforce minimum stake value
     require!(
         staked_value >= global_state.min_stake_value,
@@ -1272,16 +1276,14 @@ fn execute_stake<'info>(
     let c_start: u128 = r.get();
 
     // Transfer LP tokens from user to vault
-    if staked_amount > 0 {
-        let cpi_accounts = TransferChecked {
-            from: user_lp_token.to_account_info(),
-            mint: lp_mint.to_account_info(),
-            to: position_vault.to_account_info(),
-            authority: owner.to_account_info(),
-        };
-        let cpi_ctx = CpiContext::new(token_program.to_account_info(), cpi_accounts);
-        token_if::transfer_checked(cpi_ctx, staked_amount, lp_mint.decimals)?;
-    }
+    let cpi_accounts = TransferChecked {
+        from: user_lp_token.to_account_info(),
+        mint: lp_mint.to_account_info(),
+        to: position_vault.to_account_info(),
+        authority: owner.to_account_info(),
+    };
+    let cpi_ctx = CpiContext::new(token_program.to_account_info(), cpi_accounts);
+    token_if::transfer_checked(cpi_ctx, staked_amount, lp_mint.decimals)?;
 
     // Initialize position
     position.owner = owner.key();
@@ -1342,7 +1344,7 @@ fn get_gm_token_value_via_cpi<'info>(
     let result = get_market_token_value(
         cpi_ctx,
         amount,
-        "min".to_string(), // Conservative pricing
+        "max_after_deposit".to_string(), // Conservative pricing
         false,             // maximize: false
         global_state.pricing_staleness_seconds,
         false, // emit_event: false
