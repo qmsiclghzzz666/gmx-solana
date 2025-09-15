@@ -52,10 +52,10 @@ const APY_LAST_INDEX: usize = APY_LAST_INDEX_U8 as usize;
 #[constant]
 pub const APY_MAX: u128 = 200_000_000_000_000_000_000u128; // 200% at 1e20 scale
 
-const SECONDS_PER_YEAR: u128 = 31_557_600; // 365.25 * 24 * 3600
-const SECONDS_PER_WEEK: u128 = 7 * 24 * 3600;
+const SECONDS_PER_YEAR: u128 = 24 * 3600; // 365.25 * 24 * 3600
+const SECONDS_PER_WEEK: u128 = 1656;
 
-declare_id!("BGDJg2u2NWwUE5q4Q4masGCFBVAhJ5pKrMbVSwjVwo8m");
+declare_id!("4RQNwsn43GmcnpTSYGRsuoFp8TXJW3DVWxnnt4aVfe32");
 
 #[program]
 pub mod gmsol_liquidity_provider {
